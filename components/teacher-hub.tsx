@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   ArrowLeft, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
@@ -636,6 +636,36 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate }: {
     setMoveIdx(0); setWrongCount(0); setStatus('playing'); setMessage(''); setSelected(null)
   }
 
+  // ── Keyboard Navigation (review only) ──
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (isStudent && status === 'playing') return // Students must guess moves
+      if (e.key === 'ArrowLeft') {
+        setMoveIdx(prev => Math.max(0, prev - 1))
+      } else if (e.key === 'ArrowRight') {
+        setMoveIdx(prev => Math.min(solution.length, prev + 1))
+      } else if (e.key === 'ArrowUp') {
+        setMoveIdx(0)
+      } else if (e.key === 'ArrowDown') {
+        setMoveIdx(solution.length)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isStudent, status, solution.length])
+
+  // Sync board with moveIdx when reviewing
+  useEffect(() => {
+    if (!isStudent || status !== 'playing') {
+      const g = new Chess(startFen)
+      for (let i = 0; i < moveIdx; i++) {
+        try { g.move(solution[i]) } catch {}
+      }
+      setGame(g)
+    }
+  }, [moveIdx, isStudent, status, startFen, solution])
+
   const canMove = isStudent && status === 'playing' && game.turn() === studentColor
 
   return (
@@ -810,6 +840,24 @@ export function PgnBoard() {
   const [ctxMenu,     setCtxMenu]     = useState<{ x: number; y: number; idx: number } | null>(null)
   const [editComment, setEditComment] = useState<number | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
+
+  // ── Keyboard Navigation ──
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowLeft') {
+        setPath(p => p.length > 0 ? p.slice(0, p.length - 1) : p)
+        setSelected(null)
+      } else if (e.key === 'ArrowRight') {
+        if (candidateNodes.length > 0) makeMove(candidateNodes[0].san)
+      } else if (e.key === 'ArrowUp') {
+        setPath([])
+        setSelected(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [candidateNodes, path, tree])
 
   // ── Tree helpers ──
   function walkTo(t: GameTree, p: string[]): { nodes: TreeNode[]; node: TreeNode | null } {
