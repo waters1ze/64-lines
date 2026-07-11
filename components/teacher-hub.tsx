@@ -1017,6 +1017,12 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
         solution.forEach(san => { try { g.move(san) } catch {} })
         setGame(g); setMoveIdx(solution.length)
         setStatus('revealed'); setMessage('❌ Попытки исчерпаны. Показано правильное решение.')
+        
+        const newSolvedCount = Math.max(puzzleIdx + 1, Math.floor((hw.progress / 100) * totalPuzzles))
+        const newProgress = Math.round((newSolvedCount / totalPuzzles) * 100)
+        const isFullySolved = newSolvedCount >= totalPuzzles
+        
+        onProgress(hw.id, newProgress, isFullySolved, hw.attempts ? hw.attempts + 3 : 3)
       } else {
         setMessage(`❌ Неверно! Осталось попыток: ${3 - newWrong}`)
       }
@@ -1065,7 +1071,7 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
         over={isStudent ? 'Домашнее задание' : 'Просмотр задания'}
         title={hw.title}
         text={isStudent
-          ? (status === 'solved' ? `✅ Решено с ${hw.solved ? hw.attempts : wrongCount + 1} попыток` : `Попытки: ${wrongCount}/3 · Срок: ${hw.dueDate ? formatDate(hw.dueDate) : (hw.due || 'без срока')}`)
+          ? (hw.solved ? `✅ Выполнено (попыток: ${hw.attempts})` : status === 'solved' ? `✅ Задача решена` : status === 'revealed' ? `❌ Показано решение` : `Попытки: ${wrongCount}/3 · Срок: ${hw.dueDate ? formatDate(hw.dueDate) : (hw.due || 'без срока')}`)
           : `Ученик: ${hw.status || 'Новое'} · Срок: ${hw.dueDate ? formatDate(hw.dueDate) : (hw.due || 'без срока')}`}
         action={!isStudent && onUpdate
           ? <div className="flex gap-2">
@@ -1141,7 +1147,7 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
           {isStudent && status === 'playing' && (
             <button className="outline-button mt-3 w-full" onClick={reset}>Сбросить позицию</button>
           )}
-          {isStudent && status === 'solved' && puzzleIdx < totalPuzzles - 1 && (
+          {isStudent && (status === 'solved' || status === 'revealed') && puzzleIdx < totalPuzzles - 1 && (
             <button className="main-button mt-3 w-full" onClick={() => setPuzzleIdx(p => p + 1)}>Следующая задача <ArrowRight className="size-4 ml-2" /></button>
           )}
         </div>
@@ -1153,9 +1159,18 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
               <div className="flex justify-between"><span className="text-muted-foreground">Назначено</span><span>{formatDate(hw.assignedAt || hw.assigned)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Срок</span><span>{hw.dueDate ? formatDate(hw.dueDate) : hw.due}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Статус</span><span className="badge">{status === 'solved' ? 'Выполнено' : hw.status}</span></div>
-              {(status === 'solved' || hw.solved) && <div className="flex justify-between"><span className="text-muted-foreground">Попыток</span><span className="font-semibold">{hw.solved ? hw.attempts : wrongCount + 1}</span></div>}
             </div>
           </div>
+          {(status === 'solved' || status === 'revealed' || !isStudent) && (
+            <div className="rounded-lg border p-5">
+              <h3 className="font-semibold mb-3">Правильное решение</h3>
+              <div className="flex flex-wrap gap-2 text-sm font-mono">
+                {solution.map((san, i) => (
+                  <span key={i} className="px-1.5 py-0.5 bg-muted rounded border">{san}</span>
+                ))}
+              </div>
+            </div>
+          )}
           {isStudent && status === 'playing' && (
             <div className="rounded-lg border bg-muted/30 p-5">
               <p className="text-sm font-medium">💡 Как это работает</p>
