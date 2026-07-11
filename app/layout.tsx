@@ -7,9 +7,13 @@ const geist = Geist({ subsets: ['latin', 'cyrillic'], variable: '--font-geist' }
 const geistMono = Geist_Mono({ subsets: ['latin', 'cyrillic'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: '64 Lines — личный кабинет тренера',
-  description: 'Личный шахматный хаб: ученики, домашние задания, YouTube-уроки и PGN-базы.',
+  title: '64 Lines — Личный кабинет ученика',
+  description: 'Личный шахматный хаб: ваши задания, тренировки и уроки.',
   generator: 'v0.app',
+  keywords: ['шахматы', 'обучение шахматам', 'шахматная школа', 'тренер по шахматам', 'шахматы для детей', 'онлайн шахматы', '64 линии'],
+  verification: {
+    google: 'google6fffdecb7dae406a',
+  }
 }
 
 export const viewport: Viewport = {

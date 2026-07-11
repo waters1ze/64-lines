@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { redirect } from "next/navigation"
 import { db } from '@/lib/db'
+import { Suspense } from 'react'
 
 export default async function Page() {
   const session = await getServerSession(authOptions)
@@ -18,10 +19,12 @@ export default async function Page() {
   }
 
   let userRating = 1200
+  let userName = 'Гость'
   if (session?.user?.email) {
     const dbUser = await db.user.findUnique({ where: { email: session.user.email } })
     if (dbUser) {
       userRating = dbUser.rating
+      userName = dbUser.name || session.user.name || 'Гость'
     }
   }
 
@@ -68,17 +71,19 @@ export default async function Page() {
   }))
 
   return (
-    <TeacherHub 
-      initialRole={isTeacher ? 'Учитель' : (isStudent ? 'Ученик' : 'Гость')} 
-      userName={session?.user?.name || 'Гость'} 
-      userRating={userRating}
-      initialStudents={students}
-      initialHomeworks={homeworks}
-      initialCourses={courses}
-      initialVideos={videos}
-      initialOpenings={openings}
-      initialPurchases={purchases}
-    />
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Загрузка...</div>}>
+      <TeacherHub 
+        initialRole={isTeacher ? 'Учитель' : (isStudent ? 'Ученик' : 'Гость')} 
+        userName={userName} 
+        userRating={userRating}
+        initialStudents={students}
+        initialHomeworks={homeworks}
+        initialCourses={courses}
+        initialVideos={videos}
+        initialOpenings={openings}
+        initialPurchases={purchases}
+      />
+    </Suspense>
   )
 }
 

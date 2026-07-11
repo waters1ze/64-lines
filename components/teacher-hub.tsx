@@ -82,6 +82,9 @@ function parseHwPgn(pgn: string): { startFen: string; solution: string[] } {
 }
 
 function parsePgnToTree(pgn: string): GameTree {
+  if (pgn.startsWith('{') && pgn.endsWith('}')) {
+    try { return JSON.parse(pgn) } catch {}
+  }
   const raw = pgn.replace(/\[.*?\]/gs, '').replace(/\{[^}]*\}/gs, '')
   const tokens = (raw.match(/\d+\.{1,3}|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?|O-O-O|O-O|\(|\)|1-0|0-1|1\/2-1\/2|\*/g) ?? [])
     .filter(t => !t.match(/^\d+\./) && !['1-0','0-1','1/2-1/2','*'].includes(t))
@@ -176,6 +179,8 @@ function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen
 import { signOut } from 'next-auth/react'
 import Link from 'next/link'
 
+import { useRouter, useSearchParams } from 'next/navigation'
+
 export function TeacherHub({ 
   initialRole = 'Учитель', 
   userName = 'Учитель', 
@@ -201,8 +206,18 @@ export function TeacherHub({
   const isGuest = initialRole === 'Гость'
   const isStudent = initialRole === 'Ученик' || isGuest
 
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const sectionParam = searchParams.get('section') as Section | null
+  const section = sectionParam || 'overview'
+
+  const setSection = (s: Section) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('section', s)
+    router.push(`?${params.toString()}`)
+  }
+
   const [role] = useState(initialRole)
-  const [section, setSection] = useState<Section>('overview')
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -262,12 +277,44 @@ export function TeacherHub({
   const openStudentProfile = (id: number) => { setSelectedStudentId(id); go('studentProfile') }
   const openHwPuzzle       = (id: number) => { setSelectedHwId(id);      go('homeworkPuzzle') }
 
-  const addHomework = (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => {
-    setHomeworks(prev => [...prev, { ...hw, id: Date.now(), attempts: 0, solved: false }])
-    notify('Домашнее задание назначено!')
+  const addHomework = async (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => {
+    try {
+      const res = await fetch('/api/homework', { method: 'POST', body: JSON.stringify(hw) })
+      if (res.ok) {
+        const newHw = await res.json()
+        setHomeworks(prev => [...prev, newHw])
+        notify('Домашнее задание назначено!')
+      } else notify('Ошибка при назначении дз')
+    } catch { notify('Ошибка сети') }
   }
-  const updateHomework = (id: number, patch: Partial<HW>) =>
-    setHomeworks(prev => prev.map(h => h.id === id ? { ...h, ...patch } : h))
+  const updateHomework = async (id: number | string, patch: Partial<HW>) => {
+    try {
+      const res = await fetch(`/api/homework/${id}`, { method: 'PUT', body: JSON.stringify(patch) })
+      if (res.ok) {
+        const upHw = await res.json()
+        setHomeworks(prev => prev.map(h => h.id === id ? upHw : h))
+      }
+    } catch { notify('Ошибка при обновлении дз') }
+  }
+  const deleteStudent = async (id: string | number) => {
+    try {
+      const res = await fetch(`/api/students/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setStudents(prev => prev.filter(s => s.id !== id))
+        go('students')
+        notify('Ученик удалён')
+      } else notify('Ошибка при удалении ученика')
+    } catch { notify('Ошибка сети') }
+  }
+  const addStudent = async (student: any) => {
+    try {
+      const res = await fetch('/api/students', { method: 'POST', body: JSON.stringify({ studentId: student.id }) })
+      if (res.ok) {
+        setStudents(prev => [...prev, student])
+        notify('Ученик успешно добавлен!')
+      } else notify('Ошибка при добавлении ученика')
+    } catch { notify('Ошибка сети') }
+  }
   const purchaseCourse = (id: string | number) => {
     if (isGuest) {
       notify('Пожалуйста, зарегистрируйтесь, чтобы совершать покупки.')
@@ -387,9 +434,9 @@ export function TeacherHub({
               ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} />
               : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
-            {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} notify={notify} />}
+            {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} onAddStudent={addStudent} notify={notify} />}
             {section === 'studentProfile' && selectedStudent && (
-              <StudentProfile student={selectedStudent} homeworks={homeworks.filter(h => h.studentId === selectedStudent.id)} onOpenHw={openHwPuzzle} onAddHw={addHomework} notify={notify} />
+              <StudentProfile student={selectedStudent} homeworks={homeworks.filter(h => h.studentId === selectedStudent.id)} onOpenHw={openHwPuzzle} onAddHw={addHomework} onDeleteStudent={deleteStudent} notify={notify} />
             )}
             {section === 'homework' && (
               <HomeworkList homeworks={homeworks} students={students} isStudent={isStudent} onOpenHw={openHwPuzzle} />
@@ -400,16 +447,43 @@ export function TeacherHub({
                 onUpdate={!isStudent ? updateHomework : undefined} />
             )}
             {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
-            {section === 'openings' && <PgnBoard />}
+            {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} />}
             {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
                 onPurchase={purchaseCourse}
-                onAdd={c   => setCourses(prev => [{ ...c, id: Date.now(), createdAt: Date.now() }, ...prev])}
-                onUpdate={(id, u) => setCourses(prev => prev.map(c => c.id === id ? { ...c, ...u } : c))}
-                onDelete={id => setCourses(prev => prev.filter(c => c.id !== id))}
+                onAdd={async c => {
+                  try {
+                    const res = await fetch('/api/courses', { method: 'POST', body: JSON.stringify(c) })
+                    if (res.ok) {
+                      const nc = await res.json()
+                      setCourses(prev => [nc, ...prev])
+                      notify('Курс добавлен')
+                    } else notify('Ошибка при добавлении')
+                  } catch { notify('Ошибка сети') }
+                }}
+                onUpdate={async (id, u) => {
+                  try {
+                    const res = await fetch(`/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(u) })
+                    if (res.ok) {
+                      const uc = await res.json()
+                      setCourses(prev => prev.map(c => c.id === id ? uc : c))
+                      notify('Курс обновлён')
+                    } else notify('Ошибка при обновлении')
+                  } catch { notify('Ошибка сети') }
+                }}
+                onDelete={async id => {
+                  if (!confirm('Удалить курс?')) return
+                  try {
+                    const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' })
+                    if (res.ok) {
+                      setCourses(prev => prev.filter(c => c.id !== id))
+                      notify('Курс удалён')
+                    } else notify('Ошибка при удалении')
+                  } catch { notify('Ошибка сети') }
+                }}
                 notify={notify} />
             )}
             {section === 'settings' && <SettingsPanel notify={notify} initialName={userName || ''} isStudent={isStudent} />}
@@ -567,7 +641,21 @@ function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userNa
 
 // ─── Students ────────────────────────────────────────────────────────────────
 
-function Students({ students, homeworks, onSelect, notify }: { students: Student[]; homeworks: HW[]; onSelect: (id: number) => void; notify: (s: string) => void }) {
+function Students({ students, homeworks, onSelect, onAddStudent, notify }: { students: Student[]; homeworks: HW[]; onSelect: (id: number) => void; onAddStudent: (s: any) => void; notify: (s: string) => void }) {
+  const [search, setSearch] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const handleSearch = async (val: string) => {
+    setSearch(val)
+    if (val.length < 3) { setResults([]); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/students/search?q=${encodeURIComponent(val)}`)
+      if (res.ok) setResults(await res.json())
+    } catch {} finally { setLoading(false) }
+  }
+
   const handleInvite = async () => {
     try {
       const res = await fetch('/api/invite', { method: 'POST', body: JSON.stringify({ role: 'STUDENT' }) })
@@ -587,6 +675,29 @@ function Students({ students, homeworks, onSelect, notify }: { students: Student
     <>
       <Head over="Обучение" title="Мои ученики" text="Нажмите на ученика, чтобы открыть профиль."
         action={<button className="button" onClick={handleInvite}><UserPlus />Сгенерировать ссылку</button>} />
+      
+      <div className="rounded-lg border p-4 mb-4 bg-muted/20 relative">
+        <label className="field mb-0">
+          <span className="text-sm font-medium">Добавить ученика по Email</span>
+          <input className="input w-full" placeholder="Введите email ученика..." value={search} onChange={e => handleSearch(e.target.value)} />
+        </label>
+        {search.length >= 3 && (
+          <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-background border rounded-lg shadow-lg overflow-hidden">
+            {loading ? <div className="p-3 text-sm text-muted-foreground">Поиск...</div> :
+             results.length === 0 ? <div className="p-3 text-sm text-muted-foreground">Ученики не найдены</div> :
+             results.map(r => (
+               <div key={r.id} className="flex items-center justify-between p-3 border-b last:border-0 hover:bg-muted/50">
+                 <div>
+                   <p className="font-semibold text-sm">{r.name}</p>
+                   <p className="text-xs text-muted-foreground">{r.email}</p>
+                 </div>
+                 <button className="button text-xs py-1 px-3 h-auto" onClick={() => { onAddStudent(r); setSearch(''); setResults([]) }}>Добавить</button>
+               </div>
+             ))}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-lg border">
         {students.map(s => {
           const sHws = homeworks.filter(h => h.studentId === s.id)
@@ -612,9 +723,9 @@ function Students({ students, homeworks, onSelect, notify }: { students: Student
 
 // ─── Student Profile ──────────────────────────────────────────────────────────
 
-function StudentProfile({ student, homeworks, onOpenHw, onAddHw, notify }: {
+function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent, notify }: {
   student: Student; homeworks: HW[]; onOpenHw: (id: number) => void
-  onAddHw: (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => void; notify: (s: string) => void
+  onAddHw: (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => void; onDeleteStudent: (id: string) => void; notify: (s: string) => void
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const [hwTitle, setHwTitle] = useState('')
@@ -627,8 +738,7 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, notify }: {
 
   const handleAdd = () => {
     if (!hwTitle || !hwPgn) { notify('Заполните название и добавьте PGN'); return }
-    const today = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
-    onAddHw({ studentId: student.id, title: hwTitle, assigned: today, due: hwDue ? `до ${hwDue}` : 'без срока', progress: 0, status: 'Новое', pgn: hwPgn })
+    onAddHw({ studentId: student.id, title: hwTitle, dueDate: hwDue || undefined, progress: 0, solved: false, pgn: hwPgn })
     setShowAdd(false); setHwTitle(''); setHwDue(''); setHwPgn('')
   }
 
@@ -640,7 +750,12 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, notify }: {
           <h1 className="text-2xl font-semibold">{student.name}</h1>
           <p className="text-sm text-muted-foreground">Рейтинг {student.rating} · {done}/{homeworks.length} заданий выполнено</p>
         </div>
-        <button className="button ml-auto" onClick={() => setShowAdd(true)}><Plus />Добавить ДЗ</button>
+        <div className="ml-auto flex gap-2">
+          <button className="button" onClick={() => setShowAdd(true)}><Plus />Добавить ДЗ</button>
+          <button className="outline-button text-red-500 hover:bg-red-50" onClick={() => {
+            if (confirm('Удалить ученика?')) { onDeleteStudent(student.id) }
+          }}><Trash2 className="size-4 mr-1"/>Удалить</button>
+        </div>
       </div>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1071,7 +1186,7 @@ function VideosSection({
 
 // ─── PGN Board (full tree editor) ────────────────────────────────────────────
 
-export function PgnBoard() {
+export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { openings?: any[], setOpenings?: any, isTeacher?: boolean, notify?: (s: string) => void }) {
   const [tree,        setTree]        = useState<GameTree>({ children: [], comment: '' })
   const [path,        setPath]        = useState<string[]>([])
   const [flipped,     setFlipped]     = useState(false)
@@ -1082,6 +1197,44 @@ export function PgnBoard() {
   const [ctxMenu,     setCtxMenu]     = useState<{ x: number; y: number; idx: number } | null>(null)
   const [editComment, setEditComment] = useState<number | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
+
+  async function saveCurrent() {
+    const title = prompt('Введите название дебюта:')
+    if (!title) return
+    const pgn = JSON.stringify(tree)
+    try {
+      const res = await fetch('/api/openings', { method: 'POST', body: JSON.stringify({ title, pgn }) })
+      if (res.ok) {
+        const op = await res.json()
+        if (setOpenings) setOpenings((prev: any) => [op, ...prev])
+        if (notify) notify('Дебют сохранён')
+      }
+    } catch { if (notify) notify('Ошибка сохранения') }
+  }
+
+  async function deleteOpening(id: string) {
+    if (!confirm('Удалить дебют?')) return
+    try {
+      const res = await fetch(`/api/openings/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        if (setOpenings) setOpenings((prev: any) => prev.filter((o: any) => o.id !== id))
+        if (notify) notify('Дебют удалён')
+      }
+    } catch { if (notify) notify('Ошибка удаления') }
+  }
+
+  async function editTitle(o: any) {
+    const title = prompt('Новое название:', o.title)
+    if (!title || title === o.title) return
+    try {
+      const res = await fetch(`/api/openings/${o.id}`, { method: 'PUT', body: JSON.stringify({ title }) })
+      if (res.ok) {
+        const up = await res.json()
+        if (setOpenings) setOpenings((prev: any) => prev.map((x: any) => x.id === o.id ? up : x))
+        if (notify) notify('Дебют переименован')
+      }
+    } catch { if (notify) notify('Ошибка переименования') }
+  }
 
   // Candidate continuations from tree at current path
   const { nodes: candidateNodes } = walkTo(tree, path)
@@ -1211,7 +1364,27 @@ export function PgnBoard() {
       <Head over="Дебютный анализ" title="Мои дебюты"
         text="Двигайте фигуры — ходы сохраняются в дереве. ПКМ по ходу — удалить ветку. 💬 — добавить комментарий." />
 
-      <section className="grid gap-6 rounded-lg border p-4 lg:grid-cols-[minmax(280px,520px)_1fr]">
+      <section className="grid gap-6 rounded-lg border p-4 lg:grid-cols-[minmax(200px,250px)_minmax(280px,450px)_1fr]">
+        {/* Openings List */}
+        <div className="flex flex-col gap-2 border-r pr-4">
+          <b className="mb-2">Сохранённые дебюты</b>
+          {openings.map((o: any) => (
+            <div key={o.id} className="flex flex-col gap-1 rounded p-2 border hover:border-primary/50 transition-colors">
+              <button onClick={() => load(o.pgn)} className="text-sm font-semibold text-left">{o.title}</button>
+              {isTeacher && (
+                <div className="flex gap-2">
+                  <button onClick={() => editTitle(o)} className="text-[10px] text-blue-500 hover:underline">Изменить</button>
+                  <button onClick={() => deleteOpening(o.id)} className="text-[10px] text-red-500 hover:underline">Удалить</button>
+                </div>
+              )}
+            </div>
+          ))}
+          {openings.length === 0 && <span className="text-xs text-muted-foreground">Нет сохранённых дебютов</span>}
+          {isTeacher && (
+            <button className="outline-button mt-4 text-xs py-1.5" onClick={saveCurrent}>Сохранить текущий</button>
+          )}
+        </div>
+
         {/* Board column */}
         <div>
           <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
@@ -1475,9 +1648,18 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
 
   function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '' }); setModal('add') }
   function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl }); setModal(c.id) }
-  function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
-    const r = new FileReader(); r.onload = () => setForm(p => ({ ...p, imageUrl: String(r.result) })); r.readAsDataURL(f)
+    const formData = new FormData()
+    formData.append('file', f)
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (res.ok) setForm(p => ({ ...p, imageUrl: data.url }))
+      else notify('Ошибка загрузки: ' + data.error)
+    } catch (err) {
+      notify('Ошибка загрузки')
+    }
   }
   function handleSave() {
     if (!form.name || !form.price) { notify('Заполните название и цену'); return }
@@ -1512,7 +1694,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
                   {isTeacher ? (
                     <>
                       <button className="outline-button flex-1" onClick={() => openEdit(c)}><Pencil className="size-3" />Изменить</button>
-                      <button className="icon-button border rounded-md" onClick={() => { onDelete(c.id); notify('Курс удалён.') }}><Trash2 /></button>
+                      <button className="icon-button border rounded-md" onClick={() => onDelete(c.id)}><Trash2 /></button>
                     </>
                   ) : (
                     <>
@@ -1564,8 +1746,6 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
-
-import { useRouter } from 'next/navigation'
 
 function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string) => void; initialName: string; isStudent: boolean }) {
   const [name, setName] = useState(initialName)

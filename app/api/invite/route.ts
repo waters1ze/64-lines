@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${invite.token}`
+    const inviteUrl = `${req.nextUrl.origin}/invite/${invite.token}`
 
     return NextResponse.json({ url: inviteUrl })
   } catch (error) {
