@@ -382,7 +382,7 @@ export function TeacherHub({
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
-              ? <StudentOverview homeworks={homeworks.filter(h => h.studentId === 1)} onOpenHw={openHwPuzzle} />
+              ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} />
               : <TeacherOverview go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
             {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} notify={notify} />}
@@ -390,7 +390,7 @@ export function TeacherHub({
               <StudentProfile student={selectedStudent} homeworks={homeworks.filter(h => h.studentId === selectedStudent.id)} onOpenHw={openHwPuzzle} onAddHw={addHomework} notify={notify} />
             )}
             {section === 'homework' && (
-              <HomeworkList homeworks={isStudent ? homeworks.filter(h => h.studentId === 1) : homeworks} students={students} isStudent={isStudent} onOpenHw={openHwPuzzle} />
+              <HomeworkList homeworks={homeworks} students={students} isStudent={isStudent} onOpenHw={openHwPuzzle} />
             )}
             {section === 'homeworkPuzzle' && selectedHw && (
               <HomeworkPuzzle hw={selectedHw} isStudent={isStudent}
@@ -527,15 +527,33 @@ function TeacherOverview({ go, homeworks, students, videosCount, onOpenHw, onSel
   )
 }
 
-function StudentOverview({ homeworks, onOpenHw }: { homeworks: HW[]; onOpenHw: (id: number) => void }) {
+function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: number) => void }) {
+  const solved = homeworks.filter(h => h.solved).length
+  const totalAttempts = homeworks.filter(h => h.solved).reduce((a, h) => a + h.attempts, 0)
+  
+  // Рассчитываем процент точности: если решено с первой попытки - 100%, со второй - 50%, и т.д.
+  // Это примерная метрика для "Точности"
+  let accuracy = 0
+  if (solved > 0) {
+    const totalPossibleAccuracy = solved * 100
+    const currentAccuracy = homeworks.filter(h => h.solved).reduce((acc, h) => {
+      return acc + (100 / h.attempts)
+    }, 0)
+    accuracy = Math.round((currentAccuracy / totalPossibleAccuracy) * 100)
+  }
+
+  // Расчет "серии занятий" (просто пример на основе решенных задач, т.к. нет отдельной таблицы активности)
+  // Для более точного нужно сохранять дату каждого решения.
+  const streak = solved > 0 ? 1 : 0
+
   return (
     <>
-      <Head over="Личный кабинет" title="Михаил, продолжим тренировку" text="Статистика и задания тренера." />
+      <Head over="Личный кабинет" title={`${userName}, продолжим тренировку`} text="Статистика и задания тренера." />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Рейтинг"       value="1842" note="+86 за 90 дней" />
-        <Metric label="Выполнено"     value={`${homeworks.filter(h => h.solved).length}/${homeworks.length}`} note="заданий" />
-        <Metric label="Серия занятий" value="12 дней" note="Личный рекорд" />
-        <Metric label="Точность"      value="78%" note="100 задач" />
+        <Metric label="Рейтинг"       value={String(userRating)} note="Текущий Эло" />
+        <Metric label="Выполнено"     value={`${solved}/${homeworks.length}`} note="заданий" />
+        <Metric label="Серия занятий" value={`${streak} дней`} note="Активность" />
+        <Metric label="Точность"      value={`${accuracy}%`} note={`${solved} задач`} />
       </section>
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
       <section className="grid gap-3 lg:grid-cols-3">

@@ -17,6 +17,14 @@ export default async function Page() {
     isGuest = false
   }
 
+  let userRating = 1200
+  if (session?.user?.email) {
+    const dbUser = await db.user.findUnique({ where: { email: session.user.email } })
+    if (dbUser) {
+      userRating = dbUser.rating
+    }
+  }
+
   // Fetch data
   const courses = await db.course.findMany({ orderBy: { createdAt: 'desc' } })
   const videos = await db.video.findMany({ orderBy: { createdAt: 'desc' } })
@@ -63,6 +71,7 @@ export default async function Page() {
     <TeacherHub 
       initialRole={isTeacher ? 'Учитель' : (isStudent ? 'Ученик' : 'Гость')} 
       userName={session?.user?.name || 'Гость'} 
+      userRating={userRating}
       initialStudents={students}
       initialHomeworks={homeworks}
       initialCourses={courses}
