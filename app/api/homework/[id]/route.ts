@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
@@ -15,7 +16,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const { title, pgn, dueDate, progress, solved, attempts, teacherNote } = body
 
     // verify authorization
-    const hw = await db.homework.findUnique({ where: { id: params.id } })
+    const hw = await db.homework.findUnique({ where: { id } })
     if (!hw) return new NextResponse('Not Found', { status: 404 })
 
     const isTeacher = user.role === 'TEACHER' || user.role === 'ADMIN'
@@ -24,7 +25,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 
     const homework = await db.homework.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(title && isTeacher && { title }),
         ...(pgn && isTeacher && { pgn }),
@@ -43,8 +44,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
@@ -53,11 +55,16 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return new NextResponse('Forbidden', { status: 403 })
     }
 
+    const hw = await db.homework.findUnique({ where: { id } })
+    if (!hw) {
+      return new NextResponse('Not Found', { status: 404 })
+    }
+
     await db.homework.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
-    return new NextResponse(null, { status: 204 })
+    return new NextResponse(JSON.stringify({ success: true }), { status: 200 })
   } catch (error) {
     console.error('Homework DELETE error:', error)
     return new NextResponse('Internal Error', { status: 500 })
