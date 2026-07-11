@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
-  ArrowLeft, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
+  ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare
@@ -23,6 +23,7 @@ type Student = { id: string | number; name: string; rating: number; email?: stri
 type HW = {
   id: string | number; studentId: string | number; title: string; assignedAt?: string; dueDate?: string | null
   progress: number; solved: boolean; attempts: number; pgn: string; status?: string; assigned?: string; due?: string
+  teacherNote?: string;
 }
 type Course = {
   id: string | number;
@@ -69,20 +70,25 @@ const STATIC_MODULES = [
 function cloneTree<T>(v: T): T { return JSON.parse(JSON.stringify(v)) }
 function initials(name: string) { return name.split(' ').map((w: string) => w[0]).join('') }
 
-function parseHwPgn(pgn: string): { startFen: string; solution: string[] } {
-  try {
-    let normalizedPgn = pgn
-    const fenMatch = pgn.match(/\[FEN "(.+?)"\]/)
-    const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    if (fenMatch && !pgn.includes('[SetUp "1"]')) {
-      normalizedPgn = '[SetUp "1"]\n' + pgn
+function parseHwPgn(pgn: string): { startFen: string; solution: string[] }[] {
+  const blocks = pgn.split(/(?=\[Event )/).map(s => s.trim()).filter(Boolean);
+  if (blocks.length === 0 && pgn.trim()) blocks.push(pgn);
+  
+  return blocks.map(block => {
+    try {
+      let normalizedPgn = block
+      const fenMatch = block.match(/\[FEN "(.+?)"\]/)
+      const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+      if (fenMatch && !block.includes('[SetUp "1"]')) {
+        normalizedPgn = '[SetUp "1"]\n' + block
+      }
+      const g = new Chess()
+      g.loadPgn(normalizedPgn)
+      return { startFen, solution: g.history() }
+    } catch {
+      return null
     }
-    const g = new Chess()
-    g.loadPgn(normalizedPgn)
-    return { startFen, solution: g.history() }
-  } catch {
-    return { startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: [] }
-  }
+  }).filter((x): x is { startFen: string; solution: string[] } => x !== null)
 }
 
 function parsePgnToTree(pgn: string): GameTree {
@@ -225,7 +231,7 @@ export function TeacherHub({
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
-  const [students] = useState<Student[]>(initialStudents || INIT_STUDENTS)
+  const [students, setStudents] = useState<Student[]>(initialStudents || INIT_STUDENTS)
   const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
   const [courses, setCourses] = useState<Course[]>(initialCourses || INIT_COURSES)
   const [videos, setVideos] = useState<Video[]>(initialVideos || INIT_VIDEOS)
@@ -278,8 +284,8 @@ export function TeacherHub({
   const selectedStudent = students.find(s => s.id === selectedStudentId) ?? null
   const selectedHw = homeworks.find(h => h.id === selectedHwId) ?? null
 
-  const openStudentProfile = (id: number) => { setSelectedStudentId(id); go('studentProfile') }
-  const openHwPuzzle       = (id: number) => { setSelectedHwId(id);      go('homeworkPuzzle') }
+  const openStudentProfile = (id: string | number) => { setSelectedStudentId(id); go('studentProfile') }
+  const openHwPuzzle       = (id: string | number) => { setSelectedHwId(id);      go('homeworkPuzzle') }
 
   const addHomework = async (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => {
     try {
@@ -457,7 +463,10 @@ export function TeacherHub({
             )}
             {section === 'homeworkPuzzle' && selectedHw && (
               <HomeworkPuzzle hw={selectedHw} isStudent={isStudent}
-                onSolve={(id, attempts) => { updateHomework(id, { solved: true, attempts, status: 'Выполнено', progress: 100 }); notify(`Задача решена! Попыток: ${attempts}`) }}
+                onProgress={(id, progress, solved, attempts) => {
+                  updateHomework(id, { progress, solved, attempts, ...(solved ? { status: 'Выполнено' } : {}) })
+                  if (solved) notify(`Домашнее задание полностью выполнено! Попыток: ${attempts}`)
+                }}
                 onUpdate={!isStudent ? updateHomework : undefined}
                 onDelete={!isStudent ? deleteHomework : undefined}
                 notify={notify} />
@@ -548,7 +557,7 @@ export function TeacherHub({
 
 // ─── Overview sections ────────────────────────────────────────────────────────
 
-function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { userName: string; go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: number) => void; onSelectStudent: (id: number) => void; notify: (s: string) => void }) {
+function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { userName: string; go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: string | number) => void; onSelectStudent: (id: string | number) => void; notify: (s: string) => void }) {
   const recent = homeworks.slice(0, 3)
 
   const handleInvite = async () => {
@@ -619,7 +628,7 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
   )
 }
 
-function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: number) => void }) {
+function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: string | number) => void }) {
   const solved = homeworks.filter(h => h.solved).length
   const totalAttempts = homeworks.filter(h => h.solved).reduce((a, h) => a + h.attempts, 0)
   
@@ -657,7 +666,7 @@ function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userNa
 
 // ─── Students ────────────────────────────────────────────────────────────────
 
-function Students({ students, homeworks, onSelect, onAddStudent, notify }: { students: Student[]; homeworks: HW[]; onSelect: (id: number) => void; onAddStudent: (s: any) => void; notify: (s: string) => void }) {
+function Students({ students, homeworks, onSelect, onAddStudent, notify }: { students: Student[]; homeworks: HW[]; onSelect: (id: string | number) => void; onAddStudent: (s: any) => void; notify: (s: string) => void }) {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -740,7 +749,7 @@ function Students({ students, homeworks, onSelect, onAddStudent, notify }: { stu
 // ─── Student Profile ──────────────────────────────────────────────────────────
 
 function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent, notify }: {
-  student: Student; homeworks: HW[]; onOpenHw: (id: number) => void
+  student: Student; homeworks: HW[]; onOpenHw: (id: string | number) => void
   onAddHw: (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => void; onDeleteStudent: (id: string) => void; notify: (s: string) => void
 }) {
   const [showAdd, setShowAdd] = useState(false)
@@ -754,7 +763,7 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
 
   const handleAdd = () => {
     if (!hwTitle || !hwPgn) { notify('Заполните название и добавьте PGN'); return }
-    onAddHw({ studentId: student.id, title: hwTitle, dueDate: hwDue || undefined, progress: 0, solved: false, pgn: hwPgn })
+    onAddHw({ studentId: student.id, title: hwTitle, dueDate: hwDue || undefined, progress: 0, pgn: hwPgn })
     setShowAdd(false); setHwTitle(''); setHwDue(''); setHwPgn('')
   }
 
@@ -811,7 +820,7 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
 
 // ─── Homework List ────────────────────────────────────────────────────────────
 
-function HomeworkList({ homeworks, students, isStudent, onOpenHw }: { homeworks: HW[]; students: Student[]; isStudent: boolean; onOpenHw: (id: number) => void }) {
+function HomeworkList({ homeworks, students, isStudent, onOpenHw }: { homeworks: HW[]; students: Student[]; isStudent: boolean; onOpenHw: (id: string | number) => void }) {
   return (
     <>
       <Head over="Практика" title="Домашние задания" text="Нажмите на задание, чтобы открыть его." />
@@ -903,14 +912,25 @@ function ChessBoard({
   )
 }
 
-function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: {
+function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify }: {
   hw: HW; isStudent: boolean
-  onSolve: (id: string | number, attempts: number) => void
+  onProgress: (id: string | number, progress: number, solved: boolean, attempts: number) => void
   onUpdate?: (id: string | number, patch: Partial<HW>) => void
   onDelete?: (id: string | number) => void
   notify?: (s: string) => void
 }) {
-  const { startFen, solution } = useMemo(() => parseHwPgn(hw.pgn), [hw.pgn])
+  const puzzles = useMemo(() => parseHwPgn(hw.pgn), [hw.pgn])
+  const totalPuzzles = puzzles.length
+  
+  const [puzzleIdx, setPuzzleIdx] = useState(() => {
+    if (hw.solved) return 0
+    const idx = Math.floor((hw.progress / 100) * totalPuzzles)
+    return Math.min(Math.max(0, idx), totalPuzzles - 1)
+  })
+
+  const currentPuzzle = puzzles[puzzleIdx] || { startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: [] }
+  const { startFen, solution } = currentPuzzle
+
   const studentColor = useMemo(() => { try { return new Chess(startFen).turn() } catch { return 'w' as const } }, [startFen])
   const [game,         setGame]         = useState(() => { try { return new Chess(startFen) } catch { return new Chess() } })
   const [moveIdx,      setMoveIdx]      = useState(0)
@@ -920,15 +940,30 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
   const [selected,     setSelected]     = useState<string | null>(null)
   const [dragFrom,     setDragFrom]     = useState<string | null>(null)
   const [dragOver,     setDragOver]     = useState<string | null>(null)
-  // Auto-flip: if first move belongs to black, show from black's side
   const [flipped,      setFlipped]      = useState(studentColor === 'b')
-  // Teacher edit state
+
   const [showEdit,     setShowEdit]     = useState(false)
   const [editTitle,    setEditTitle]    = useState(hw.title)
   const [editDue,      setEditDue]      = useState(hw.due)
   const [editPgn,      setEditPgn]      = useState(hw.pgn)
   const [teacherNote,  setTeacherNote]  = useState('')
   const editFileRef = useRef<HTMLInputElement>(null)
+
+  // Reset puzzle state when navigating
+  useEffect(() => {
+    try { setGame(new Chess(startFen)) } catch { setGame(new Chess()) }
+    setMoveIdx(0); setWrongCount(0); setMessage(''); setSelected(null)
+    setFlipped(studentColor === 'b')
+    
+    // Determine status based on overall homework progress
+    if (hw.solved) {
+      setStatus('solved')
+    } else {
+      const solvedCount = Math.floor((hw.progress / 100) * totalPuzzles)
+      if (puzzleIdx < solvedCount) setStatus('solved')
+      else setStatus('playing')
+    }
+  }, [puzzleIdx, startFen, studentColor, hw.solved, hw.progress, totalPuzzles])
 
   function applyStudentMove(from: string, to: string) {
     if (status !== 'playing' || !isStudent) return
@@ -939,7 +974,6 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
     const mv = legalMoves.find(m => m.from === from && m.to === to)
     if (!mv) return
 
-    // Check correctness by comparing resulting FEN
     const expectedSan = solution[moveIdx]
     let correct = false
     try {
@@ -949,20 +983,28 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
     } catch { correct = false }
 
     if (correct) {
-      // Apply student move then auto-play engine responses
       let g = new Chess(game.fen())
       g.move(mv.san)
       let idx = moveIdx + 1
-      // Auto-play engine moves
       while (idx < solution.length) {
         const g2 = new Chess(g.fen())
-        if (g2.turn() === studentColor) break  // student's turn again
+        if (g2.turn() === studentColor) break
         try { g.move(solution[idx]); idx++ } catch { break }
       }
       setGame(g); setMoveIdx(idx); setSelected(null)
       if (idx >= solution.length) {
-        setStatus('solved'); setMessage('🏆 Задача решена! Отличная работа!')
-        onSolve(hw.id, wrongCount + 1)
+        setStatus('solved')
+        const newSolvedCount = Math.max(puzzleIdx + 1, Math.floor((hw.progress / 100) * totalPuzzles))
+        const newProgress = Math.round((newSolvedCount / totalPuzzles) * 100)
+        const isFullySolved = newSolvedCount >= totalPuzzles
+
+        if (isFullySolved) {
+          setMessage('🏆 Все задачи решены! Отличная работа!')
+        } else {
+          setMessage('✅ Задача решена! Переходите к следующей.')
+        }
+        
+        onProgress(hw.id, newProgress, isFullySolved, hw.attempts ? hw.attempts + wrongCount + 1 : wrongCount + 1)
       } else {
         setMessage('✅ Верно! Продолжайте.')
       }
@@ -971,7 +1013,6 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
       setWrongCount(newWrong)
       setSelected(null)
       if (newWrong >= 3) {
-        // Reveal: play out full solution
         let g = new Chess(startFen)
         solution.forEach(san => { try { g.move(san) } catch {} })
         setGame(g); setMoveIdx(solution.length)
@@ -987,11 +1028,10 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
     setMoveIdx(0); setWrongCount(0); setStatus('playing'); setMessage(''); setSelected(null)
   }
 
-  // ── Keyboard Navigation (review only) ──
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (isStudent && status === 'playing') return // Students must guess moves
+      if (isStudent && status === 'playing') return
       if (e.key === 'ArrowLeft') {
         setMoveIdx(prev => Math.max(0, prev - 1))
       } else if (e.key === 'ArrowRight') {
@@ -1059,6 +1099,17 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
 
       <div className="grid gap-6 lg:grid-cols-[minmax(280px,500px)_1fr]">
         <div>
+          {totalPuzzles > 1 && (
+            <div className="flex items-center justify-between mb-3 bg-muted/50 rounded-lg p-2 border">
+              <button className="icon-button hover:bg-background" disabled={puzzleIdx === 0} onClick={() => setPuzzleIdx(p => Math.max(0, p - 1))}>
+                <ArrowLeft className="size-4" />
+              </button>
+              <span className="text-sm font-medium tracking-tight">Задача {puzzleIdx + 1} из {totalPuzzles}</span>
+              <button className="icon-button hover:bg-background" disabled={puzzleIdx === totalPuzzles - 1} onClick={() => setPuzzleIdx(p => Math.min(totalPuzzles - 1, p + 1))}>
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+          )}
           <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
             <ChessBoard game={game} selected={selected} setSelected={canMove ? setSelected : () => {}}
               dragFrom={dragFrom} setDragFrom={setDragFrom} dragOver={dragOver} setDragOver={setDragOver}
@@ -1089,6 +1140,9 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: 
           )}
           {isStudent && status === 'playing' && (
             <button className="outline-button mt-3 w-full" onClick={reset}>Сбросить позицию</button>
+          )}
+          {isStudent && status === 'solved' && puzzleIdx < totalPuzzles - 1 && (
+            <button className="main-button mt-3 w-full" onClick={() => setPuzzleIdx(p => p + 1)}>Следующая задача <ArrowRight className="size-4 ml-2" /></button>
           )}
         </div>
 
@@ -1653,10 +1707,10 @@ type CourseForm = { name: string; description: string; price: string; imageUrl: 
 
 function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, onUpdate, onDelete, notify }: {
   courses: Course[]; isTeacher: boolean; purchasedIds: number[]
-  onPurchase: (id: number) => void
+  onPurchase: (id: string | number) => void
   onAdd: (c: Omit<Course, 'id' | 'createdAt'>) => void
   onUpdate: (id: number, u: Partial<Course>) => void
-  onDelete: (id: number) => void
+  onDelete: (id: string | number) => void
   notify: (s: string) => void
 }) {
   const [modal, setModal] = useState<null | 'add' | 'detail' | number>(null)
