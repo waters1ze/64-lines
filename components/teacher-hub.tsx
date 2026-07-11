@@ -379,7 +379,7 @@ export function TeacherHub({
                 onSolve={(id, attempts) => { updateHomework(id, { solved: true, attempts, status: 'Выполнено', progress: 100 }); notify(`Задача решена! Попыток: ${attempts}`) }}
                 onUpdate={!isStudent ? updateHomework : undefined} />
             )}
-            {section === 'videos'   && <VideosSection teacher={!isStudent} notify={notify} />}
+            {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard />}
             {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} />}
             {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} />}
@@ -922,8 +922,17 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate }: {
 
 // ─── Videos ───────────────────────────────────────────────────────────────────
 
-function VideosSection({ teacher, notify }: { teacher: boolean; notify: (s: string) => void }) {
-  const [videos, setVideos] = useState(VIDEOS_DATA)
+function VideosSection({ 
+  videos, 
+  setVideos, 
+  teacher, 
+  notify 
+}: { 
+  videos: Video[]; 
+  setVideos: React.Dispatch<React.SetStateAction<Video[]>>; 
+  teacher: boolean; 
+  notify: (s: string) => void 
+}) {
   const [show, setShow] = useState(false)
   const [form, setForm] = useState({ title: '', meta: '', url: '' })
   return (
@@ -950,10 +959,25 @@ function VideosSection({ teacher, notify }: { teacher: boolean; notify: (s: stri
           <label className="field">Название<input className="input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></label>
           <label className="field">Длительность и тема<input className="input" value={form.meta} onChange={e => setForm(p => ({ ...p, meta: e.target.value }))} placeholder="18 мин · Тактика" /></label>
           <label className="field">Ссылка YouTube<input className="input" type="url" value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://youtube.com/watch?v=..." /></label>
-          <button className="button" onClick={() => {
+          <button className="button" onClick={async () => {
             if (!form.title || !form.url) { notify('Заполните все поля'); return }
-            setVideos(prev => [...prev, { id: Date.now(), ...form }])
-            setShow(false); notify('Видео опубликовано!')
+            try {
+              const res = await fetch('/api/videos/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form)
+              })
+              if (res.ok) {
+                const { video } = await res.json()
+                setVideos(prev => [video, ...prev])
+                notify('Видео опубликовано!')
+              } else {
+                notify('Ошибка при сохранении видео.')
+              }
+            } catch {
+              notify('Ошибка сети.')
+            }
+            setShow(false)
           }}>Опубликовать</button>
         </Modal>
       )}
