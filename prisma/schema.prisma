@@ -52,6 +52,7 @@ model Course {
   description String
   price       Int
   imageUrl    String?
+  fileUrl     String?  // Ссылка на файл или текст PGN, который будет отправлен
   createdAt   DateTime @default(now())
   
   purchases   Purchase[]
@@ -61,10 +62,26 @@ model Purchase {
   id        String   @id @default(cuid())
   userId    String
   courseId  String
+  status    String   @default("PENDING") // PENDING, APPROVED
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Video {
+  id        String   @id @default(cuid())
+  title     String
+  meta      String
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model Opening {
+  id        String   @id @default(cuid())
+  title     String
+  pgn       String
+  createdAt DateTime @default(now())
 }
 
 model InviteLink {

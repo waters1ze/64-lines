@@ -7,41 +7,69 @@ import { db } from '@/lib/db'
 export default async function Page() {
   const session = await getServerSession(authOptions)
 
-  if (!session) {
-    redirect("/login")
+  let isTeacher = false
+  let isStudent = false
+  let isGuest = true
+
+  if (session) {
+    isTeacher = session.user.role === 'TEACHER' || session.user.role === 'ADMIN'
+    isStudent = session.user.role === 'STUDENT'
+    isGuest = false
   }
 
-  const isTeacher = session.user.role === 'TEACHER' || session.user.role === 'ADMIN'
+  // Fetch data
+  const courses = await db.course.findMany({ orderBy: { createdAt: 'desc' } })
+  const videos = await db.video.findMany({ orderBy: { createdAt: 'desc' } })
+  const openings = await db.opening.findMany({ orderBy: { createdAt: 'desc' } })
 
-  // Fetch students
-  let students = []
-  if (isTeacher) {
+  let students: any[] = []
+  let homeworksRaw: any[] = []
+  let purchasesRaw: any[] = []
+
+  if (isTeacher && session) {
     students = await db.user.findMany({
       where: { teacherId: session.user.id },
       select: { id: true, name: true, rating: true, email: true }
     })
+    homeworksRaw = await db.homework.findMany({
+      where: { student: { teacherId: session.user.id } }
+    })
+    purchasesRaw = await db.purchase.findMany({
+      include: { user: true, course: true },
+      orderBy: { createdAt: 'desc' }
+    })
+  } else if (isStudent && session) {
+    homeworksRaw = await db.homework.findMany({
+      where: { studentId: session.user.id }
+    })
+    purchasesRaw = await db.purchase.findMany({
+      where: { userId: session.user.id },
+      include: { course: true }
+    })
   }
 
-  // Fetch homeworks
-  const homeworksRaw = await db.homework.findMany({
-    where: isTeacher
-      ? { student: { teacherId: session.user.id } }
-      : { studentId: session.user.id }
-  })
-
-  // Format homeworks for client
   const homeworks = homeworksRaw.map(hw => ({
     ...hw,
     assignedAt: hw.assignedAt.toISOString(),
     dueDate: hw.dueDate ? hw.dueDate.toISOString() : null
   }))
 
+  const purchases = purchasesRaw.map(p => ({
+    ...p,
+    createdAt: p.createdAt.toISOString()
+  }))
+
   return (
     <TeacherHub 
-      initialRole={isTeacher ? 'Учитель' : 'Ученик'} 
-      userName={session.user.name} 
+      initialRole={isTeacher ? 'Учитель' : (isStudent ? 'Ученик' : 'Гость')} 
+      userName={session?.user?.name || 'Гость'} 
       initialStudents={students}
       initialHomeworks={homeworks}
+      initialCourses={courses}
+      initialVideos={videos}
+      initialOpenings={openings}
+      initialPurchases={purchases}
     />
   )
 }
+

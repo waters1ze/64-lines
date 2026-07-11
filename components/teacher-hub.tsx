@@ -5,7 +5,7 @@ import {
   ArrowLeft, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw,
-  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X,
+  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare
 } from 'lucide-react'
 import { Chess } from 'chess.js'
 
@@ -25,8 +25,26 @@ type HW = {
   progress: number; solved: boolean; attempts: number; pgn: string; status?: string; assigned?: string; due?: string
 }
 type Course = {
-  id: number; name: string; description: string; price: number
-  imageUrl: string; createdAt: number
+  id: string | number;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl?: string | null;
+  fileUrl?: string | null;
+  createdAt: any;
+}
+
+type Video = {
+  id: string | number;
+  title: string;
+  meta: string;
+  url: string;
+}
+
+type Opening = {
+  id: string | number;
+  title: string;
+  pgn: string;
 }
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
@@ -35,37 +53,11 @@ const SAMPLE_PGN = `[Event "Домашнее задание"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5`
 
-const INIT_STUDENTS: Student[] = [
-  { id: 1, name: 'Михаил Орлов',    rating: 1842 },
-  { id: 2, name: 'Анна Волкова',    rating: 1714 },
-  { id: 3, name: 'Даниил Соколов',  rating: 1586 },
-  { id: 4, name: 'Елена Морозова',  rating: 1458 },
-]
-
-const INIT_HW: HW[] = [
-  { id: 1, studentId: 1, title: 'Тактика: отвлечение защитника',    assigned: '7 июля 2026',  due: 'до 14 июля', progress: 40,  status: 'В работе',  pgn: SAMPLE_PGN, attempts: 1, solved: false },
-  { id: 2, studentId: 1, title: 'Ладейный эндшпиль: активный король', assigned: '2 июля 2026',  due: 'до 10 июля', progress: 100, status: 'Выполнено', pgn: SAMPLE_PGN, attempts: 2, solved: true  },
-  { id: 3, studentId: 2, title: 'Сицилианская защита: 12 позиций',  assigned: '10 июля 2026', due: 'до 18 июля', progress: 0,   status: 'Новое',     pgn: SAMPLE_PGN, attempts: 0, solved: false },
-  { id: 4, studentId: 3, title: 'Французская защита: основы',       assigned: '5 июля 2026',  due: 'до 15 июля', progress: 0,   status: 'Новое',     pgn: SAMPLE_PGN, attempts: 0, solved: false },
-]
-
-const INIT_COURSES: Course[] = [
-  { id: 1, name: 'Сицилианская защита: полный репертуар', description: 'Изучите все основные линии: дракон, найдорф, шевенинген. 32 PGN-файла с анализом.', price: 4900, imageUrl: '', createdAt: Date.now() - 86400000 },
-  { id: 2, name: 'Испанская партия за белых',             description: 'Классический дебют. Главные линии, ловушки и типичные планы за белых.',            price: 3900, imageUrl: '', createdAt: Date.now() - 86400000 * 7  },
-  { id: 3, name: 'Дебют ферзевых пешек: гамбиты',        description: 'Агрессивные начала за белых: гамбит ферзевой пешки, каталонское начало.',          price: 2900, imageUrl: '', createdAt: Date.now() - 86400000 * 14 },
-]
-
-const VIDEOS_DATA = [
-  { id: 1, title: 'Как считать форсированные варианты', meta: '18 мин · Тактика',   url: 'https://www.youtube.com/' },
-  { id: 2, title: 'План в изолированной ферзевой пешке', meta: '26 мин · Стратегия', url: 'https://www.youtube.com/' },
-  { id: 3, title: 'Ладейный эндшпиль: правило пяти',    meta: '14 мин · Эндшпиль',  url: 'https://www.youtube.com/' },
-]
-
-const STATIC_MODULES = [
-  { name: 'Стратегия для рейтинга 1600+', lessons: 18, progress: 88 },
-  { name: 'Полный курс эндшпиля',          lessons: 24, progress: 63 },
-  { name: 'Дебютный репертуар за белых',   lessons: 12, progress: 100 },
-]
+const INIT_STUDENTS: Student[] = []
+const INIT_HW: HW[] = []
+const INIT_COURSES: Course[] = []
+const INIT_VIDEOS: Video[] = []
+const INIT_OPENINGS: Opening[] = []
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -180,29 +172,48 @@ import { signOut } from 'next-auth/react'
 
 export function TeacherHub({ 
   initialRole = 'Учитель', 
-  userName = 'Алексей',
+  userName = 'Учитель', 
   initialStudents,
-  initialHomeworks
+  initialHomeworks,
+  initialCourses,
+  initialVideos,
+  initialOpenings,
+  initialPurchases = [],
 }: { 
-  initialRole?: Role, 
-  userName?: string | null,
-  initialStudents?: Student[],
-  initialHomeworks?: HW[]
+  initialRole?: string, 
+  userName?: string, 
+  initialStudents?: any[],
+  initialHomeworks?: any[],
+  initialCourses?: any[],
+  initialVideos?: any[],
+  initialOpenings?: any[],
+  initialPurchases?: any[],
 }) {
-  const [role, setRole] = useState<Role>(initialRole)
+  const isTeacher = initialRole === 'Учитель' || initialRole === 'ADMIN'
+  const isStudent = initialRole === 'Ученик'
+  const isGuest = initialRole === 'Гость'
+
+  const [role] = useState(initialRole)
   const [section, setSection] = useState<Section>('overview')
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
   const [students] = useState<Student[]>(initialStudents || INIT_STUDENTS)
   const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
-  const [courses, setCourses] = useState<Course[]>(INIT_COURSES)
-  const [purchasedIds, setPurchasedIds] = useState<number[]>([])
+  const [courses, setCourses] = useState<Course[]>(initialCourses || INIT_COURSES)
+  const [videos, setVideos] = useState<Video[]>(initialVideos || INIT_VIDEOS)
+  const [openings, setOpenings] = useState<Opening[]>(initialOpenings || INIT_OPENINGS)
+  const [purchases, setPurchases] = useState<any[]>(initialPurchases)
+  
+  const purchasedIds = useMemo(() => {
+    return purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID').map(p => p.courseId)
+  }, [purchases])
+  
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
   const [selectedHwId, setSelectedHwId] = useState<string | number | null>(null)
+  const [paymentCourseId, setPaymentCourseId] = useState<string | number | null>(null)
 
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 2500) }
-  const isStudent = role === 'Ученик'
   const go = (s: Section) => { setSection(s); setMobile(false) }
 
   const teacherNav = [
@@ -242,9 +253,56 @@ export function TeacherHub({
   }
   const updateHomework = (id: number, patch: Partial<HW>) =>
     setHomeworks(prev => prev.map(h => h.id === id ? { ...h, ...patch } : h))
-  const purchaseCourse = (id: number) => {
-    setPurchasedIds(prev => prev.includes(id) ? prev : [...prev, id])
-    notify('Курс куплен! Он доступен в «Учебных модулях».')
+  const purchaseCourse = (id: string | number) => {
+    if (isGuest) {
+      notify('Пожалуйста, зарегистрируйтесь, чтобы совершать покупки.')
+      return
+    }
+    const alreadyPending = purchases.some(p => p.courseId === id && p.status === 'PENDING')
+    if (alreadyPending) {
+      notify('У вас уже есть заявка на этот курс. Ожидайте подтверждения.')
+      return
+    }
+    setPaymentCourseId(id)
+  }
+
+  const handleManualPayment = async () => {
+    if (!paymentCourseId) return
+    try {
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courseId: paymentCourseId })
+      })
+      if (res.ok) {
+        const { purchase } = await res.json()
+        setPurchases(prev => [purchase, ...prev])
+        notify('Заявка на оплату отправлена! Как только мы её проверим, курс появится в вашем кабинете.')
+      } else {
+        notify('Произошла ошибка или заявка уже существует.')
+      }
+    } catch {
+      notify('Ошибка сети.')
+    }
+    setPaymentCourseId(null)
+  }
+
+  const approvePurchase = async (purchaseId: string) => {
+    try {
+      const res = await fetch('/api/payments/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ purchaseId })
+      })
+      if (res.ok) {
+        setPurchases(prev => prev.map(p => p.id === purchaseId ? { ...p, status: 'APPROVED' } : p))
+        notify('Оплата подтверждена! Доступ выдан, письмо отправлено.')
+      } else {
+        notify('Ошибка при подтверждении оплаты.')
+      }
+    } catch {
+      notify('Ошибка сети.')
+    }
   }
 
   const sectionLabel = (() => {
@@ -324,7 +382,7 @@ export function TeacherHub({
             {section === 'videos'   && <VideosSection teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard />}
             {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} />}
-            {section === 'sales'    && !isStudent && <Sales />}
+            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
@@ -339,10 +397,44 @@ export function TeacherHub({
         </main>
       </div>
 
-      {toast && <div role="status" className="fixed bottom-5 right-5 z-50 rounded-lg border bg-background px-4 py-3 text-sm shadow-lg">{toast}</div>}
+      {paymentCourseId && (() => {
+        const course = courses.find(c => c.id === paymentCourseId)
+        if (!course) return null
+        return (
+          <Modal title="Оплата курса" close={() => setPaymentCourseId(null)}>
+            <div className="flex flex-col gap-4 text-center">
+              <div className="rounded-xl bg-muted/30 p-6">
+                <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
+                <b className="mt-2 block text-2xl tracking-widest">+7 (999) 000-00-00</b>
+                <p className="mt-1 text-sm text-muted-foreground">Банк: Тинькофф (Т-Банк) / Получатель: Иван И.</p>
+              </div>
+              <p className="text-sm">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
+              <div className="mt-4 flex flex-col gap-3">
+                <button className="button w-full" onClick={handleManualPayment}>
+                  Я перевел(а) деньги
+                </button>
+                <a href="https://t.me/your_telegram" target="_blank" rel="noopener noreferrer" className="outline-button flex w-full items-center justify-center gap-2">
+                  <MessageSquare className="size-4" />
+                  Написать в поддержку
+                </a>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                После нажатия "Я перевел деньги" мы проверим оплату, и курс появится в вашем кабинете. Если что-то пойдет не так, смело пишите в поддержку!
+              </p>
+            </div>
+          </Modal>
+        )
+      })()}
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 rounded-lg border bg-background p-4 shadow-xl">
+          <p className="text-sm font-medium">{toast}</p>
+        </div>
+      )}
     </div>
   )
 }
+
 
 // ─── Overview sections ────────────────────────────────────────────────────────
 
@@ -1158,24 +1250,47 @@ function Modules({ courses, purchasedIds }: { courses: Course[]; purchasedIds: n
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
-function Sales() {
+function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: string) => void }) {
+  const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
+  
   return (
     <>
-      <Head over="Коммерция" title="Продажи" text="Статистика продаж курсов и материалов." />
+      <Head over="Коммерция" title="Продажи" text="Заявки на оплату и статистика." />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="За 30 дней"  value="184 900 ₽" note="+18%" />
-        <Metric label="Заказов"      value="52"        note="Средний чек 3 556 ₽" />
-        <Metric label="Конверсия"    value="6,8%"      note="Из просмотра" />
-        <Metric label="Возвраты"     value="0 ₽"       note="Нет запросов" />
+        <Metric label="Выручка"  value={`${revenue.toLocaleString('ru-RU')} ₽`} note="Всего" />
+        <Metric label="Заказов"  value={`${purchases.length}`} note={`Ожидают: ${purchases.filter(p => p.status === 'PENDING').length}`} />
       </section>
+
+      <div className="mt-8">
+        <h3 className="mb-4 text-xl font-semibold">История заказов</h3>
+        <div className="flex flex-col gap-3">
+          {purchases.map(p => (
+            <div key={p.id} className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <p className="font-medium">{p.user?.name || p.user?.email}</p>
+                <p className="text-sm text-muted-foreground">{p.course?.name}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className={`badge ${p.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-green-500/10 text-green-500'}`}>
+                  {p.status === 'PENDING' ? 'Ожидает оплаты' : 'Оплачено'}
+                </span>
+                {p.status === 'PENDING' && (
+                  <button className="button text-xs py-1 px-3 h-auto" onClick={() => onApprove(p.id)}>Одобрить</button>
+                )}
+              </div>
+            </div>
+          ))}
+          {purchases.length === 0 && <p className="text-muted-foreground">Пока нет ни одного заказа.</p>}
+        </div>
+      </div>
     </>
   )
 }
 
 // ─── Storefront (Витрина) ─────────────────────────────────────────────────────
 
-function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; purchasedIds: number[]; onPurchase: (id: number) => void }) {
-  const [detailId, setDetailId] = useState<number | null>(null)
+function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; purchasedIds: number[]; onPurchase: (id: string | number) => void }) {
+  const [detailId, setDetailId] = useState<string | number | null>(null)
   const detail = courses.find(c => c.id === detailId)
 
   // All items: courses newest first + static modules
