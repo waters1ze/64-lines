@@ -342,6 +342,26 @@ export function TeacherHub({
       } else notify('Ошибка при добавлении ученика')
     } catch { notify('Ошибка сети') }
   }
+  const approvePurchase = async (purchaseId: string) => {
+    try {
+      const res = await fetch('/api/payments/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purchaseId }) })
+      if (res.ok) {
+        setPurchases(prev => prev.map(p => p.id === purchaseId ? { ...p, status: 'APPROVED' } : p))
+        notify('Оплата подтверждена!')
+      } else { notify('Ошибка сервера') }
+    } catch { notify('Ошибка сети') }
+  }
+
+  const rejectPurchase = async (purchaseId: string) => {
+    try {
+      const res = await fetch('/api/payments/reject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purchaseId }) })
+      if (res.ok) {
+        setPurchases(prev => prev.map(p => p.id === purchaseId ? { ...p, status: 'REJECTED' } : p))
+        notify('Оплата отклонена')
+      } else { notify('Ошибка сервера') }
+    } catch { notify('Ошибка сети') }
+  }
+
   const purchaseCourse = (id: string | number) => {
     if (isGuest) {
       notify('Пожалуйста, зарегистрируйтесь, чтобы совершать покупки.')
@@ -379,23 +399,6 @@ export function TeacherHub({
     setPaymentCourseId(null)
   }
 
-  const approvePurchase = async (purchaseId: string) => {
-    try {
-      const res = await fetch('/api/payments/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ purchaseId })
-      })
-      if (res.ok) {
-        setPurchases(prev => prev.map(p => p.id === purchaseId ? { ...p, status: 'APPROVED' } : p))
-        notify('Оплата подтверждена! Доступ выдан, письмо отправлено.')
-      } else {
-        notify('Ошибка при подтверждении оплаты.')
-      }
-    } catch {
-      notify('Ошибка сети.')
-    }
-  }
 
   const sectionLabel = (() => {
     if (section === 'studentProfile' && selectedStudent) return selectedStudent.name
@@ -486,7 +489,7 @@ export function TeacherHub({
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} onOpenCourse={openCourseViewer} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
-            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} />}
+            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
@@ -1237,6 +1240,11 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
 
 // ─── Videos ───────────────────────────────────────────────────────────────────
 
+function getYouTubeId(url: string) {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+  return match ? match[1] : null;
+}
+
 function VideosSection({ 
   videos, 
   setVideos, 
@@ -1256,18 +1264,27 @@ function VideosSection({
         text={teacher ? 'Публикуйте ссылки на видео с вашего канала.' : 'Смотрите видеоуроки тренера.'}
         action={teacher ? <button className="button" onClick={() => setShow(true)}><Plus />Добавить видео</button> : undefined} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {videos.map(v => (
-          <article key={v.id} className="overflow-hidden rounded-lg border">
-            <div className="flex aspect-video items-center justify-center border-b bg-muted/40"><Video className="size-9 text-muted-foreground" /></div>
-            <div className="p-5">
-              <h3 className="font-semibold">{v.title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{v.meta}</p>
-              <a className="outline-button mt-5 w-full" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
-                Смотреть на YouTube<ExternalLink />
-              </a>
-            </div>
-          </article>
-        ))}
+        {videos.map(v => {
+          const ytId = getYouTubeId(v.url)
+          return (
+            <article key={v.id} className="overflow-hidden rounded-lg border">
+              <div className="flex aspect-video items-center justify-center border-b bg-muted/40 relative">
+                {ytId ? (
+                  <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover" />
+                ) : (
+                  <Video className="size-9 text-muted-foreground" />
+                )}
+              </div>
+              <div className="p-5">
+                <h3 className="font-semibold">{v.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{v.meta}</p>
+                <a className="outline-button mt-5 w-full" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
+                  Смотреть на YouTube<ExternalLink />
+                </a>
+              </div>
+            </article>
+          )
+        })}
       </div>
       {show && (
         <Modal title="Добавить видео с YouTube" close={() => setShow(false)}>
@@ -1666,10 +1683,10 @@ function Modules({ courses, purchasedIds, onOpenCourse }: { courses: Course[]; p
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
-function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: string) => void }) {
+function Sales({ purchases, onApprove, onReject }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void }) {
   const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
   const pending = purchases.filter(p => p.status === 'PENDING')
-  const approved = purchases.filter(p => p.status === 'APPROVED')
+  const history = purchases.filter(p => p.status === 'APPROVED' || p.status === 'REJECTED')
   
   return (
     <>
@@ -1685,7 +1702,7 @@ function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: str
           <div className="flex flex-col gap-3">
             {pending.map(p => (
               <div key={p.id} className="rounded-lg border-2 border-yellow-300 bg-yellow-50/50 p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="font-semibold">{p.user?.name || p.user?.email}</p>
                     <p className="text-sm text-muted-foreground">Курс: {p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
@@ -1693,7 +1710,10 @@ function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: str
                     {p.comment && <p className="mt-0.5 text-sm text-muted-foreground"><b>Комментарий:</b> {p.comment}</p>}
                     <p className="mt-1 text-xs text-muted-foreground">{formatDate(p.createdAt)}</p>
                   </div>
-                  <button className="button text-sm py-1.5 px-4 h-auto whitespace-nowrap" onClick={() => onApprove(p.id)}>✅ Одобрить</button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button className="button w-full sm:w-auto text-sm py-1.5 px-4 bg-red-100 hover:bg-red-200 text-red-700" onClick={() => onReject(p.id)}>❌ Отклонить</button>
+                    <button className="button w-full sm:w-auto text-sm py-1.5 px-4 bg-green-600 hover:bg-green-700 text-white" onClick={() => onApprove(p.id)}>✅ Одобрить</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1704,16 +1724,18 @@ function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: str
       <div className="mt-8">
         <h3 className="mb-4 text-xl font-semibold">История заказов</h3>
         <div className="flex flex-col gap-3">
-          {approved.map(p => (
+          {history.map(p => (
             <div key={p.id} className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <p className="font-medium">{p.user?.name || p.user?.email}</p>
                 <p className="text-sm text-muted-foreground">{p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
               </div>
-              <span className="badge bg-green-500/10 text-green-500">Оплачено</span>
+              <span className={`badge ${p.status === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                {p.status === 'APPROVED' ? 'Оплачено' : 'Отклонено'}
+              </span>
             </div>
           ))}
-          {approved.length === 0 && <p className="text-muted-foreground">Пока нет подтверждённых заказов.</p>}
+          {history.length === 0 && <p className="text-muted-foreground">Пока нет завершённых заказов.</p>}
         </div>
       </div>
     </>
@@ -1920,56 +1942,173 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
 
 // ─── Course Viewer ────────────────────────────────────────────────────────────
 
-type PgnGame = { event: string; white: string; black: string; result: string; startFen: string; moves: string[] }
+type MoveNode = {
+  id: string;
+  san: string;
+  moveNumber?: number;
+  turn: 'w' | 'b';
+  variations: MoveNode[][];
+  comment?: string;
+  fen: string;
+  parentId: string | null;
+}
+
+type PgnGame = {
+  event: string;
+  white: string;
+  black: string;
+  result: string;
+  startFen: string;
+  rootMoves: MoveNode[];
+  nodeMap: Record<string, MoveNode>;
+}
 
 function parsePgnGames(pgn: string): PgnGame[] {
   if (!pgn?.trim()) return []
-  const blocks = pgn.split(/(?=\[Event )/).map(s => s.trim()).filter(Boolean)
-  return blocks.map(block => {
-    const get = (tag: string) => block.match(new RegExp(`\\[${tag} "(.+?)"\\]`))?.[1] ?? ''
-    const fenMatch = block.match(/\[FEN "(.+?)"\]/)
-    const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    let normalizedPgn = block
-    if (fenMatch && !block.includes('[SetUp "1"]')) normalizedPgn = '[SetUp "1"]\n' + block
-    let moves: string[] = []
-    try { const g = new Chess(); g.loadPgn(normalizedPgn); moves = g.history() } catch {}
-    return { event: get('Event') || 'Партия', white: get('White'), black: get('Black'), result: get('Result'), startFen, moves }
-  })
+  try {
+    const { parse } = require('@mliebelt/pgn-parser')
+    const parsed = parse(pgn, { startRule: 'games' }) as any[]
+    
+    return parsed.map(game => {
+      const startFen = game.tags?.FEN ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+      let nextId = 1
+      const nodeMap: Record<string, MoveNode> = {}
+      
+      function processMoves(moves: any[], currentFen: string, parentId: string | null): MoveNode[] {
+        const result: MoveNode[] = []
+        let fen = currentFen
+        const chess = new Chess(fen)
+        
+        for (const m of moves) {
+          const san = m.notation.notation
+          let newFen = fen
+          try {
+            chess.move(san)
+            newFen = chess.fen()
+          } catch (e) {
+            // fallback
+          }
+          
+          const node: MoveNode = {
+            id: `m${nextId++}`,
+            san,
+            moveNumber: m.moveNumber,
+            turn: m.turn,
+            fen: newFen,
+            comment: m.commentDiag?.comment,
+            variations: [],
+            parentId
+          }
+          nodeMap[node.id] = node
+          
+          if (m.variations && m.variations.length > 0) {
+            node.variations = m.variations.map((vMoves: any[]) => processMoves(vMoves, fen, parentId))
+          }
+          
+          result.push(node)
+          fen = newFen
+          parentId = node.id
+        }
+        return result
+      }
+      
+      const white = game.tags?.White === '?' ? '' : (game.tags?.White || '')
+      const black = game.tags?.Black === '?' ? '' : (game.tags?.Black || '')
+      
+      return {
+        event: game.tags?.Event || 'Партия',
+        white,
+        black,
+        result: game.tags?.Result || '',
+        startFen,
+        rootMoves: processMoves(game.moves || [], startFen, null),
+        nodeMap
+      }
+    })
+  } catch (e) {
+    console.error('PGN parse error', e)
+    return []
+  }
+}
+
+function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], activeId: string|null, onSelect: (id: string) => void }) {
+  return (
+    <>
+      {nodes.map((node, i) => (
+        <React.Fragment key={node.id}>
+          <span 
+            className={`inline-block px-1 rounded cursor-pointer transition-colors ${activeId === node.id ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted'}`}
+            onClick={() => onSelect(node.id)}
+          >
+            {node.turn === 'w' ? `${node.moveNumber}. ${node.san}` : (i === 0 ? `${node.moveNumber}... ${node.san}` : node.san)}
+          </span>
+          {' '}
+          {node.variations.length > 0 && (
+            <span className="inline-block text-muted-foreground">
+              {node.variations.map((v, vi) => (
+                <span key={vi} className="inline-flex gap-1 ml-1">
+                  ( <MoveNodeList nodes={v} activeId={activeId} onSelect={onSelect} /> )
+                </span>
+              ))}
+            </span>
+          )}
+          {node.comment && <span className="text-muted-foreground italic ml-1 mr-1">{`{ ${node.comment} }`}</span>}
+        </React.Fragment>
+      ))}
+    </>
+  )
 }
 
 function CourseViewer({ course }: { course: Course }) {
   const games = useMemo(() => parsePgnGames(course.pgn ?? ''), [course.pgn])
   const [selectedIdx, setSelectedIdx] = useState(0)
-  const [moveIdx, setMoveIdx] = useState(0)
+  const [activeMoveId, setActiveMoveId] = useState<string | null>(null)
+  const [flipped, setFlipped] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [dragFrom, setDragFrom] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
-  const [flipped, setFlipped] = useState(false)
 
   const currentGame = games[selectedIdx]
-  const { startFen, moves } = currentGame ?? { startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', moves: [] }
+  
+  const currentFen = useMemo(() => {
+    if (!currentGame) return 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    if (!activeMoveId) return currentGame.startFen
+    return currentGame.nodeMap[activeMoveId]?.fen ?? currentGame.startFen
+  }, [currentGame, activeMoveId])
 
   const boardGame = useMemo(() => {
-    try {
-      const g = new Chess(startFen)
-      for (let i = 0; i < moveIdx; i++) { try { g.move(moves[i]) } catch {} }
-      return g
-    } catch { return new Chess() }
-  }, [startFen, moves, moveIdx])
+    try { return new Chess(currentFen) } catch { return new Chess() }
+  }, [currentFen])
 
-  useEffect(() => { setMoveIdx(0); setSelected(null) }, [selectedIdx])
+  useEffect(() => { setActiveMoveId(null); setSelected(null) }, [selectedIdx])
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === 'ArrowLeft')  setMoveIdx(p => Math.max(0, p - 1))
-      if (e.key === 'ArrowRight') setMoveIdx(p => Math.min(moves.length, p + 1))
-      if (e.key === 'ArrowUp')    setMoveIdx(0)
-      if (e.key === 'ArrowDown')  setMoveIdx(moves.length)
+      if (!currentGame) return
+      
+      if (e.key === 'ArrowLeft') {
+        if (activeMoveId) {
+          const node = currentGame.nodeMap[activeMoveId]
+          setActiveMoveId(node?.parentId ?? null)
+        }
+      }
+      if (e.key === 'ArrowRight') {
+        // Find first child of current node
+        if (!activeMoveId) {
+          if (currentGame.rootMoves.length > 0) setActiveMoveId(currentGame.rootMoves[0].id)
+        } else {
+          // Find next node in main line. 
+          // We can just search rootMoves and variations for the node whose parentId is activeMoveId
+          const nextNode = Object.values(currentGame.nodeMap).find(n => n.parentId === activeMoveId)
+          if (nextNode) setActiveMoveId(nextNode.id)
+        }
+      }
+      if (e.key === 'ArrowUp') setActiveMoveId(null)
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [moves.length])
+  }, [currentGame, activeMoveId])
 
   if (games.length === 0) {
     return (
@@ -1998,26 +2137,25 @@ function CourseViewer({ course }: { course: Course }) {
               >⬇ Скачать PGN</a>
             )}
           </div>
-          <div className="rounded-lg border overflow-hidden">
-            {games.map((g, i) => (
-              <button
-                key={i}
-                onClick={() => setSelectedIdx(i)}
-                className={`w-full text-left p-3 border-b last:border-0 transition-colors ${i === selectedIdx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-mono w-6 shrink-0 ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{i + 1}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{g.event}</p>
-                    {(g.white || g.black) && (
-                      <p className={`text-xs truncate ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                        {[g.white, g.black].filter(Boolean).join(' vs ')}
-                      </p>
-                    )}
+          <div className="rounded-lg border overflow-hidden max-h-[600px] overflow-y-auto">
+            {games.map((g, i) => {
+              const label = (g.white || g.black) ? [g.white, g.black].filter(Boolean).join(' - ') : g.event
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelectedIdx(i)}
+                  className={`w-full text-left p-3 border-b last:border-0 transition-colors ${i === selectedIdx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-mono w-6 shrink-0 ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{label}</p>
+                      {(g.white || g.black) && <p className={`text-xs truncate ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{g.event}</p>}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -2026,22 +2164,26 @@ function CourseViewer({ course }: { course: Course }) {
           {/* Navigation controls */}
           <div className="flex items-center justify-between rounded-lg border p-2 bg-muted/30">
             <div className="flex gap-1">
-              <button className="icon-button" onClick={() => setMoveIdx(0)} title="Начало" disabled={moveIdx === 0}>
+              <button className="icon-button" onClick={() => setActiveMoveId(null)} title="Начало" disabled={!activeMoveId}>
                 <ArrowLeft className="size-3" /><ArrowLeft className="size-3 -ml-2" />
               </button>
-              <button className="icon-button" onClick={() => setMoveIdx(p => Math.max(0, p - 1))} disabled={moveIdx === 0}>
+              <button className="icon-button" onClick={() => {
+                if (activeMoveId) setActiveMoveId(currentGame.nodeMap[activeMoveId]?.parentId ?? null)
+              }
+              } disabled={!activeMoveId}>
                 <ArrowLeft className="size-4" />
               </button>
             </div>
             <span className="text-xs font-medium text-muted-foreground">
-              {moveIdx === 0 ? 'Начальная позиция' : `Ход ${Math.ceil(moveIdx / 2)}: ${moves[moveIdx - 1]}`}
+              {!activeMoveId ? 'Начальная позиция' : `Ход: ${currentGame.nodeMap[activeMoveId]?.san ?? ''}`}
             </span>
             <div className="flex gap-1">
-              <button className="icon-button" onClick={() => setMoveIdx(p => Math.min(moves.length, p + 1))} disabled={moveIdx === moves.length}>
+              <button className="icon-button" onClick={() => {
+                const next = Object.values(currentGame.nodeMap).find(n => n.parentId === activeMoveId)
+                if (next) setActiveMoveId(next.id)
+                else if (!activeMoveId && currentGame.rootMoves.length > 0) setActiveMoveId(currentGame.rootMoves[0].id)
+              }}>
                 <ArrowRight className="size-4" />
-              </button>
-              <button className="icon-button" onClick={() => setMoveIdx(moves.length)} title="Конец" disabled={moveIdx === moves.length}>
-                <ArrowRight className="size-3" /><ArrowRight className="size-3 -ml-2" />
               </button>
             </div>
           </div>
@@ -2058,7 +2200,7 @@ function CourseViewer({ course }: { course: Course }) {
                 dragOver={dragOver}
                 setDragOver={setDragOver}
                 flipped={flipped}
-                onMove={() => {}}
+                onMove={() => {}} // Read-only for now
               />
             </div>
             <div className="mt-3 flex items-center gap-2">
@@ -2070,21 +2212,15 @@ function CourseViewer({ course }: { course: Course }) {
             </div>
           </div>
 
-          {/* Move list */}
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-semibold mb-3">Ходы партии</p>
-            <div className="flex flex-wrap gap-x-1 gap-y-1.5 text-sm font-mono leading-7">
-              {moves.length === 0
-                ? <span className="text-xs text-muted-foreground">Ходы не записаны</span>
-                : moves.map((san, i) => (
-                    <span key={i} className="inline-flex items-center gap-0.5">
-                      {i % 2 === 0 && <span className="text-xs text-muted-foreground">{Math.floor(i / 2) + 1}.</span>}
-                      <button
-                        className={`rounded px-1 transition-colors ${i === moveIdx - 1 ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                        onClick={() => setMoveIdx(i + 1)}
-                      >{san}</button>
-                    </span>
-                  ))}
+          {/* Move list with variations */}
+          <div className="rounded-lg border p-4 bg-white/50">
+            <p className="text-sm font-semibold mb-3">Вся теория</p>
+            <div className="text-sm leading-8 font-medium">
+              {currentGame.rootMoves.length === 0 ? (
+                <span className="text-muted-foreground text-sm">Ходы не записаны</span>
+              ) : (
+                <MoveNodeList nodes={currentGame.rootMoves} activeId={activeMoveId} onSelect={setActiveMoveId} />
+              )}
             </div>
           </div>
         </div>
