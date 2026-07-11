@@ -179,6 +179,7 @@ import Link from 'next/link'
 export function TeacherHub({ 
   initialRole = 'Учитель', 
   userName = 'Учитель', 
+  userRating = 1200,
   initialStudents,
   initialHomeworks,
   initialCourses,
@@ -188,6 +189,7 @@ export function TeacherHub({
 }: { 
   initialRole?: string, 
   userName?: string, 
+  userRating?: number,
   initialStudents?: any[],
   initialHomeworks?: any[],
   initialCourses?: any[],
