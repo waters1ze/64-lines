@@ -1342,21 +1342,23 @@ function VideosSection({
           const ytId = getYouTubeId(v.url)
           return (
             <article key={v.id} className="overflow-hidden rounded-lg border flex flex-col">
-              <div className="flex aspect-video items-center justify-center border-b bg-muted/40 relative shrink-0">
+              <div className="w-full aspect-video border-b bg-muted/40 relative shrink-0 overflow-hidden">
                 {ytId ? (
                   <img
                     src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`}
                     alt={v.title}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover scale-105"
                     onError={e => {
                       const img = e.target as HTMLImageElement
-                      if (!img.src.includes('mqdefault')) {
-                        img.src = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+                      if (!img.src.includes('hqdefault')) {
+                        img.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
                       }
                     }}
                   />
                 ) : (
-                  <Video className="size-9 text-muted-foreground" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Video className="size-9 text-muted-foreground" />
+                  </div>
                 )}
               </div>
               <div className="p-5 flex flex-col flex-1">
