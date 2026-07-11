@@ -25,6 +25,10 @@ export default async function Page() {
     if (dbUser) {
       userRating = dbUser.rating
       userName = dbUser.name || session.user.name || 'Гость'
+      
+      // Override session role with database role to prevent stale JWT session issues
+      isTeacher = dbUser.role === 'TEACHER' || dbUser.role === 'ADMIN'
+      isStudent = dbUser.role === 'STUDENT'
     }
   }
 
