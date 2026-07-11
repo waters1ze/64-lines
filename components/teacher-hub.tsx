@@ -1267,61 +1267,111 @@ function VideosSection({
   teacher: boolean; 
   notify: (s: string) => void 
 }) {
-  const [show, setShow] = useState(false)
+  const [modal, setModal] = useState<null | 'add' | string | number>(null)
   const [form, setForm] = useState({ title: '', meta: '', url: '' })
+
+  function openAdd() {
+    setForm({ title: '', meta: '', url: '' })
+    setModal('add')
+  }
+
+  function openEdit(v: Video) {
+    setForm({ title: v.title, meta: v.meta, url: v.url })
+    setModal(v.id)
+  }
+
+  async function handleDelete(id: string | number) {
+    if (!confirm('Удалить видео?')) return
+    try {
+      const res = await fetch(`/api/videos/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setVideos(prev => prev.filter(v => v.id !== id))
+        notify('Видео удалено')
+      } else {
+        notify('Ошибка при удалении')
+      }
+    } catch {
+      notify('Ошибка сети')
+    }
+  }
+
+  async function handleSave() {
+    if (!form.title || !form.url) { notify('Заполните все поля'); return }
+    const isEdit = modal !== 'add' && modal !== null
+    try {
+      if (modal === 'add') {
+        const res = await fetch('/api/videos/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form)
+        })
+        if (res.ok) {
+          const { video } = await res.json()
+          setVideos(prev => [video, ...prev])
+          notify('Видео опубликовано!')
+        } else {
+          notify('Ошибка при сохранении видео.')
+        }
+      } else if (isEdit) {
+        const res = await fetch(`/api/videos/${modal}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form)
+        })
+        if (res.ok) {
+          const updatedVideo = await res.json()
+          setVideos(prev => prev.map(v => v.id === modal ? updatedVideo : v))
+          notify('Видео обновлено!')
+        } else {
+          notify('Ошибка при обновлении видео.')
+        }
+      }
+    } catch {
+      notify('Ошибка сети.')
+    }
+    setModal(null)
+  }
+
   return (
     <>
       <Head over="YouTube библиотека" title="Видеоуроки"
         text={teacher ? 'Публикуйте ссылки на видео с вашего канала.' : 'Смотрите видеоуроки тренера.'}
-        action={teacher ? <button className="button" onClick={() => setShow(true)}><Plus />Добавить видео</button> : undefined} />
+        action={teacher ? <button className="button" onClick={openAdd}><Plus />Добавить видео</button> : undefined} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {videos.map(v => {
           const ytId = getYouTubeId(v.url)
           return (
-            <article key={v.id} className="overflow-hidden rounded-lg border">
-              <div className="flex aspect-video items-center justify-center border-b bg-muted/40 relative">
+            <article key={v.id} className="overflow-hidden rounded-lg border flex flex-col">
+              <div className="flex aspect-video items-center justify-center border-b bg-muted/40 relative shrink-0">
                 {ytId ? (
                   <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt={v.title} className="w-full h-full object-cover" />
                 ) : (
                   <Video className="size-9 text-muted-foreground" />
                 )}
               </div>
-              <div className="p-5">
+              <div className="p-5 flex flex-col flex-1">
                 <h3 className="font-semibold">{v.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{v.meta}</p>
-                <a className="outline-button mt-5 w-full" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
+                <p className="mt-1 text-sm text-muted-foreground flex-1">{v.meta}</p>
+                <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
                   Смотреть на YouTube<ExternalLink />
                 </a>
+                {teacher && (
+                  <div className="flex items-center gap-2 mt-2 shrink-0">
+                    <button className="outline-button flex-1 py-1 text-xs h-auto" onClick={() => openEdit(v)}><Pencil className="size-3" /> Изменить</button>
+                    <button className="icon-button border rounded-md" onClick={() => handleDelete(v.id)}><Trash2 className="size-4 text-red-500" /></button>
+                  </div>
+                )}
               </div>
             </article>
           )
         })}
       </div>
-      {show && (
-        <Modal title="Добавить видео с YouTube" close={() => setShow(false)}>
+      {(modal === 'add' || (modal !== null)) && (
+        <Modal title={modal === 'add' ? 'Добавить видео с YouTube' : 'Редактировать видео'} close={() => setModal(null)}>
           <label className="field">Название<input className="input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></label>
           <label className="field">Длительность и тема<input className="input" value={form.meta} onChange={e => setForm(p => ({ ...p, meta: e.target.value }))} placeholder="18 мин · Тактика" /></label>
           <label className="field">Ссылка YouTube<input className="input" type="url" value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://youtube.com/watch?v=..." /></label>
-          <button className="button" onClick={async () => {
-            if (!form.title || !form.url) { notify('Заполните все поля'); return }
-            try {
-              const res = await fetch('/api/videos/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form)
-              })
-              if (res.ok) {
-                const { video } = await res.json()
-                setVideos(prev => [video, ...prev])
-                notify('Видео опубликовано!')
-              } else {
-                notify('Ошибка при сохранении видео.')
-              }
-            } catch {
-              notify('Ошибка сети.')
-            }
-            setShow(false)
-          }}>Опубликовать</button>
+          <button className="button" onClick={handleSave}>{modal === 'add' ? 'Опубликовать' : 'Сохранить'}</button>
         </Modal>
       )}
     </>
