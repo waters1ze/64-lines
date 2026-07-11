@@ -14,7 +14,7 @@ import { Chess } from 'chess.js'
 type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
-  | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings'
+  | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -32,6 +32,7 @@ type Course = {
   price: number;
   imageUrl?: string | null;
   fileUrl?: string | null;
+  pgn?: string | null;
   createdAt: any;
 }
 
@@ -245,6 +246,10 @@ export function TeacherHub({
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
   const [selectedHwId, setSelectedHwId] = useState<string | number | null>(null)
   const [paymentCourseId, setPaymentCourseId] = useState<string | number | null>(null)
+  const [paymentStep, setPaymentStep] = useState<'info' | 'confirm'>('info')
+  const [paymentSender, setPaymentSender] = useState('')
+  const [paymentComment, setPaymentComment] = useState('')
+  const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
 
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 2500) }
   const go = (s: Section) => { setSection(s); setMobile(false) }
@@ -283,9 +288,11 @@ export function TeacherHub({
 
   const selectedStudent = students.find(s => s.id === selectedStudentId) ?? null
   const selectedHw = homeworks.find(h => h.id === selectedHwId) ?? null
+  const viewingCourse = courses.find(c => c.id === viewingCourseId) ?? null
 
   const openStudentProfile = (id: string | number) => { setSelectedStudentId(id); go('studentProfile') }
   const openHwPuzzle       = (id: string | number) => { setSelectedHwId(id);      go('homeworkPuzzle') }
+  const openCourseViewer   = (id: string | number) => { setViewingCourseId(id);   go('courseViewer') }
 
   const addHomework = async (hw: Omit<HW, 'id' | 'attempts' | 'solved'>) => {
     try {
@@ -345,6 +352,9 @@ export function TeacherHub({
       notify('У вас уже есть заявка на этот курс. Ожидайте подтверждения.')
       return
     }
+    setPaymentStep('info')
+    setPaymentSender('')
+    setPaymentComment('')
     setPaymentCourseId(id)
   }
 
@@ -354,7 +364,7 @@ export function TeacherHub({
       const res = await fetch('/api/payments/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseId: paymentCourseId })
+        body: JSON.stringify({ courseId: paymentCourseId, senderName: paymentSender, comment: paymentComment })
       })
       if (res.ok) {
         const { purchase } = await res.json()
@@ -390,6 +400,7 @@ export function TeacherHub({
   const sectionLabel = (() => {
     if (section === 'studentProfile' && selectedStudent) return selectedStudent.name
     if (section === 'homeworkPuzzle' && selectedHw)      return selectedHw.title
+    if (section === 'courseViewer' && viewingCourse)      return viewingCourse.name
     return [...teacherNav, ...studentNavBase].find(n => n[0] === section)?.[1] ?? 'Обзор'
   })()
 
@@ -433,8 +444,8 @@ export function TeacherHub({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 md:px-6">
           <button className="icon-button md:hidden" onClick={() => setMobile(true)}><Menu /></button>
-          {(section === 'studentProfile' || section === 'homeworkPuzzle') && (
-            <button className="icon-button" onClick={() => go(section === 'studentProfile' ? 'students' : (isStudent ? 'overview' : 'homework'))}><ArrowLeft /></button>
+          {(section === 'studentProfile' || section === 'homeworkPuzzle' || section === 'courseViewer') && (
+            <button className="icon-button" onClick={() => go(section === 'studentProfile' ? 'students' : section === 'courseViewer' ? 'modules' : (isStudent ? 'overview' : 'homework'))}><ArrowLeft /></button>
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
@@ -473,7 +484,8 @@ export function TeacherHub({
             )}
             {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
-            {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} />}
+            {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} onOpenCourse={openCourseViewer} />}
+            {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
             {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
@@ -521,26 +533,40 @@ export function TeacherHub({
         if (!course) return null
         return (
           <Modal title="Оплата курса" close={() => setPaymentCourseId(null)}>
-            <div className="flex flex-col gap-4 text-center">
-              <div className="rounded-xl bg-muted/30 p-6">
-                <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
-                <b className="mt-2 block text-2xl tracking-widest">+7 (999) 000-00-00</b>
-                <p className="mt-1 text-sm text-muted-foreground">Банк: Тинькофф (Т-Банк) / Получатель: Иван И.</p>
-              </div>
-              <p className="text-sm">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
-              <div className="mt-4 flex flex-col gap-3">
-                <button className="button w-full" onClick={handleManualPayment}>
-                  Я перевел(а) деньги
+            {paymentStep === 'info' ? (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию, чтобы мы могли быстрее подтвердить ваш перевод.</p>
+                <label className="field">Ваше имя (отправитель перевода)
+                  <input className="input" value={paymentSender} onChange={e => setPaymentSender(e.target.value)} placeholder="Иван Иванов" />
+                </label>
+                <label className="field">Комментарий к заказу
+                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Например: оплачиваю по акции, или ник на lichess..." />
+                </label>
+                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('confirm')}>
+                  Далее — к оплате
                 </button>
-                <a href="https://t.me/your_telegram" target="_blank" rel="noopener noreferrer" className="outline-button flex w-full items-center justify-center gap-2">
-                  <MessageSquare className="size-4" />
-                  Написать в поддержку
-                </a>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                После нажатия "Я перевел деньги" мы проверим оплату, и курс появится в вашем кабинете. Если что-то пойдет не так, смело пишите в поддержку!
-              </p>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-4 text-center">
+                <div className="rounded-xl bg-muted/30 p-6">
+                  <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
+                  <b className="mt-2 block text-2xl tracking-widest">+7 (999) 813-78-70</b>
+                  <p className="mt-1 text-sm text-muted-foreground">Банк: Альфа-Банк / Получатель: Кирилл П.</p>
+                </div>
+                <p className="text-sm">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
+                <div className="mt-2 flex flex-col gap-3">
+                  <button className="button w-full" onClick={handleManualPayment}>
+                    Я перевел(а) деньги
+                  </button>
+                  <button className="outline-button w-full" onClick={() => setPaymentStep('info')}>
+                    <ArrowLeft className="size-4" />Назад
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  После нажатия "Я перевел деньги" мы проверим оплату, и курс появится в вашем кабинете. Если что-то пойдет не так, смело пишите в поддержку!
+                </p>
+              </div>
+            )}
           </Modal>
         )
       })()}
@@ -1597,22 +1623,40 @@ function Openings() { return <PgnBoard /> }
 
 // ─── Modules ──────────────────────────────────────────────────────────────────
 
-function Modules({ courses, purchasedIds }: { courses: Course[]; purchasedIds: number[] }) {
+function Modules({ courses, purchasedIds, onOpenCourse }: { courses: Course[]; purchasedIds: (string | number)[]; onOpenCourse: (id: string | number) => void }) {
   const purchased = courses.filter(c => purchasedIds.includes(c.id))
-  const items = [...purchased.map(c => ({ name: c.name, lessons: 20, progress: 0 })), ...STATIC_MODULES]
   return (
     <>
-      <Head over="Программы" title="Учебные модули" text="Ваши активные учебные программы." />
+      <Head over="Программы" title="Учебные модули" text="Ваши купленные курсы и учебные программы." />
+      {purchased.length === 0 && (
+        <p className="text-muted-foreground">У вас пока нет купленных курсов. Перейдите в «Дебютные курсы» или «Витрину», чтобы приобрести материалы.</p>
+      )}
       <div className="grid gap-3">
-        {items.map((m, i) => (
-          <article key={i} className="flex flex-col gap-4 rounded-lg border p-5 md:flex-row md:items-center">
-            <span className="flex size-11 items-center justify-center rounded-md border font-mono text-sm">{String(i + 1).padStart(2, '0')}</span>
+        {purchased.map((c, i) => {
+          const gameCount = c.pgn ? c.pgn.split(/(?=\[Event )/).filter(Boolean).length : 0
+          return (
+            <article key={c.id} className="flex flex-col gap-4 rounded-lg border p-5 md:flex-row md:items-center">
+              <span className="flex size-11 items-center justify-center rounded-md border font-mono text-sm">{String(i + 1).padStart(2, '0')}</span>
+              <div className="flex-1">
+                <h3 className="font-medium">{c.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {gameCount > 0 ? `${gameCount} партий в базе` : 'Курс без PGN-базы'}
+                  {c.description ? ` · ${c.description.slice(0, 60)}${c.description.length > 60 ? '…' : ''}` : ''}
+                </p>
+              </div>
+              <button className="button" onClick={() => onOpenCourse(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+            </article>
+          )
+        })}
+        {STATIC_MODULES.map((m, i) => (
+          <article key={`static-${i}`} className="flex flex-col gap-4 rounded-lg border p-5 md:flex-row md:items-center opacity-60">
+            <span className="flex size-11 items-center justify-center rounded-md border font-mono text-sm">{String(purchased.length + i + 1).padStart(2, '0')}</span>
             <div className="flex-1">
               <h3 className="font-medium">{m.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{m.lessons} уроков · Заполнено на {m.progress}%</p>
               <div className="mt-3 max-w-md"><ProgressBar value={m.progress} /></div>
             </div>
-            <button className="outline-button">Открыть</button>
+            <button className="outline-button" disabled>Скоро</button>
           </article>
         ))}
       </div>
@@ -1624,35 +1668,52 @@ function Modules({ courses, purchasedIds }: { courses: Course[]; purchasedIds: n
 
 function Sales({ purchases, onApprove }: { purchases: any[]; onApprove: (id: string) => void }) {
   const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
+  const pending = purchases.filter(p => p.status === 'PENDING')
+  const approved = purchases.filter(p => p.status === 'APPROVED')
   
   return (
     <>
       <Head over="Коммерция" title="Продажи" text="Заявки на оплату и статистика." />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Выручка"  value={`${revenue.toLocaleString('ru-RU')} ₽`} note="Всего" />
-        <Metric label="Заказов"  value={`${purchases.length}`} note={`Ожидают: ${purchases.filter(p => p.status === 'PENDING').length}`} />
+        <Metric label="Заказов"  value={`${purchases.length}`} note={`Ожидают: ${pending.length}`} />
       </section>
+
+      {pending.length > 0 && (
+        <div className="mt-8">
+          <h3 className="mb-4 text-xl font-semibold text-yellow-600">⏳ Ожидают подтверждения ({pending.length})</h3>
+          <div className="flex flex-col gap-3">
+            {pending.map(p => (
+              <div key={p.id} className="rounded-lg border-2 border-yellow-300 bg-yellow-50/50 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="font-semibold">{p.user?.name || p.user?.email}</p>
+                    <p className="text-sm text-muted-foreground">Курс: {p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
+                    {p.senderName && <p className="mt-1 text-sm"><b>Отправитель:</b> {p.senderName}</p>}
+                    {p.comment && <p className="mt-0.5 text-sm text-muted-foreground"><b>Комментарий:</b> {p.comment}</p>}
+                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(p.createdAt)}</p>
+                  </div>
+                  <button className="button text-sm py-1.5 px-4 h-auto whitespace-nowrap" onClick={() => onApprove(p.id)}>✅ Одобрить</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8">
         <h3 className="mb-4 text-xl font-semibold">История заказов</h3>
         <div className="flex flex-col gap-3">
-          {purchases.map(p => (
+          {approved.map(p => (
             <div key={p.id} className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <p className="font-medium">{p.user?.name || p.user?.email}</p>
-                <p className="text-sm text-muted-foreground">{p.course?.name}</p>
+                <p className="text-sm text-muted-foreground">{p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
               </div>
-              <div className="flex items-center gap-4">
-                <span className={`badge ${p.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-green-500/10 text-green-500'}`}>
-                  {p.status === 'PENDING' ? 'Ожидает оплаты' : 'Оплачено'}
-                </span>
-                {p.status === 'PENDING' && (
-                  <button className="button text-xs py-1 px-3 h-auto" onClick={() => onApprove(p.id)}>Одобрить</button>
-                )}
-              </div>
+              <span className="badge bg-green-500/10 text-green-500">Оплачено</span>
             </div>
           ))}
-          {purchases.length === 0 && <p className="text-muted-foreground">Пока нет ни одного заказа.</p>}
+          {approved.length === 0 && <p className="text-muted-foreground">Пока нет подтверждённых заказов.</p>}
         </div>
       </div>
     </>
@@ -1718,7 +1779,7 @@ function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; 
 
 // ─── Opening Courses (CRUD) ───────────────────────────────────────────────────
 
-type CourseForm = { name: string; description: string; price: string; imageUrl: string }
+type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string }
 
 function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, onUpdate, onDelete, notify }: {
   courses: Course[]; isTeacher: boolean; purchasedIds: number[]
@@ -1730,14 +1791,15 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
 }) {
   const [modal, setModal] = useState<null | 'add' | 'detail' | number>(null)
   const [detailId, setDetailId] = useState<number | null>(null)
-  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '' })
+  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '' })
   const fileRef = useRef<HTMLInputElement>(null)
+  const pgnFileRef = useRef<HTMLInputElement>(null)
 
   const sorted = [...courses].sort((a, b) => b.createdAt - a.createdAt)
   const detailCourse = courses.find(c => c.id === detailId)
 
-  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '' }); setModal('add') }
-  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl }); setModal(c.id) }
+  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '' }); setModal('add') }
+  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '' }); setModal(c.id) }
   async function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     const formData = new FormData()
@@ -1753,7 +1815,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
   }
   function handleSave() {
     if (!form.name || !form.price) { notify('Заполните название и цену'); return }
-    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl }
+    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined }
     if (modal === 'add') onAdd(data)
     else if (typeof modal === 'number') onUpdate(modal, data)
     setModal(null); notify(modal === 'add' ? 'Курс добавлен!' : 'Курс обновлён!')
@@ -1776,6 +1838,12 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
               <div className="flex flex-1 flex-col p-5">
                 <h3 className="font-semibold">{c.name}</h3>
                 <p className="mt-2 flex-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>
+                {isTeacher && c.pgn && (
+                  <p className="mt-1 text-xs text-green-600">✅ PGN загружен ({c.pgn.split(/(?=\[Event )/).filter(Boolean).length} партий)</p>
+                )}
+                {isTeacher && !c.pgn && (
+                  <p className="mt-1 text-xs text-muted-foreground">⚠️ PGN не загружен</p>
+                )}
                 <div className="mt-4 flex items-center justify-between">
                   <b className="text-lg">{c.price.toLocaleString('ru-RU')} ₽</b>
                   {purchased && <span className="badge"><Check className="size-3" />Куплен</span>}
@@ -1814,6 +1882,21 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
               <input ref={fileRef} className="sr-only" type="file" accept="image/*" onChange={handleImg} />
             </label>
           </div>
+          <div className="field">
+            <span>PGN-база дебютов (файл курса)</span>
+            <label className="drop-zone cursor-pointer">
+              <Upload className="size-5 text-muted-foreground" />
+              <b>{form.pgn ? `✅ PGN загружен (${form.pgn.split(/(?=\[Event )/).filter(Boolean).length} партий)` : 'Загрузить PGN-файл с базой'}</b>
+              <span>Ученики смогут просматривать и скачивать этот файл после покупки</span>
+              <input ref={pgnFileRef} className="sr-only" type="file" accept=".pgn,.txt"
+                onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => setForm(p => ({ ...p, pgn: String(r.result) })); r.readAsText(f) } }} />
+            </label>
+            {form.pgn && (
+              <textarea className="textarea font-mono text-xs min-h-20 mt-2" value={form.pgn}
+                onChange={e => setForm(p => ({ ...p, pgn: e.target.value }))}
+                placeholder="Или вставьте PGN вручную..." />
+            )}
+          </div>
           <button className="button" onClick={handleSave}>{modal === 'add' ? 'Добавить курс' : 'Сохранить изменения'}</button>
         </Modal>
       )}
@@ -1831,6 +1914,181 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
           </div>
         </Modal>
       )}
+    </>
+  )
+}
+
+// ─── Course Viewer ────────────────────────────────────────────────────────────
+
+type PgnGame = { event: string; white: string; black: string; result: string; startFen: string; moves: string[] }
+
+function parsePgnGames(pgn: string): PgnGame[] {
+  if (!pgn?.trim()) return []
+  const blocks = pgn.split(/(?=\[Event )/).map(s => s.trim()).filter(Boolean)
+  return blocks.map(block => {
+    const get = (tag: string) => block.match(new RegExp(`\\[${tag} "(.+?)"\\]`))?.[1] ?? ''
+    const fenMatch = block.match(/\[FEN "(.+?)"\]/)
+    const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    let normalizedPgn = block
+    if (fenMatch && !block.includes('[SetUp "1"]')) normalizedPgn = '[SetUp "1"]\n' + block
+    let moves: string[] = []
+    try { const g = new Chess(); g.loadPgn(normalizedPgn); moves = g.history() } catch {}
+    return { event: get('Event') || 'Партия', white: get('White'), black: get('Black'), result: get('Result'), startFen, moves }
+  })
+}
+
+function CourseViewer({ course }: { course: Course }) {
+  const games = useMemo(() => parsePgnGames(course.pgn ?? ''), [course.pgn])
+  const [selectedIdx, setSelectedIdx] = useState(0)
+  const [moveIdx, setMoveIdx] = useState(0)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [dragFrom, setDragFrom] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null)
+  const [flipped, setFlipped] = useState(false)
+
+  const currentGame = games[selectedIdx]
+  const { startFen, moves } = currentGame ?? { startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', moves: [] }
+
+  const boardGame = useMemo(() => {
+    try {
+      const g = new Chess(startFen)
+      for (let i = 0; i < moveIdx; i++) { try { g.move(moves[i]) } catch {} }
+      return g
+    } catch { return new Chess() }
+  }, [startFen, moves, moveIdx])
+
+  useEffect(() => { setMoveIdx(0); setSelected(null) }, [selectedIdx])
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowLeft')  setMoveIdx(p => Math.max(0, p - 1))
+      if (e.key === 'ArrowRight') setMoveIdx(p => Math.min(moves.length, p + 1))
+      if (e.key === 'ArrowUp')    setMoveIdx(0)
+      if (e.key === 'ArrowDown')  setMoveIdx(moves.length)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [moves.length])
+
+  if (games.length === 0) {
+    return (
+      <>
+        <Head over="Курс" title={course.name} text="Просмотрщик дебютной базы" />
+        <div className="rounded-lg border p-8 text-center text-muted-foreground">
+          <p>В этом курсе пока нет PGN-базы. Тренер ещё не загрузил материалы.</p>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Head over="Курс" title={course.name} text={`${games.length} партий · используйте ← → для навигации по ходам`} />
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        {/* Game list */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-semibold">Партии ({games.length})</p>
+            {course.pgn && (
+              <a
+                href={`data:application/x-chess-pgn;charset=utf-8,${encodeURIComponent(course.pgn)}`}
+                download={`${course.name}.pgn`}
+                className="outline-button text-xs py-1 px-2 h-auto"
+              >⬇ Скачать PGN</a>
+            )}
+          </div>
+          <div className="rounded-lg border overflow-hidden">
+            {games.map((g, i) => (
+              <button
+                key={i}
+                onClick={() => setSelectedIdx(i)}
+                className={`w-full text-left p-3 border-b last:border-0 transition-colors ${i === selectedIdx ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60'}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-mono w-6 shrink-0 ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{g.event}</p>
+                    {(g.white || g.black) && (
+                      <p className={`text-xs truncate ${i === selectedIdx ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                        {[g.white, g.black].filter(Boolean).join(' vs ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Board + moves */}
+        <div className="flex flex-col gap-4">
+          {/* Navigation controls */}
+          <div className="flex items-center justify-between rounded-lg border p-2 bg-muted/30">
+            <div className="flex gap-1">
+              <button className="icon-button" onClick={() => setMoveIdx(0)} title="Начало" disabled={moveIdx === 0}>
+                <ArrowLeft className="size-3" /><ArrowLeft className="size-3 -ml-2" />
+              </button>
+              <button className="icon-button" onClick={() => setMoveIdx(p => Math.max(0, p - 1))} disabled={moveIdx === 0}>
+                <ArrowLeft className="size-4" />
+              </button>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {moveIdx === 0 ? 'Начальная позиция' : `Ход ${Math.ceil(moveIdx / 2)}: ${moves[moveIdx - 1]}`}
+            </span>
+            <div className="flex gap-1">
+              <button className="icon-button" onClick={() => setMoveIdx(p => Math.min(moves.length, p + 1))} disabled={moveIdx === moves.length}>
+                <ArrowRight className="size-4" />
+              </button>
+              <button className="icon-button" onClick={() => setMoveIdx(moves.length)} title="Конец" disabled={moveIdx === moves.length}>
+                <ArrowRight className="size-3" /><ArrowRight className="size-3 -ml-2" />
+              </button>
+            </div>
+          </div>
+
+          {/* Board */}
+          <div className="max-w-[560px] w-full mx-auto">
+            <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
+              <ChessBoard
+                game={boardGame}
+                selected={selected}
+                setSelected={setSelected}
+                dragFrom={dragFrom}
+                setDragFrom={setDragFrom}
+                dragOver={dragOver}
+                setDragOver={setDragOver}
+                flipped={flipped}
+                onMove={() => {}}
+              />
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="size-4 rounded-full border-2" style={{ backgroundColor: boardGame.turn() === 'w' ? '#fff' : '#111', borderColor: BOARD_DARK }} />
+              <span className="flex-1 text-xs text-muted-foreground">
+                {boardGame.turn() === 'w' ? 'Ходят белые' : 'Ходят чёрные'}
+              </span>
+              <button className="icon-button" onClick={() => setFlipped(f => !f)} title="Перевернуть"><RotateCcw /></button>
+            </div>
+          </div>
+
+          {/* Move list */}
+          <div className="rounded-lg border p-4">
+            <p className="text-sm font-semibold mb-3">Ходы партии</p>
+            <div className="flex flex-wrap gap-x-1 gap-y-1.5 text-sm font-mono leading-7">
+              {moves.length === 0
+                ? <span className="text-xs text-muted-foreground">Ходы не записаны</span>
+                : moves.map((san, i) => (
+                    <span key={i} className="inline-flex items-center gap-0.5">
+                      {i % 2 === 0 && <span className="text-xs text-muted-foreground">{Math.floor(i / 2) + 1}.</span>}
+                      <button
+                        className={`rounded px-1 transition-colors ${i === moveIdx - 1 ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                        onClick={() => setMoveIdx(i + 1)}
+                      >{san}</button>
+                    </span>
+                  ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   )
 }

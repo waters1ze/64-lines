@@ -55,21 +55,24 @@ model Course {
   description String
   price       Int
   imageUrl    String?
-  fileUrl     String?  // Ссылка на файл или текст PGN, который будет отправлен
+  fileUrl     String?
+  pgn         String?  @db.Text
   createdAt   DateTime @default(now())
   
   purchases   Purchase[]
 }
 
 model Purchase {
-  id        String   @id @default(cuid())
-  userId    String
-  courseId  String
-  status    String   @default("PENDING") // PENDING, APPROVED
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String
+  status      String   @default("PENDING") // PENDING, APPROVED
+  senderName  String?
+  comment     String?
+  createdAt   DateTime @default(now())
   
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 
 model Video {

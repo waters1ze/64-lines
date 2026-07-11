@@ -14,7 +14,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { name, description, price, imageUrl, fileUrl } = await req.json()
+    const { name, description, price, imageUrl, fileUrl, pgn } = await req.json()
 
     const course = await db.course.update({
       where: { id },
@@ -24,6 +24,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(price !== undefined && { price: Number(price) }),
         ...(imageUrl !== undefined && { imageUrl }),
         ...(fileUrl !== undefined && { fileUrl }),
+        ...(pgn !== undefined && { pgn }),
       }
     })
 

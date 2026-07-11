@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { courseId } = await req.json()
+    const { courseId, senderName, comment } = await req.json()
     if (!courseId) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 })
     }
@@ -38,8 +38,11 @@ export async function POST(req: Request) {
       data: {
         userId: session.user.id,
         courseId: String(courseId),
-        status: 'PENDING'
-      }
+        status: 'PENDING',
+        senderName: senderName || null,
+        comment: comment || null,
+      },
+      include: { user: true, course: true }
     })
 
     return NextResponse.json({ success: true, purchase })

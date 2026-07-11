@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // 2. Send Email
     try {
       const { sendCourseDeliveryEmail } = await import("@/lib/mail")
-      await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "")
+      await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "", purchase.course.pgn)
     } catch (err) {
       console.error("Failed to send course delivery email", err)
       // We don't fail the approval if email fails
