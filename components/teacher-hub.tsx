@@ -1732,17 +1732,7 @@ function Modules({ courses, purchasedIds, onOpenCourse }: { courses: Course[]; p
             </article>
           )
         })}
-        {STATIC_MODULES.map((m, i) => (
-          <article key={`static-${i}`} className="flex flex-col gap-4 rounded-lg border p-5 md:flex-row md:items-center opacity-60">
-            <span className="flex size-11 items-center justify-center rounded-md border font-mono text-sm">{String(purchased.length + i + 1).padStart(2, '0')}</span>
-            <div className="flex-1">
-              <h3 className="font-medium">{m.name}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{m.lessons} уроков · Заполнено на {m.progress}%</p>
-              <div className="mt-3 max-w-md"><ProgressBar value={m.progress} /></div>
-            </div>
-            <button className="outline-button" disabled>Скоро</button>
-          </article>
-        ))}
+
       </div>
     </>
   )
