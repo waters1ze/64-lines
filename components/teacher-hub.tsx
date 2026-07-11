@@ -49,6 +49,27 @@ type Opening = {
   pgn: string;
 }
 
+type Lesson = {
+  id: string;
+  title: string;
+  videoUrl?: string | null;
+  fileUrl?: string | null;
+  order: number;
+  moduleId: string;
+}
+
+type Module = {
+  id: string;
+  title: string;
+  description?: string | null;
+  tags: string[];
+  visibility: 'ALL' | 'PAID' | 'STUDENTS';
+  price: number;
+  order: number;
+  lessons: Lesson[];
+  hasAccess?: boolean;
+}
+
 // ─── Seed data ─────────────────────────────────────────────────────────────────
 
 const SAMPLE_PGN = `[Event "Домашнее задание"]
@@ -238,6 +259,8 @@ export function TeacherHub({
   const [videos, setVideos] = useState<Video[]>(initialVideos || INIT_VIDEOS)
   const [openings, setOpenings] = useState<Opening[]>(initialOpenings || INIT_OPENINGS)
   const [purchases, setPurchases] = useState<any[]>(initialPurchases)
+  const [modules, setModules] = useState<Module[]>([])
+  const [paymentModuleId, setPaymentModuleId] = useState<string | null>(null)
   
   const purchasedIds = useMemo(() => {
     return purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID').map(p => p.courseId)
@@ -250,6 +273,13 @@ export function TeacherHub({
   const [paymentSender, setPaymentSender] = useState('')
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
+
+  // Load modules on mount
+  useEffect(() => {
+    fetch('/api/modules').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setModules(data)
+    }).catch(() => {})
+  }, [])
 
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 2500) }
   const go = (s: Section) => { setSection(s); setMobile(false) }
@@ -269,16 +299,17 @@ export function TeacherHub({
 
   const studentNavBase = [
     ['overview',  'Мой обзор',          LayoutDashboard],
-    ['videos',    'Видео с YouTube',         Video],
+    ['modules',   'Модули',             BookOpen],
+    ['videos',    'Видео с YouTube',    Video],
     ['courses',   'Дебютные курсы',     GraduationCap],
     ['store',     'Витрина',            Store],
     ['openings',  'Мои дебюты',         Library],
-    ...(purchasedIds.length > 0 ? [['modules', 'Учебные модули', BookOpen] as const] : []),
     ['settings',  'Настройки',          Settings],
   ] as const
 
   const guestNavBase = [
-    ['videos',    'Видео с YouTube',         Video],
+    ['modules',   'Модули',             BookOpen],
+    ['videos',    'Видео с YouTube',    Video],
     ['courses',   'Дебютные курсы',     GraduationCap],
     ['store',     'Витрина',            Store],
     ['openings',  'Мои дебюты',         Library],
@@ -498,7 +529,11 @@ export function TeacherHub({
             )}
             {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
-            {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} onOpenCourse={openCourseViewer} />}
+            {section === 'modules'  && (
+              isTeacher
+                ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
+                : <ModulesView modules={modules} setModules={setModules} onPurchase={(id) => { setPaymentStep('info'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} isGuest={isGuest} notify={notify} />
+            )}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
             {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
@@ -578,6 +613,65 @@ export function TeacherHub({
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   После нажатия "Я перевел деньги" мы проверим оплату, и курс появится в вашем кабинете. Если что-то пойдет не так, смело пишите в поддержку!
+                </p>
+              </div>
+            )}
+          </Modal>
+        )
+      })()}
+
+      {paymentModuleId && (() => {
+        const mod = modules.find(m => m.id === paymentModuleId)
+        if (!mod) return null
+        return (
+          <Modal title="Оплата модуля" close={() => setPaymentModuleId(null)}>
+            {paymentStep === 'info' ? (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию, чтобы мы могли быстрее подтвердить ваш перевод.</p>
+                <label className="field">Ваше имя (отправитель перевода)
+                  <input className="input" value={paymentSender} onChange={e => setPaymentSender(e.target.value)} placeholder="Иван Иванов" />
+                </label>
+                <label className="field">Комментарий к заказу
+                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Например: оплачиваю по акции, или ник на lichess..." />
+                </label>
+                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('confirm')}>
+                  Далее — к оплате
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 text-center">
+                <div className="rounded-xl bg-muted/30 p-6">
+                  <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
+                  <b className="mt-2 block text-2xl tracking-widest">+7 (999) 813-78-70</b>
+                  <p className="mt-1 text-sm text-muted-foreground">Банк: Альфа-Банк / Получатель: Кирилл П.</p>
+                </div>
+                <p className="text-sm">Сумма к оплате: <b>{mod.price.toLocaleString('ru-RU')} ₽</b></p>
+                <div className="mt-2 flex flex-col gap-3">
+                  <button className="button w-full" onClick={async () => {
+                    try {
+                      const res = await fetch('/api/payments/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ courseId: paymentModuleId, senderName: paymentSender, comment: `[Модуль] ${mod.title} — ${paymentComment}` })
+                      })
+                      if (res.ok) {
+                        const { purchase } = await res.json()
+                        setPurchases(prev => [purchase, ...prev])
+                        notify('Заявка отправлена! Как только проверим перевод, модуль появится в вашем кабинете.')
+                      } else {
+                        notify('Произошла ошибка или заявка уже существует.')
+                      }
+                    } catch { notify('Ошибка сети.') }
+                    setPaymentModuleId(null)
+                  }}>
+                    Я перевел(а) деньги
+                  </button>
+                  <button className="outline-button w-full" onClick={() => setPaymentStep('info')}>
+                    <ArrowLeft className="size-4" />Назад
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  После нажатия "Я перевел деньги" мы проверим оплату, и модуль появится в вашем кабинете.
                 </p>
               </div>
             )}
@@ -1705,38 +1799,309 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
 
 function Openings() { return <PgnBoard /> }
 
-// ─── Modules ──────────────────────────────────────────────────────────────────
+// ─── Modules Editor (Teacher) ─────────────────────────────────────────────────
 
-function Modules({ courses, purchasedIds, onOpenCourse }: { courses: Course[]; purchasedIds: (string | number)[]; onOpenCourse: (id: string | number) => void }) {
-  const purchased = courses.filter(c => purchasedIds.includes(c.id))
+const ALL_TAGS = ['Дебют', 'Миттельшпиль', 'Эндшпиль', 'Тактика', 'Стратегия', 'Другое']
+
+function ModulesEditor({ modules, setModules, students, notify }: {
+  modules: Module[]
+  setModules: React.Dispatch<React.SetStateAction<Module[]>>
+  students: Student[]
+  notify: (s: string) => void
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [editModule, setEditModule] = useState<Partial<Module> & { id?: string } | null>(null)
+  const [editLesson, setEditLesson] = useState<{ moduleId: string; lesson?: Lesson } | null>(null)
+  const [accessModuleId, setAccessModuleId] = useState<string | null>(null)
+  const [accesses, setAccesses] = useState<{ id: string; user: { id: string; name: string; email: string } }[]>([])
+
+  const saveModule = async () => {
+    if (!editModule?.title?.trim()) return
+    const isNew = !editModule.id
+    const url = isNew ? '/api/modules' : `/api/modules/${editModule.id}`
+    const method = isNew ? 'POST' : 'PUT'
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editModule) })
+    if (res.ok) {
+      const saved = await res.json()
+      setModules(prev => isNew ? [saved, ...prev] : prev.map(m => m.id === saved.id ? { ...m, ...saved } : m))
+      notify(isNew ? 'Модуль создан!' : 'Модуль сохранён!')
+      setEditModule(null)
+    } else notify('Ошибка при сохранении')
+  }
+
+  const deleteModule = async (id: string) => {
+    if (!confirm('Удалить модуль вместе со всеми уроками?')) return
+    const res = await fetch(`/api/modules/${id}`, { method: 'DELETE' })
+    if (res.ok) { setModules(prev => prev.filter(m => m.id !== id)); notify('Модуль удалён') }
+    else notify('Ошибка при удалении')
+  }
+
+  const saveLesson = async () => {
+    if (!editLesson || !editLesson.lesson?.title?.trim()) return
+    const isNew = !editLesson.lesson.id || editLesson.lesson.id === ''
+    const url = isNew ? `/api/modules/${editLesson.moduleId}/lessons` : `/api/lessons/${editLesson.lesson.id}`
+    const method = isNew ? 'POST' : 'PUT'
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editLesson.lesson) })
+    if (res.ok) {
+      const saved = await res.json()
+      setModules(prev => prev.map(m => {
+        if (m.id !== editLesson.moduleId) return m
+        const lessons = isNew ? [...m.lessons, saved] : m.lessons.map(l => l.id === saved.id ? saved : l)
+        return { ...m, lessons }
+      }))
+      notify(isNew ? 'Урок добавлен!' : 'Урок сохранён!')
+      setEditLesson(null)
+    } else notify('Ошибка при сохранении урока')
+  }
+
+  const deleteLesson = async (moduleId: string, lessonId: string) => {
+    if (!confirm('Удалить урок?')) return
+    const res = await fetch(`/api/lessons/${lessonId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setModules(prev => prev.map(m => m.id === moduleId ? { ...m, lessons: m.lessons.filter(l => l.id !== lessonId) } : m))
+      notify('Урок удалён')
+    } else notify('Ошибка при удалении урока')
+  }
+
+  const openAccess = async (moduleId: string) => {
+    setAccessModuleId(moduleId)
+    const res = await fetch(`/api/modules/${moduleId}/access`)
+    if (res.ok) setAccesses(await res.json())
+  }
+
+  const grantAccess = async (userId: string) => {
+    if (!accessModuleId) return
+    const res = await fetch(`/api/modules/${accessModuleId}/access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+    if (res.ok) {
+      const student = students.find(s => s.id === userId)
+      if (student) setAccesses(prev => [...prev, { id: Date.now().toString(), user: { id: userId, name: student.name, email: (student as any).email || '' } }])
+      notify('Доступ выдан!')
+    } else notify('Ошибка при выдаче доступа')
+  }
+
+  const revokeAccess = async (userId: string) => {
+    if (!accessModuleId) return
+    const res = await fetch(`/api/modules/${accessModuleId}/access`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+    if (res.ok) { setAccesses(prev => prev.filter(a => a.user.id !== userId)); notify('Доступ отозван') }
+    else notify('Ошибка')
+  }
+
   return (
     <>
-      <Head over="Программы" title="Учебные модули" text="Ваши купленные курсы и учебные программы." />
-      {purchased.length === 0 && (
-        <p className="text-muted-foreground">У вас пока нет купленных курсов. Перейдите в «Дебютные курсы» или «Витрину», чтобы приобрести материалы.</p>
-      )}
-      <div className="grid gap-3">
-        {purchased.map((c, i) => {
-          const gameCount = c.pgn ? c.pgn.split(/(?=\[Event )/).filter(Boolean).length : 0
-          return (
-            <article key={c.id} className="flex flex-col gap-4 rounded-lg border p-5 md:flex-row md:items-center">
-              <span className="flex size-11 items-center justify-center rounded-md border font-mono text-sm">{String(i + 1).padStart(2, '0')}</span>
-              <div className="flex-1">
-                <h3 className="font-medium">{c.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {gameCount > 0 ? `${gameCount} партий в базе` : 'Курс без PGN-базы'}
-                  {c.description ? ` · ${c.description.slice(0, 60)}${c.description.length > 60 ? '…' : ''}` : ''}
-                </p>
+      <Head over="Программы" title="Учебные модули" text="Создавайте модули с видеоуроками и управляйте доступом." />
+      <button className="button w-fit" onClick={() => setEditModule({ title: '', description: '', tags: [], visibility: 'ALL', price: 0 })}>
+        <Plus className="size-4" />Создать модуль
+      </button>
+
+      <div className="mt-6 flex flex-col gap-4">
+        {modules.length === 0 && <p className="text-muted-foreground">Пока нет модулей. Создайте первый!</p>}
+        {modules.map(m => (
+          <div key={m.id} className="rounded-lg border overflow-hidden">
+            <div className="flex items-center gap-3 p-4 bg-muted/30">
+              <button className="flex-1 text-left font-semibold flex items-center gap-2" onClick={() => setOpenId(openId === m.id ? null : m.id)}>
+                <ChevronRight className={`size-4 shrink-0 transition-transform ${openId === m.id ? 'rotate-90' : ''}`} />
+                {m.title}
+                <span className="badge text-xs ml-1">{m.visibility === 'ALL' ? 'Всем' : m.visibility === 'PAID' ? `${m.price.toLocaleString()} ₽` : 'По спискам'}</span>
+                {m.tags.map(t => <span key={t} className="badge text-xs bg-blue-50 text-blue-600">{t}</span>)}
+              </button>
+              <button className="icon-button" onClick={() => openAccess(m.id)} title="Управление доступом"><Users className="size-4" /></button>
+              <button className="icon-button" onClick={() => setEditModule({ ...m })} title="Редактировать"><Pencil className="size-4" /></button>
+              <button className="icon-button text-red-500 hover:bg-red-50" onClick={() => deleteModule(m.id)} title="Удалить"><Trash2 className="size-4" /></button>
+            </div>
+            {openId === m.id && (
+              <div className="p-4 flex flex-col gap-2">
+                {m.description && <p className="text-sm text-muted-foreground mb-2">{m.description}</p>}
+                {m.lessons.map(l => (
+                  <div key={l.id} className="flex items-center gap-3 rounded-md border p-3">
+                    <span className="flex-1">
+                      <p className="text-sm font-medium">{l.title}</p>
+                      <div className="flex gap-2 mt-1">
+                        {l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1"><Video className="size-3" />Видео</a>}
+                        {l.fileUrl && <a href={l.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-green-600 hover:underline flex items-center gap-1"><ExternalLink className="size-3" />Файл</a>}
+                      </div>
+                    </span>
+                    <button className="icon-button" onClick={() => setEditLesson({ moduleId: m.id, lesson: { ...l } })}><Pencil className="size-4" /></button>
+                    <button className="icon-button text-red-500 hover:bg-red-50" onClick={() => deleteLesson(m.id, l.id)}><Trash2 className="size-4" /></button>
+                  </div>
+                ))}
+                <button className="outline-button w-fit mt-2" onClick={() => setEditLesson({ moduleId: m.id, lesson: { id: '', title: '', videoUrl: '', fileUrl: '', order: m.lessons.length, moduleId: m.id } })}>
+                  <Plus className="size-4" />Добавить урок
+                </button>
               </div>
-              <button className="button" onClick={() => onOpenCourse(c.id)}>Открыть<ChevronRight className="size-4" /></button>
-            </article>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Module modal */}
+      {editModule !== null && (
+        <Modal title={editModule.id ? 'Редактировать модуль' : 'Создать модуль'} close={() => setEditModule(null)}>
+          <div className="flex flex-col gap-4">
+            <label className="field">Название модуля
+              <input className="input" value={editModule.title || ''} onChange={e => setEditModule(p => ({ ...p!, title: e.target.value }))} placeholder="Например: Эндшпиль для начинающих" />
+            </label>
+            <label className="field">Описание
+              <textarea className="textarea text-sm" rows={3} value={editModule.description || ''} onChange={e => setEditModule(p => ({ ...p!, description: e.target.value }))} placeholder="Кратко о содержании..." />
+            </label>
+            <div className="field">
+              <span className="text-sm font-medium">Теги</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {ALL_TAGS.map(tag => {
+                  const sel = editModule.tags?.includes(tag)
+                  return <button key={tag} type="button" onClick={() => setEditModule(p => ({ ...p!, tags: sel ? (p!.tags || []).filter(t => t !== tag) : [...(p!.tags || []), tag] }))} className={`badge cursor-pointer ${sel ? 'bg-primary text-primary-foreground' : ''}`}>{tag}</button>
+                })}
+              </div>
+            </div>
+            <label className="field">Видимость
+              <select className="input" value={editModule.visibility || 'ALL'} onChange={e => setEditModule(p => ({ ...p!, visibility: e.target.value as any }))}>
+                <option value="ALL">🌐 Всем (бесплатно)</option>
+                <option value="PAID">💳 По оплате</option>
+                <option value="STUDENTS">👤 Конкретным ученикам</option>
+              </select>
+            </label>
+            {editModule.visibility === 'PAID' && (
+              <label className="field">Цена (₽)
+                <input className="input" type="number" min={0} value={editModule.price || 0} onChange={e => setEditModule(p => ({ ...p!, price: Number(e.target.value) }))} />
+              </label>
+            )}
+            <div className="flex gap-2">
+              <button className="button flex-1" onClick={saveModule} disabled={!editModule.title?.trim()}>Сохранить</button>
+              <button className="outline-button flex-1" onClick={() => setEditModule(null)}>Отмена</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Lesson modal */}
+      {editLesson !== null && (
+        <Modal title={editLesson.lesson?.id ? 'Редактировать урок' : 'Добавить урок'} close={() => setEditLesson(null)}>
+          <div className="flex flex-col gap-4">
+            <label className="field">Название урока
+              <input className="input" value={editLesson.lesson?.title || ''} onChange={e => setEditLesson(p => ({ ...p!, lesson: { ...p!.lesson!, title: e.target.value } }))} placeholder="Например: Урок 1 — Правило квадрата" />
+            </label>
+            <label className="field">Ссылка на YouTube
+              <input className="input" value={editLesson.lesson?.videoUrl || ''} onChange={e => setEditLesson(p => ({ ...p!, lesson: { ...p!.lesson!, videoUrl: e.target.value } }))} placeholder="https://youtube.com/watch?v=..." />
+            </label>
+            <label className="field">Ссылка на файл (PDF / PGN / Диск)
+              <input className="input" value={editLesson.lesson?.fileUrl || ''} onChange={e => setEditLesson(p => ({ ...p!, lesson: { ...p!.lesson!, fileUrl: e.target.value } }))} placeholder="https://drive.google.com/..." />
+            </label>
+            <div className="flex gap-2">
+              <button className="button flex-1" onClick={saveLesson} disabled={!editLesson.lesson?.title?.trim()}>Сохранить</button>
+              <button className="outline-button flex-1" onClick={() => setEditLesson(null)}>Отмена</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Access modal */}
+      {accessModuleId !== null && (
+        <Modal title="Управление доступом" close={() => setAccessModuleId(null)}>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">Добавьте учеников, которые получат доступ к этому модулю.</p>
+            <select className="input" onChange={e => { if (e.target.value) { grantAccess(e.target.value); e.target.value = '' } }}>
+              <option value="">— Выбрать ученика —</option>
+              {students.filter(s => !accesses.some(a => a.user.id === s.id)).map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <div className="flex flex-col gap-2">
+              {accesses.length === 0 && <p className="text-sm text-muted-foreground">Пока никто не добавлен.</p>}
+              {accesses.map(a => (
+                <div key={a.id} className="flex items-center justify-between rounded-md border p-3">
+                  <span className="text-sm font-medium">{a.user.name || a.user.email}</span>
+                  <button className="icon-button text-red-500 hover:bg-red-50" onClick={() => revokeAccess(a.user.id)}><X className="size-4" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// ─── Modules View (Student/Guest) ─────────────────────────────────────────────
+
+function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
+  modules: Module[]
+  setModules: React.Dispatch<React.SetStateAction<Module[]>>
+  onPurchase: (id: string) => void
+  isGuest: boolean
+  notify: (s: string) => void
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+
+  const allTags = Array.from(new Set(modules.flatMap(m => m.tags)))
+  const filtered = activeTag ? modules.filter(m => m.tags.includes(activeTag)) : modules
+
+  return (
+    <>
+      <Head over="Программы" title="Модули" text="Видеоуроки по темам. Откройте бесплатные или приобретите платные." />
+
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button className={`badge cursor-pointer ${!activeTag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(null)}>Все</button>
+          {allTags.map(tag => (
+            <button key={tag} className={`badge cursor-pointer ${activeTag === tag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(activeTag === tag ? null : tag)}>{tag}</button>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filtered.length === 0 && <p className="text-muted-foreground col-span-3">Модулей пока нет.</p>}
+        {filtered.map(m => {
+          const canOpen = m.hasAccess || m.visibility === 'ALL'
+          const isOpen = openId === m.id && canOpen
+          return (
+            <div key={m.id} className="rounded-lg border flex flex-col overflow-hidden">
+              <div className="p-5 flex flex-col flex-1">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {m.visibility === 'PAID' && !m.hasAccess && <span className="badge bg-amber-50 text-amber-700">💳 {m.price.toLocaleString()} ₽</span>}
+                  {m.visibility === 'STUDENTS' && !m.hasAccess && <span className="badge bg-slate-100 text-slate-600">🔒 По приглашению</span>}
+                  {m.visibility === 'ALL' && <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>}
+                  {m.hasAccess && m.visibility !== 'ALL' && <span className="badge bg-green-50 text-green-700">✅ Открыто</span>}
+                  {m.tags.map(t => <span key={t} className="badge bg-blue-50 text-blue-600 text-xs">{t}</span>)}
+                </div>
+                <h3 className="font-semibold">{m.title}</h3>
+                {m.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{m.description}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">{m.lessons.length} уроков</p>
+                <div className="mt-4">
+                  {canOpen
+                    ? <button className="button w-full" onClick={() => setOpenId(isOpen ? null : m.id)}>
+                        {isOpen ? 'Свернуть' : 'Открыть'}<ChevronRight className={`size-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                      </button>
+                    : m.visibility === 'PAID'
+                      ? <button className="button w-full" onClick={() => {
+                          if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }
+                          onPurchase(m.id)
+                        }}><LockKeyhole className="size-4" />Купить доступ</button>
+                      : <button className="outline-button w-full" disabled>🔒 Доступ по приглашению</button>}
+                </div>
+              </div>
+              {isOpen && m.lessons.length > 0 && (
+                <div className="border-t p-4 flex flex-col gap-2 bg-muted/20">
+                  {m.lessons.map((l, i) => (
+                    <div key={l.id} className="flex items-center gap-3 rounded-md border bg-background p-3">
+                      <span className="text-xs font-mono text-muted-foreground w-6 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="flex-1 text-sm font-medium">{l.title}</span>
+                      <div className="flex gap-2">
+                        {l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="icon-button" title="Смотреть видео"><Video className="size-4 text-blue-600" /></a>}
+                        {l.fileUrl && <a href={l.fileUrl} target="_blank" rel="noreferrer" className="icon-button" title="Открыть файл"><ExternalLink className="size-4 text-green-600" /></a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )
         })}
-
       </div>
     </>
   )
 }
+
+
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
@@ -1762,7 +2127,14 @@ function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[];
                 <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="font-semibold">{p.user?.name || p.user?.email}</p>
-                    <p className="text-sm text-muted-foreground">Курс: {p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
+                    <p className="text-sm text-muted-foreground">
+                      {p.comment?.startsWith('[Модуль]') ? (
+                        <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-blue-100 text-blue-700">Модуль</span> {p.comment.replace('[Модуль] ', '').split(' — ')[0]}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1"><span className="badge text-xs">Дебют</span> {p.course?.name}</span>
+                      )}
+                      {' · '}{p.course?.price?.toLocaleString('ru-RU')} ₽
+                    </p>
                     {p.senderName && <p className="mt-1 text-sm"><b>Отправитель:</b> {p.senderName}</p>}
                     {p.comment && <p className="mt-0.5 text-sm text-muted-foreground"><b>Комментарий:</b> {p.comment}</p>}
                     <p className="mt-1 text-xs text-muted-foreground">{formatDate(p.createdAt)}</p>
@@ -1810,25 +2182,24 @@ function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; 
   const [detailId, setDetailId] = useState<string | number | null>(null)
   const detail = courses.find(c => c.id === detailId)
 
-  // All items: courses newest first + static modules
-  const allItems: { id: number; name: string; desc: string; price: number; img: string; kind: 'course' | 'module' }[] = [
-    ...[...courses].sort((a, b) => b.createdAt - a.createdAt).map(c => ({ id: c.id, name: c.name, desc: c.description, price: c.price, img: c.imageUrl, kind: 'course' as const })),
-    ...STATIC_MODULES.map((m, i) => ({ id: -(i + 1), name: m.name, desc: `${m.lessons} уроков · ${m.progress}% изучено`, price: 0, img: '', kind: 'module' as const })),
-  ]
+  // Only real courses (no more static module placeholders)
+  const allItems = [...courses].sort((a, b) => b.createdAt - a.createdAt).map(c => ({
+    id: c.id, name: c.name, desc: c.description, price: c.price, img: c.imageUrl
+  }))
 
   return (
     <>
       <Head over="Витрина" title="Все материалы" text="Все доступные курсы и модули — от нового к старому." />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {allItems.map(item => {
-          const owned = item.id < 0 || purchasedIds.includes(item.id)
+          const owned = purchasedIds.includes(item.id as any)
           return (
             <article key={item.id} className="flex flex-col overflow-hidden rounded-lg border">
               <div className="flex aspect-video items-center justify-center border-b bg-muted/30">
                 {item.img ? <img src={item.img} alt={item.name} className="size-full object-cover" /> : <Library className="size-10 text-muted-foreground" />}
               </div>
               <div className="flex flex-1 flex-col p-5">
-                <span className="badge w-fit">{item.kind === 'course' ? 'Курс' : 'Модуль'}</span>
+                <span className="badge w-fit">Курс</span>
                 <h3 className="mt-3 font-semibold">{item.name}</h3>
                 <p className="mt-1 flex-1 text-sm text-muted-foreground line-clamp-2">{item.desc}</p>
                 <div className="mt-4">
@@ -1837,7 +2208,7 @@ function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; 
                     ? <button className="button w-full">Открыть<ChevronRight /></button>
                     : <div className="flex gap-2">
                         <button className="outline-button flex-1" onClick={() => setDetailId(item.id)}>Подробнее</button>
-                        <button className="button flex-1" onClick={() => { if (item.id > 0) onPurchase(item.id) }}><LockKeyhole />Купить</button>
+                        <button className="button flex-1" onClick={() => { if (item.id) onPurchase(item.id) }}><LockKeyhole />Купить</button>
                       </div>}
                 </div>
               </div>

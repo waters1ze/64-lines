@@ -25,6 +25,7 @@ model User {
   
   homeworks         Homework[]
   purchases         Purchase[]
+  moduleAccesses    ModuleAccess[]
 }
 
 enum Role {
@@ -97,4 +98,42 @@ model InviteLink {
   teacherId String?
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  tags        String[]
+  visibility  String   @default("ALL") // ALL | PAID | STUDENTS
+  price       Int      @default(0)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  lessons     Lesson[]
+  accesses    ModuleAccess[]
+}
+
+model Lesson {
+  id        String   @id @default(cuid())
+  title     String
+  videoUrl  String?
+  fileUrl   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  moduleId  String
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+model ModuleAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  moduleId  String
+  grantedAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
 }
