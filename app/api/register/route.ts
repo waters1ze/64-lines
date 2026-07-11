@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
+import crypto from "crypto"
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
+    const verificationToken = crypto.randomUUID()
 
     const user = await db.user.create({
       data: {
@@ -35,7 +37,8 @@ export async function POST(req: NextRequest) {
         email,
         passwordHash,
         role: invite.role,
-        teacherId: invite.teacherId, // Если пригласил учитель, привязываем ученика
+        teacherId: invite.teacherId,
+        verificationToken,
       }
     })
 
@@ -44,8 +47,12 @@ export async function POST(req: NextRequest) {
       where: { id: invite.id },
       data: { used: true }
     })
+    
+    // Отправляем письмо с подтверждением
+    const { sendVerificationEmail } = await import("@/lib/mail")
+    await sendVerificationEmail(email, verificationToken)
 
-    return NextResponse.json({ success: true, userId: user.id })
+    return NextResponse.json({ success: true, message: "Письмо с подтверждением отправлено" })
   } catch (error) {
     console.error("Registration error:", error)
     return NextResponse.json({ error: "Внутренняя ошибка сервера" }, { status: 500 })

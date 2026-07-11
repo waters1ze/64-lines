@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { db } from '@/lib/db'
-import nodemailer from 'nodemailer'
 
 export async function POST(req: Request) {
   try {
@@ -36,28 +35,12 @@ export async function POST(req: Request) {
     })
 
     // 2. Send Email
-    // In a real app, use environment variables: process.env.EMAIL_USER and process.env.EMAIL_PASS
-    // For now, we will assume standard SMTP if env vars are present. 
-    // If not, we just log it and simulate success so the app doesn't crash during testing.
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.mail.ru', // Adjust depending on user's email provider
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      })
-
-      const mailOptions = {
-        from: `"Шахматная Школа" <${process.env.EMAIL_USER}>`,
-        to: purchase.user.email,
-        subject: `Доступ к курсу: ${purchase.course.name}`,
-        text: `Здравствуйте, ${purchase.user.name}!\n\nОплата успешно подтверждена.\nВаш курс "${purchase.course.name}" теперь доступен в вашем личном кабинете на сайте.\n\nМатериалы курса (ссылка или текст): ${purchase.course.fileUrl || 'Нет дополнительных файлов.'}\n\nС уважением, Шахматная Школа.`
-      }
-
-      await transporter.sendMail(mailOptions)
+    try {
+      const { sendCourseDeliveryEmail } = await import("@/lib/mail")
+      await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "")
+    } catch (err) {
+      console.error("Failed to send course delivery email", err)
+      // We don't fail the approval if email fails
     }
 
     return NextResponse.json({ success: true })

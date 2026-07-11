@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 
@@ -9,11 +9,19 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("verified")) setSuccess("Почта успешно подтверждена! Теперь вы можете войти.")
+    if (params.get("error")) setError(params.get("error") || "Ошибка")
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setSuccess("")
     setLoading(true)
 
     const result = await signIn("credentials", {
@@ -43,6 +51,11 @@ export default function LoginPage() {
           {error && (
             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="p-3 bg-green-50 text-green-700 text-sm rounded-md border border-green-200">
+              {success}
             </div>
           )}
 

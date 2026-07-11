@@ -8,20 +8,23 @@ generator client {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  passwordHash  String
-  role          Role      @default(STUDENT)
-  rating        Int       @default(1500)
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(STUDENT)
+  rating            Int       @default(1500)
+  
+  emailVerified     DateTime?
+  verificationToken String?
   
   // Relations
-  teacherId     String?
-  teacher       User?     @relation("TeacherStudents", fields: [teacherId], references: [id])
-  students      User[]    @relation("TeacherStudents")
+  teacherId         String?
+  teacher           User?     @relation("TeacherStudents", fields: [teacherId], references: [id])
+  students          User[]    @relation("TeacherStudents")
   
-  homeworks     Homework[]
-  purchases     Purchase[]
+  homeworks         Homework[]
+  purchases         Purchase[]
 }
 
 enum Role {
