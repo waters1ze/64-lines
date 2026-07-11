@@ -904,9 +904,9 @@ function ChessBoard({
 
 function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
   hw: HW; isStudent: boolean
-  onSolve: (id: number, attempts: number) => void
-  onUpdate?: (id: number, patch: Partial<HW>) => void
-  onDelete?: (id: number) => void
+  onSolve: (id: string | number, attempts: number) => void
+  onUpdate?: (id: string | number, patch: Partial<HW>) => void
+  onDelete?: (id: string | number) => void
 }) {
   const { startFen, solution } = useMemo(() => parseHwPgn(hw.pgn), [hw.pgn])
   const studentColor = useMemo(() => { try { return new Chess(startFen).turn() } catch { return 'w' as const } }, [startFen])
