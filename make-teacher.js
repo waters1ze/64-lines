@@ -2,12 +2,14 @@ const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 async function main() {
-  const email = process.argv[2]
+  const emailArg = process.argv[2]
   
-  if (!email) {
+  if (!emailArg) {
     console.log('Пожалуйста, укажите email пользователя. Пример: node make-teacher.js myemail@gmail.com')
     process.exit(1)
   }
+
+  const email = emailArg.toLowerCase()
 
   const user = await prisma.user.findUnique({ where: { email } })
   if (!user) {

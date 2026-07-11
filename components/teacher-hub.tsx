@@ -385,7 +385,7 @@ export function TeacherHub({
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
               ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} />
-              : <TeacherOverview go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
+              : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
             {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} notify={notify} />}
             {section === 'studentProfile' && selectedStudent && (
@@ -458,7 +458,7 @@ export function TeacherHub({
 
 // ─── Overview sections ────────────────────────────────────────────────────────
 
-function TeacherOverview({ go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: number) => void; onSelectStudent: (id: number) => void; notify: (s: string) => void }) {
+function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { userName: string; go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: number) => void; onSelectStudent: (id: number) => void; notify: (s: string) => void }) {
   const recent = homeworks.slice(0, 3)
 
   const handleInvite = async () => {
@@ -478,7 +478,7 @@ function TeacherOverview({ go, homeworks, students, videosCount, onOpenHw, onSel
 
   return (
     <>
-      <Head over="Рабочее пространство" title="Добрый день, Алексей" text="Ученики, задания и авторские материалы 64 Lines."
+      <Head over="Рабочее пространство" title={`Добрый день, ${userName}`} text="Ученики, задания и авторские материалы 64 Lines."
         action={<button className="button" onClick={() => go('homework')}><Plus />Создать задание</button>} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Активные ученики" value={String(students.length)}  note="всего" />
