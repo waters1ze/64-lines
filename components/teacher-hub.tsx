@@ -362,6 +362,17 @@ export function TeacherHub({
     } catch { notify('Ошибка сети') }
   }
 
+  const deletePurchase = async (purchaseId: string) => {
+    try {
+      if (!confirm('Точно удалить этот заказ из базы? Выручка за него также спишется.')) return
+      const res = await fetch(`/api/payments/${purchaseId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setPurchases(prev => prev.filter(p => p.id !== purchaseId))
+        notify('Заказ удалён')
+      } else { notify('Ошибка сервера') }
+    } catch { notify('Ошибка сети') }
+  }
+
   const purchaseCourse = (id: string | number) => {
     if (isGuest) {
       notify('Пожалуйста, зарегистрируйтесь, чтобы совершать покупки.')
@@ -489,7 +500,7 @@ export function TeacherHub({
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'modules'  && <Modules courses={courses} purchasedIds={purchasedIds} onOpenCourse={openCourseViewer} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
-            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} />}
+            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
             {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
@@ -1683,7 +1694,7 @@ function Modules({ courses, purchasedIds, onOpenCourse }: { courses: Course[]; p
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
-function Sales({ purchases, onApprove, onReject }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void }) {
+function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void; onDelete: (id: string) => void }) {
   const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
   const pending = purchases.filter(p => p.status === 'PENDING')
   const history = purchases.filter(p => p.status === 'APPROVED' || p.status === 'REJECTED')
@@ -1730,9 +1741,14 @@ function Sales({ purchases, onApprove, onReject }: { purchases: any[]; onApprove
                 <p className="font-medium">{p.user?.name || p.user?.email}</p>
                 <p className="text-sm text-muted-foreground">{p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
               </div>
-              <span className={`badge ${p.status === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                {p.status === 'APPROVED' ? 'Оплачено' : 'Отклонено'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className={`badge ${p.status === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                  {p.status === 'APPROVED' ? 'Оплачено' : 'Отклонено'}
+                </span>
+                <button className="icon-button text-red-500 hover:bg-red-50" onClick={() => onDelete(p.id)} title="Удалить из базы">
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
             </div>
           ))}
           {history.length === 0 && <p className="text-muted-foreground">Пока нет завершённых заказов.</p>}
@@ -1965,70 +1981,86 @@ type PgnGame = {
 
 function parsePgnGames(pgn: string): PgnGame[] {
   if (!pgn?.trim()) return []
-  try {
-    const { parse } = require('@mliebelt/pgn-parser')
-    const parsed = parse(pgn, { startRule: 'games' }) as any[]
-    
-    return parsed.map(game => {
-      const startFen = game.tags?.FEN ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-      let nextId = 1
-      const nodeMap: Record<string, MoveNode> = {}
-      
-      function processMoves(moves: any[], currentFen: string, parentId: string | null): MoveNode[] {
-        const result: MoveNode[] = []
-        let fen = currentFen
-        const chess = new Chess(fen)
-        
-        for (const m of moves) {
-          const san = m.notation.notation
-          let newFen = fen
-          try {
-            chess.move(san)
-            newFen = chess.fen()
-          } catch (e) {
-            // fallback
-          }
-          
-          const node: MoveNode = {
-            id: `m${nextId++}`,
-            san,
-            moveNumber: m.moveNumber,
-            turn: m.turn,
-            fen: newFen,
-            comment: m.commentDiag?.comment,
-            variations: [],
-            parentId
-          }
-          nodeMap[node.id] = node
-          
-          if (m.variations && m.variations.length > 0) {
-            node.variations = m.variations.map((vMoves: any[]) => processMoves(vMoves, fen, parentId))
-          }
-          
-          result.push(node)
-          fen = newFen
-          parentId = node.id
-        }
-        return result
-      }
-      
-      const white = game.tags?.White === '?' ? '' : (game.tags?.White || '')
-      const black = game.tags?.Black === '?' ? '' : (game.tags?.Black || '')
-      
+  const blocks = pgn.split(/(?=\[Event )/).map(s => s.trim()).filter(Boolean)
+  const { parse } = require('@mliebelt/pgn-parser')
+  
+  return blocks.map(block => {
+    let parsedGame: any = null
+    try {
+      parsedGame = parse(block, { startRule: 'game' })
+    } catch (e) {
+      console.warn('Failed to parse game with mliebelt', e)
+      const get = (tag: string) => block.match(new RegExp(`\\[${tag} "(.+?)"\\]`))?.[1] ?? ''
+      const fenMatch = block.match(/\[FEN "(.+?)"\]/)
+      const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+      const event = get('Event') === '?' ? '' : (get('Event') || 'Партия')
       return {
-        event: game.tags?.Event || 'Партия',
-        white,
-        black,
-        result: game.tags?.Result || '',
+        event,
+        white: get('White') === '?' ? '' : get('White'),
+        black: get('Black') === '?' ? '' : get('Black'),
+        result: get('Result'),
         startFen,
-        rootMoves: processMoves(game.moves || [], startFen, null),
-        nodeMap
+        rootMoves: [],
+        nodeMap: {}
       }
-    })
-  } catch (e) {
-    console.error('PGN parse error', e)
-    return []
-  }
+    }
+
+    const startFen = parsedGame.tags?.FEN ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    let nextId = 1
+    const nodeMap: Record<string, MoveNode> = {}
+    
+    function processMoves(moves: any[], currentFen: string, parentId: string | null): MoveNode[] {
+      const result: MoveNode[] = []
+      let fen = currentFen
+      const chess = new Chess(fen)
+      
+      for (const m of moves) {
+        const san = m.notation.notation
+        let newFen = fen
+        try {
+          chess.move(san)
+          newFen = chess.fen()
+        } catch (e) {
+          // fallback
+        }
+        
+        const node: MoveNode = {
+          id: `m${nextId++}`,
+          san,
+          moveNumber: m.moveNumber,
+          turn: m.turn,
+          fen: newFen,
+          comment: m.commentDiag?.comment,
+          variations: [],
+          parentId
+        }
+        nodeMap[node.id] = node
+        
+        if (m.variations && m.variations.length > 0) {
+          node.variations = m.variations.map((vMoves: any[]) => processMoves(vMoves, fen, parentId))
+        }
+        
+        result.push(node)
+        fen = newFen
+        parentId = node.id
+      }
+      return result
+    }
+    
+    const white = parsedGame.tags?.White === '?' ? '' : (parsedGame.tags?.White || '')
+    const black = parsedGame.tags?.Black === '?' ? '' : (parsedGame.tags?.Black || '')
+    const event = parsedGame.tags?.Event === '?' ? '' : (parsedGame.tags?.Event || 'Партия')
+    
+    return {
+      event,
+      white,
+      black,
+      result: parsedGame.tags?.Result || '',
+      startFen,
+      rootMoves: processMoves(parsedGame.moves || [], startFen, null),
+      nodeMap
+    }
+  })
 }
 
 function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], activeId: string|null, onSelect: (id: string) => void }) {
@@ -2080,6 +2112,11 @@ function CourseViewer({ course }: { course: Course }) {
     try { return new Chess(currentFen) } catch { return new Chess() }
   }, [currentFen])
 
+  const candidateNodes = useMemo(() => {
+    if (!currentGame) return []
+    return Object.values(currentGame.nodeMap).filter(n => n.parentId === activeMoveId)
+  }, [currentGame, activeMoveId])
+
   useEffect(() => { setActiveMoveId(null); setSelected(null) }, [selectedIdx])
 
   useEffect(() => {
@@ -2094,12 +2131,9 @@ function CourseViewer({ course }: { course: Course }) {
         }
       }
       if (e.key === 'ArrowRight') {
-        // Find first child of current node
         if (!activeMoveId) {
           if (currentGame.rootMoves.length > 0) setActiveMoveId(currentGame.rootMoves[0].id)
         } else {
-          // Find next node in main line. 
-          // We can just search rootMoves and variations for the node whose parentId is activeMoveId
           const nextNode = Object.values(currentGame.nodeMap).find(n => n.parentId === activeMoveId)
           if (nextNode) setActiveMoveId(nextNode.id)
         }
@@ -2210,6 +2244,23 @@ function CourseViewer({ course }: { course: Course }) {
               </span>
               <button className="icon-button" onClick={() => setFlipped(f => !f)} title="Перевернуть"><RotateCcw /></button>
             </div>
+            
+            {candidateNodes.length > 0 && (
+              <div className="mt-4 rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs font-semibold mb-2 text-muted-foreground">Возможные ходы:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {candidateNodes.map(n => (
+                    <button 
+                      key={n.id} 
+                      onClick={() => setActiveMoveId(n.id)} 
+                      className="outline-button text-xs py-1.5 px-3 h-auto hover:bg-primary hover:text-primary-foreground transition-colors"
+                    >
+                      {n.turn === 'w' ? `${n.moveNumber}. ${n.san}` : `${n.moveNumber}... ${n.san}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Move list with variations */}
