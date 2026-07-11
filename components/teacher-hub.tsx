@@ -1345,15 +1345,9 @@ function VideosSection({
               <div className="w-full aspect-video border-b bg-muted/40 relative shrink-0 overflow-hidden">
                 {ytId ? (
                   <img
-                    src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`}
+                    src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
                     alt={v.title}
                     className="absolute inset-0 w-full h-full object-cover scale-105"
-                    onError={e => {
-                      const img = e.target as HTMLImageElement
-                      if (!img.src.includes('hqdefault')) {
-                        img.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
-                      }
-                    }}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
