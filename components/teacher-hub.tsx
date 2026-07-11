@@ -1823,12 +1823,12 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
   courses: Course[]; isTeacher: boolean; purchasedIds: number[]
   onPurchase: (id: string | number) => void
   onAdd: (c: Omit<Course, 'id' | 'createdAt'>) => void
-  onUpdate: (id: number, u: Partial<Course>) => void
+  onUpdate: (id: string | number, u: Partial<Course>) => void
   onDelete: (id: string | number) => void
   notify: (s: string) => void
 }) {
-  const [modal, setModal] = useState<null | 'add' | 'detail' | number>(null)
-  const [detailId, setDetailId] = useState<number | null>(null)
+  const [modal, setModal] = useState<null | 'add' | 'detail' | string | number>(null)
+  const [detailId, setDetailId] = useState<string | number | null>(null)
   const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '' })
   const fileRef = useRef<HTMLInputElement>(null)
   const pgnFileRef = useRef<HTMLInputElement>(null)
@@ -1854,8 +1854,9 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
   function handleSave() {
     if (!form.name || !form.price) { notify('Заполните название и цену'); return }
     const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined }
+    const isEdit = modal !== 'add' && modal !== 'detail' && modal !== null
     if (modal === 'add') onAdd(data)
-    else if (typeof modal === 'number') onUpdate(modal, data)
+    else if (isEdit) onUpdate(modal as string | number, data)
     setModal(null); notify(modal === 'add' ? 'Курс добавлен!' : 'Курс обновлён!')
   }
 
@@ -1906,7 +1907,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
       </div>
 
       {/* Add / Edit modal */}
-      {(modal === 'add' || typeof modal === 'number') && (
+      {(modal === 'add' || (modal !== null && modal !== 'detail')) && (
         <Modal title={modal === 'add' ? 'Добавить курс' : 'Редактировать курс'} close={() => setModal(null)}>
           <label className="field">Название<input className="input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Сицилианская защита" /></label>
           <label className="field">Описание<textarea className="textarea" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Подробное описание курса..." /></label>
