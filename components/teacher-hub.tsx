@@ -1344,7 +1344,17 @@ function VideosSection({
             <article key={v.id} className="overflow-hidden rounded-lg border flex flex-col">
               <div className="flex aspect-video items-center justify-center border-b bg-muted/40 relative shrink-0">
                 {ytId ? (
-                  <img src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} alt={v.title} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${ytId}/sddefault.jpg` }} />
+                  <img
+                    src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`}
+                    alt={v.title}
+                    className="w-full h-full object-cover"
+                    onError={e => {
+                      const img = e.target as HTMLImageElement
+                      if (!img.src.includes('mqdefault')) {
+                        img.src = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+                      }
+                    }}
+                  />
                 ) : (
                   <Video className="size-9 text-muted-foreground" />
                 )}
