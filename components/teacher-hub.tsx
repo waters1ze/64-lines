@@ -237,7 +237,7 @@ export function TeacherHub({
 
   const studentNavBase = [
     ['overview',  'Мой обзор',          LayoutDashboard],
-    ['videos',    'Видеоуроки',         Video],
+    ['videos',    'Видео с YouTube',         Video],
     ['courses',   'Дебютные курсы',     GraduationCap],
     ['store',     'Витрина',            Store],
     ['openings',  'Мои дебюты',         Library],
@@ -246,7 +246,7 @@ export function TeacherHub({
   ] as const
 
   const guestNavBase = [
-    ['videos',    'Видеоуроки',         Video],
+    ['videos',    'Видео с YouTube',         Video],
     ['courses',   'Дебютные курсы',     GraduationCap],
     ['store',     'Витрина',            Store],
     ['openings',  'Мои дебюты',         Library],

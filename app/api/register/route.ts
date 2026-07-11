@@ -8,16 +8,25 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { token, name, email, password } = body
 
-    if (!token || !name || !email || !password) {
+    if (!name || !email || !password) {
       return NextResponse.json({ error: "Пожалуйста, заполните все поля" }, { status: 400 })
     }
 
-    const invite = await db.inviteLink.findUnique({
-      where: { token }
-    })
+    let role = "STUDENT"
+    let teacherId = null
+    let invite = null
 
-    if (!invite || invite.used) {
-      return NextResponse.json({ error: "Недействительная или использованная ссылка-приглашение" }, { status: 400 })
+    if (token) {
+      invite = await db.inviteLink.findUnique({
+        where: { token }
+      })
+
+      if (!invite || invite.used) {
+        return NextResponse.json({ error: "Недействительная или использованная ссылка-приглашение" }, { status: 400 })
+      }
+      
+      role = invite.role
+      teacherId = invite.teacherId
     }
 
     const existingUser = await db.user.findUnique({
@@ -36,17 +45,19 @@ export async function POST(req: NextRequest) {
         name,
         email,
         passwordHash,
-        role: invite.role,
-        teacherId: invite.teacherId,
+        role: role as any,
+        teacherId,
         verificationToken,
       }
     })
 
-    // Помечаем токен как использованный
-    await db.inviteLink.update({
-      where: { id: invite.id },
-      data: { used: true }
-    })
+    if (invite) {
+      // Помечаем токен как использованный
+      await db.inviteLink.update({
+        where: { id: invite.id },
+        data: { used: true }
+      })
+    }
     
     // Отправляем письмо с подтверждением
     const { sendVerificationEmail } = await import("@/lib/mail")

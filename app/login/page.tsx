@@ -98,7 +98,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          Нет аккаунта? Обратитесь к вашему тренеру за ссылкой-приглашением.
+          Нет аккаунта? <a href="/register" className="text-primary hover:underline">Зарегистрироваться</a>
         </div>
       </div>
     </div>
