@@ -1,0 +1,108 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@theme inline {
+  --font-sans: var(--font-geist), Arial, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: .35rem;
+  --radius-md: .45rem;
+  --radius-lg: .6rem;
+  --radius-xl: .75rem;
+}
+
+:root {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(.19 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(.19 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(.19 0 0);
+  --primary: oklch(.21 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(.97 0 0);
+  --secondary-foreground: oklch(.21 0 0);
+  --muted: oklch(.97 0 0);
+  --muted-foreground: oklch(.49 0 0);
+  --accent: oklch(.965 0 0);
+  --accent-foreground: oklch(.19 0 0);
+  --destructive: oklch(.53 .2 27);
+  --border: oklch(.9 0 0);
+  --input: oklch(.87 0 0);
+  --ring: oklch(.34 0 0);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/40; }
+  html { @apply bg-background; overflow: hidden; }
+  body { @apply bg-background font-sans text-foreground; margin: 0; }
+  button, select, input, textarea { font: inherit; }
+  button:not(:disabled), select:not(:disabled), input[type='checkbox'] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .45; }
+  ::selection { background: var(--foreground); color: var(--background); }
+}
+
+@layer components {
+  .button, .outline-button, .destructive-button, .text-button, .icon-button {
+    @apply inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2;
+  }
+  .button { @apply h-9 bg-primary px-4 text-primary-foreground hover:opacity-85; }
+  .outline-button { @apply h-9 border bg-background px-3 text-foreground hover:bg-muted; }
+  .destructive-button { @apply h-9 border border-destructive bg-background px-3 text-destructive hover:bg-destructive hover:text-primary-foreground; }
+  .text-button { @apply h-8 text-muted-foreground hover:text-foreground; }
+  .icon-button { @apply size-9 text-muted-foreground hover:bg-muted hover:text-foreground; }
+  .button svg, .outline-button svg, .destructive-button svg, .text-button svg, .icon-button svg { @apply size-4; }
+  .input, .select, .textarea { display: block; width: 100%; border: 1px solid var(--input); border-radius: .45rem; background: var(--background); padding-inline: .75rem; font-size: .875rem; outline: none; transition: border-color .15s ease; }
+  .input:focus, .select:focus, .textarea:focus { border-color: var(--foreground); box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 10%, transparent); }
+  .input, .select { height: 2.25rem; }
+  .textarea { min-height: 6rem; resize: vertical; padding-block: .5rem; line-height: 1.5rem; }
+  .field { display: flex; flex-direction: column; gap: .5rem; font-size: .875rem; font-weight: 500; }
+  .nav-item { @apply flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground; }
+  .nav-item svg { @apply size-4 shrink-0; }
+  .nav-item-active { @apply bg-muted font-medium text-foreground; }
+  .quick-action { @apply flex min-h-12 items-center gap-3 rounded-md border px-3 text-left text-sm font-medium hover:bg-muted/50; }
+  .badge { @apply inline-flex w-fit items-center rounded-full border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground; }
+  .badge-warn { @apply border-foreground text-foreground; }
+  .settings-section { @apply overflow-hidden rounded-lg border; }
+  .settings-section > h2 { @apply border-b p-5 font-semibold; }
+  .setting-row { @apply flex flex-col gap-4 border-b p-5 last:border-0 sm:flex-row sm:items-center sm:justify-between; }
+  .setting-row > div:first-child p { @apply mt-1 text-sm leading-6 text-muted-foreground; }
+  .drop-zone { @apply flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm hover:bg-muted/40; }
+  .drop-zone svg { @apply size-5 text-muted-foreground; }
+  .drop-zone span { @apply text-xs text-muted-foreground; }
+  .chess-square-light { background: var(--background); }
+  .chess-square-dark { background: var(--foreground); }
+  .chess-piece {
+    font-family: 'DejaVu Sans', 'Arial Unicode MS', 'Noto Sans Symbols 2', sans-serif;
+    font-size: clamp(1.8rem, 6.5vw, 4.5rem);
+    font-weight: 400;
+    line-height: 1;
+    transform: translateY(-2%);
+  }
+  .chess-piece-black { color: var(--foreground); -webkit-text-stroke: 1px var(--background); }
+  .chess-piece-white { color: var(--background); -webkit-text-stroke: 1px var(--foreground); }
+}
+
+@media (max-width: 640px) {
+  .settings-section .input { min-width: 0; }
+}
