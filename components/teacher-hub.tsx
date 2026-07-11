@@ -2068,23 +2068,26 @@ function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], active
     <>
       {nodes.map((node, i) => (
         <React.Fragment key={node.id}>
-          <span 
-            className={`inline-block px-1 rounded cursor-pointer transition-colors ${activeId === node.id ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted'}`}
+          {node.turn === 'w' && <span className="text-muted-foreground select-none">{node.moveNumber}. </span>}
+          {node.turn === 'b' && i === 0 && <span className="text-muted-foreground select-none">{node.moveNumber}… </span>}
+          <span
+            className={`cursor-pointer rounded px-0.5 transition-colors ${activeId === node.id ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-muted'}`}
             onClick={() => onSelect(node.id)}
           >
-            {node.turn === 'w' ? `${node.moveNumber}. ${node.san}` : (i === 0 ? `${node.moveNumber}... ${node.san}` : node.san)}
+            {node.san}
           </span>
-          {' '}
-          {node.variations.length > 0 && (
-            <span className="inline-block text-muted-foreground">
-              {node.variations.map((v, vi) => (
-                <span key={vi} className="inline-flex gap-1 ml-1">
-                  ( <MoveNodeList nodes={v} activeId={activeId} onSelect={onSelect} /> )
-                </span>
-              ))}
-            </span>
+          {node.comment && (
+            <> <span className="text-muted-foreground/80 italic text-xs">{'{ '}{node.comment}{' }'}</span></>
           )}
-          {node.comment && <span className="text-muted-foreground italic ml-1 mr-1">{`{ ${node.comment} }`}</span>}
+          {node.variations.map((v, vi) => (
+            <React.Fragment key={vi}>
+              {' '}
+              <span className="text-muted-foreground/60 select-none">(</span>
+              <MoveNodeList nodes={v} activeId={activeId} onSelect={onSelect} />
+              <span className="text-muted-foreground/60 select-none">)</span>
+            </React.Fragment>
+          ))}
+          {' '}
         </React.Fragment>
       ))}
     </>
@@ -2273,7 +2276,7 @@ function CourseViewer({ course }: { course: Course }) {
 
           <div className="rounded-lg border p-4 bg-white/50">
             <p className="text-sm font-semibold mb-3">Вся теория</p>
-            <div className="text-sm leading-8 font-medium max-h-[600px] overflow-y-auto pr-2">
+            <div className="text-sm leading-relaxed font-medium max-h-[600px] overflow-y-auto pr-2 break-words">
               {currentGame.rootMoves.length === 0 ? (
                 <span className="text-muted-foreground text-sm">Ходы не записаны</span>
               ) : (
