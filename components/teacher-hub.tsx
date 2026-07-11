@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
