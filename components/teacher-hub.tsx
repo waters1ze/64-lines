@@ -170,8 +170,10 @@ function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function TeacherHub() {
-  const [role, setRole] = useState<Role>('Учитель')
+import { signOut } from 'next-auth/react'
+
+export function TeacherHub({ initialRole = 'Учитель', userName = 'Алексей' }: { initialRole?: Role, userName?: string | null }) {
+  const [role, setRole] = useState<Role>(initialRole)
   const [section, setSection] = useState<Section>('overview')
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
@@ -256,9 +258,17 @@ export function TeacherHub() {
             </button>
           ))}
         </nav>
-        <div className="border-t p-4">
-          <p className="text-sm font-medium">{isStudent ? 'Михаил Орлов' : 'Алексей Карпов'}</p>
-          <p className="text-xs text-muted-foreground">{isStudent ? 'Ученик · рейтинг 1842' : 'Владелец школы'}</p>
+        <div className="border-t p-4 flex flex-col gap-2">
+          <div>
+            <p className="text-sm font-medium">{userName || 'Пользователь'}</p>
+            <p className="text-xs text-muted-foreground">{isStudent ? 'Ученик' : 'Тренер'}</p>
+          </div>
+          <button 
+            onClick={() => signOut()}
+            className="text-xs text-red-500 hover:text-red-700 text-left font-medium"
+          >
+            Выйти
+          </button>
         </div>
       </aside>
 
@@ -270,9 +280,9 @@ export function TeacherHub() {
             <button className="icon-button" onClick={() => go(section === 'studentProfile' ? 'students' : (isStudent ? 'overview' : 'homework'))}><ArrowLeft /></button>
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
-          <select className="select ml-auto w-auto" value={role} onChange={e => { setRole(e.target.value as Role); setSection(e.target.value === 'Покупатель' ? 'store' : 'overview') }}>
-            <option>Учитель</option><option>Ученик</option><option>Покупатель</option>
-          </select>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
+          </div>
           <button className="icon-button" onClick={() => notify('Новых уведомлений нет')}><Bell /></button>
         </header>
 
@@ -365,10 +375,25 @@ function StudentOverview({ homeworks, onOpenHw }: { homeworks: HW[]; onOpenHw: (
 // ─── Students ────────────────────────────────────────────────────────────────
 
 function Students({ students, homeworks, onSelect, notify }: { students: Student[]; homeworks: HW[]; onSelect: (id: number) => void; notify: (s: string) => void }) {
+  const handleInvite = async () => {
+    try {
+      const res = await fetch('/api/invite', { method: 'POST', body: JSON.stringify({ role: 'STUDENT' }) })
+      const data = await res.json()
+      if (res.ok) {
+        navigator.clipboard.writeText(data.url)
+        notify('Ссылка-приглашение скопирована в буфер обмена!')
+      } else {
+        notify('Ошибка: ' + data.error)
+      }
+    } catch (e) {
+      notify('Ошибка при создании приглашения')
+    }
+  }
+
   return (
     <>
       <Head over="Обучение" title="Мои ученики" text="Нажмите на ученика, чтобы открыть профиль."
-        action={<button className="button" onClick={() => notify('Форма приглашения открыта')}><UserPlus />Добавить ученика</button>} />
+        action={<button className="button" onClick={handleInvite}><UserPlus />Сгенерировать ссылку</button>} />
       <div className="rounded-lg border">
         {students.map(s => {
           const sHws = homeworks.filter(h => h.studentId === s.id)

@@ -20,12 +20,16 @@ export const viewport: Viewport = {
   userScalable: true,
 }
 
+import { Providers } from '@/components/providers'
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru" className={`bg-background ${geist.variable} ${geistMono.variable}`}>
       <body className="antialiased">
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <Providers>
+          {children}
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </Providers>
       </body>
     </html>
   )
