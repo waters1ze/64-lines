@@ -169,6 +169,7 @@ function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 import { signOut } from 'next-auth/react'
+import Link from 'next/link'
 
 export function TeacherHub({ 
   initialRole = 'Учитель', 
@@ -190,8 +191,8 @@ export function TeacherHub({
   initialPurchases?: any[],
 }) {
   const isTeacher = initialRole === 'Учитель' || initialRole === 'ADMIN'
-  const isStudent = initialRole === 'Ученик'
   const isGuest = initialRole === 'Гость'
+  const isStudent = initialRole === 'Ученик' || isGuest
 
   const [role] = useState(initialRole)
   const [section, setSection] = useState<Section>('overview')
@@ -239,7 +240,14 @@ export function TeacherHub({
     ['settings',  'Настройки',          Settings],
   ] as const
 
-  const nav = isStudent ? studentNavBase : teacherNav
+  const guestNavBase = [
+    ['videos',    'Видеоуроки',         Video],
+    ['courses',   'Дебютные курсы',     GraduationCap],
+    ['store',     'Витрина',            Store],
+    ['openings',  'Мои дебюты',         Library],
+  ] as const
+
+  const nav = isGuest ? guestNavBase : (isStudent ? studentNavBase : teacherNav)
 
   const selectedStudent = students.find(s => s.id === selectedStudentId) ?? null
   const selectedHw = homeworks.find(h => h.id === selectedHwId) ?? null
@@ -357,6 +365,11 @@ export function TeacherHub({
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
+            {isGuest && (
+              <Link href="/login" className="button ml-2 py-1 px-3 text-xs">
+                Войти / Регистрация
+              </Link>
+            )}
           </div>
           <button className="icon-button" onClick={() => notify('Новых уведомлений нет')}><Bell /></button>
         </header>
@@ -365,7 +378,7 @@ export function TeacherHub({
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
               ? <StudentOverview homeworks={homeworks.filter(h => h.studentId === 1)} onOpenHw={openHwPuzzle} />
-              : <TeacherOverview go={go} homeworks={homeworks} onOpenHw={openHwPuzzle} />
+              : <TeacherOverview go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
             {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} notify={notify} />}
             {section === 'studentProfile' && selectedStudent && (
@@ -438,18 +451,64 @@ export function TeacherHub({
 
 // ─── Overview sections ────────────────────────────────────────────────────────
 
-function TeacherOverview({ go, homeworks, onOpenHw }: { go: (s: Section) => void; homeworks: HW[]; onOpenHw: (id: number) => void }) {
+function TeacherOverview({ go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: number) => void; onSelectStudent: (id: number) => void; notify: (s: string) => void }) {
   const recent = homeworks.slice(0, 3)
+
+  const handleInvite = async () => {
+    try {
+      const res = await fetch('/api/invite', { method: 'POST', body: JSON.stringify({ role: 'STUDENT' }) })
+      const data = await res.json()
+      if (res.ok) {
+        navigator.clipboard.writeText(data.url)
+        notify('Ссылка-приглашение скопирована в буфер обмена!')
+      } else {
+        notify('Ошибка: ' + data.error)
+      }
+    } catch (e) {
+      notify('Ошибка при создании приглашения')
+    }
+  }
+
   return (
     <>
       <Head over="Рабочее пространство" title="Добрый день, Алексей" text="Ученики, задания и авторские материалы 64 Lines."
         action={<button className="button" onClick={() => go('homework')}><Plus />Создать задание</button>} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Активные ученики" value="4"  note="+1 за месяц" />
+        <Metric label="Активные ученики" value={String(students.length)}  note="всего" />
         <Metric label="Активных заданий" value={String(homeworks.filter(h => !h.solved).length)} note="не завершено" />
-        <Metric label="Видеоуроков"      value="3"  note="в библиотеке" />
+        <Metric label="Видеоуроков"      value={String(videosCount)}  note="в библиотеке" />
         <Metric label="Выполнено"        value={String(homeworks.filter(h => h.solved).length)} note="всего" />
       </section>
+
+      <section className="rounded-lg border">
+        <div className="flex items-center justify-between border-b p-5">
+          <div><h2 className="font-semibold">Ученики</h2><p className="mt-1 text-sm text-muted-foreground">Управление учениками</p></div>
+          <div className="flex gap-2">
+            <button className="outline-button text-xs" onClick={handleInvite}><UserPlus className="size-4 mr-1"/>Пригласить по ссылке</button>
+            <button className="text-button text-xs" onClick={() => go('students')}>Все<ChevronRight className="size-4 ml-1"/></button>
+          </div>
+        </div>
+        <div className="flex flex-col">
+          {students.slice(0, 5).map(s => {
+            const sHws = homeworks.filter(h => h.studentId === s.id)
+            const done = sHws.filter(h => h.solved).length
+            const pct  = sHws.length > 0 ? Math.round(done / sHws.length * 100) : 0
+            return (
+              <button key={s.id} onClick={() => onSelectStudent(s.id)}
+                className="flex w-full items-center gap-4 border-b p-4 text-left last:border-0 transition-colors hover:bg-muted/30">
+                <span className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">{initials(s.name)}</span>
+                <span className="flex-1">
+                  <b className="text-sm">{s.name}</b>
+                  <small className="block text-muted-foreground">Рейтинг {s.rating} · {done}/{sHws.length} заданий</small>
+                </span>
+                <span className="w-24"><ProgressBar value={pct} /></span>
+              </button>
+            )
+          })}
+          {students.length === 0 && <div className="p-4 text-sm text-muted-foreground text-center">Нет учеников</div>}
+        </div>
+      </section>
+
       <section className="rounded-lg border">
         <div className="flex items-center justify-between border-b p-5">
           <div><h2 className="font-semibold">Последние домашние задания</h2><p className="mt-1 text-sm text-muted-foreground">Нажмите, чтобы открыть задание</p></div>
