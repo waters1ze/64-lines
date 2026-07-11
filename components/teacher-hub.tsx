@@ -71,10 +71,14 @@ function initials(name: string) { return name.split(' ').map((w: string) => w[0]
 
 function parseHwPgn(pgn: string): { startFen: string; solution: string[] } {
   try {
+    let normalizedPgn = pgn
     const fenMatch = pgn.match(/\[FEN "(.+?)"\]/)
     const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    if (fenMatch && !pgn.includes('[SetUp "1"]')) {
+      normalizedPgn = '[SetUp "1"]\n' + pgn
+    }
     const g = new Chess()
-    g.loadPgn(pgn)
+    g.loadPgn(normalizedPgn)
     return { startFen, solution: g.history() }
   } catch {
     return { startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: [] }
@@ -296,6 +300,16 @@ export function TeacherHub({
       }
     } catch { notify('Ошибка при обновлении дз') }
   }
+  const deleteHomework = async (id: number | string) => {
+    try {
+      const res = await fetch(`/api/homework/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setHomeworks(prev => prev.filter(h => h.id !== id))
+        go('overview')
+        notify('Домашнее задание удалено')
+      } else notify('Ошибка при удалении дз')
+    } catch { notify('Ошибка сети') }
+  }
   const deleteStudent = async (id: string | number) => {
     try {
       const res = await fetch(`/api/students/${id}`, { method: 'DELETE' })
@@ -444,7 +458,8 @@ export function TeacherHub({
             {section === 'homeworkPuzzle' && selectedHw && (
               <HomeworkPuzzle hw={selectedHw} isStudent={isStudent}
                 onSolve={(id, attempts) => { updateHomework(id, { solved: true, attempts, status: 'Выполнено', progress: 100 }); notify(`Задача решена! Попыток: ${attempts}`) }}
-                onUpdate={!isStudent ? updateHomework : undefined} />
+                onUpdate={!isStudent ? updateHomework : undefined}
+                onDelete={!isStudent ? deleteHomework : undefined} />
             )}
             {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
@@ -887,10 +902,11 @@ function ChessBoard({
   )
 }
 
-function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate }: {
+function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
   hw: HW; isStudent: boolean
   onSolve: (id: number, attempts: number) => void
   onUpdate?: (id: number, patch: Partial<HW>) => void
+  onDelete?: (id: number) => void
 }) {
   const { startFen, solution } = useMemo(() => parseHwPgn(hw.pgn), [hw.pgn])
   const studentColor = useMemo(() => { try { return new Chess(startFen).turn() } catch { return 'w' as const } }, [startFen])
@@ -1007,10 +1023,13 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate }: {
         over={isStudent ? 'Домашнее задание' : 'Просмотр задания'}
         title={hw.title}
         text={isStudent
-          ? (status === 'solved' ? `✅ Решено с ${hw.solved ? hw.attempts : wrongCount + 1} попыток` : `Попытки: ${wrongCount}/3 · Срок: ${hw.due}`)
-          : `Ученик: ${hw.status} · Срок: ${hw.due}`}
+          ? (status === 'solved' ? `✅ Решено с ${hw.solved ? hw.attempts : wrongCount + 1} попыток` : `Попытки: ${wrongCount}/3 · Срок: ${hw.dueDate ? formatDate(hw.dueDate) : (hw.due || 'без срока')}`)
+          : `Ученик: ${hw.status || 'Новое'} · Срок: ${hw.dueDate ? formatDate(hw.dueDate) : (hw.due || 'без срока')}`}
         action={!isStudent && onUpdate
-          ? <button className="outline-button" onClick={() => setShowEdit(true)}><Pencil className="size-4" />Редактировать</button>
+          ? <div className="flex gap-2">
+              <button className="outline-button text-red-500 hover:bg-red-50" onClick={() => { if (onDelete && confirm('Удалить задание?')) onDelete(hw.id) }}><Trash2 className="size-4" />Удалить</button>
+              <button className="outline-button" onClick={() => setShowEdit(true)}><Pencil className="size-4" />Редактировать</button>
+            </div>
           : undefined} />
 
       {/* Teacher: progress + note, NOT the raw solution */}
