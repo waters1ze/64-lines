@@ -2131,14 +2131,22 @@ function CourseViewer({ course }: { course: Course }) {
         }
       }
       if (e.key === 'ArrowRight') {
-        if (!activeMoveId) {
-          if (currentGame.rootMoves.length > 0) setActiveMoveId(currentGame.rootMoves[0].id)
-        } else {
-          const nextNode = Object.values(currentGame.nodeMap).find(n => n.parentId === activeMoveId)
-          if (nextNode) setActiveMoveId(nextNode.id)
+        const candidates = Object.values(currentGame.nodeMap).filter(n => n.parentId === activeMoveId)
+        if (candidates.length > 0) setActiveMoveId(candidates[0].id)
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (!activeMoveId) return
+        const parentId = currentGame.nodeMap[activeMoveId]?.parentId ?? null
+        const siblings = Object.values(currentGame.nodeMap).filter(n => n.parentId === parentId)
+        if (siblings.length > 1) {
+          e.preventDefault()
+          const currentIdx = siblings.findIndex(n => n.id === activeMoveId)
+          let nextIdx = currentIdx + (e.key === 'ArrowDown' ? 1 : -1)
+          if (nextIdx >= siblings.length) nextIdx = 0
+          if (nextIdx < 0) nextIdx = siblings.length - 1
+          setActiveMoveId(siblings[nextIdx].id)
         }
       }
-      if (e.key === 'ArrowUp') setActiveMoveId(null)
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
@@ -2157,10 +2165,10 @@ function CourseViewer({ course }: { course: Course }) {
 
   return (
     <>
-      <Head over="Курс" title={course.name} text={`${games.length} партий · используйте ← → для навигации по ходам`} />
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-        {/* Game list */}
-        <div className="flex flex-col gap-2">
+      <Head over="Курс" title={course.name} text={`${games.length} партий · используйте ← → ↑ ↓ для навигации по ходам`} />
+      <div className="flex flex-col xl:flex-row gap-6 items-start">
+        {/* Left: Game list */}
+        <div className="w-full xl:w-[280px] shrink-0 flex flex-col gap-2">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-semibold">Партии ({games.length})</p>
             {course.pgn && (
@@ -2193,9 +2201,8 @@ function CourseViewer({ course }: { course: Course }) {
           </div>
         </div>
 
-        {/* Board + moves */}
-        <div className="flex flex-col gap-4">
-          {/* Navigation controls */}
+        {/* Middle: Board + Navigation */}
+        <div className="flex-1 w-full max-w-[560px] flex flex-col gap-4 mx-auto xl:mx-0 shrink-0">
           <div className="flex items-center justify-between rounded-lg border p-2 bg-muted/30">
             <div className="flex gap-1">
               <button className="icon-button" onClick={() => setActiveMoveId(null)} title="Начало" disabled={!activeMoveId}>
@@ -2203,8 +2210,7 @@ function CourseViewer({ course }: { course: Course }) {
               </button>
               <button className="icon-button" onClick={() => {
                 if (activeMoveId) setActiveMoveId(currentGame.nodeMap[activeMoveId]?.parentId ?? null)
-              }
-              } disabled={!activeMoveId}>
+              }} disabled={!activeMoveId}>
                 <ArrowLeft className="size-4" />
               </button>
             </div>
@@ -2213,17 +2219,15 @@ function CourseViewer({ course }: { course: Course }) {
             </span>
             <div className="flex gap-1">
               <button className="icon-button" onClick={() => {
-                const next = Object.values(currentGame.nodeMap).find(n => n.parentId === activeMoveId)
-                if (next) setActiveMoveId(next.id)
-                else if (!activeMoveId && currentGame.rootMoves.length > 0) setActiveMoveId(currentGame.rootMoves[0].id)
+                const candidates = Object.values(currentGame.nodeMap).filter(n => n.parentId === activeMoveId)
+                if (candidates.length > 0) setActiveMoveId(candidates[0].id)
               }}>
                 <ArrowRight className="size-4" />
               </button>
             </div>
           </div>
 
-          {/* Board */}
-          <div className="max-w-[560px] w-full mx-auto">
+          <div className="w-full">
             <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
               <ChessBoard
                 game={boardGame}
@@ -2234,7 +2238,7 @@ function CourseViewer({ course }: { course: Course }) {
                 dragOver={dragOver}
                 setDragOver={setDragOver}
                 flipped={flipped}
-                onMove={() => {}} // Read-only for now
+                onMove={() => {}} 
               />
             </div>
             <div className="mt-3 flex items-center gap-2">
@@ -2244,29 +2248,32 @@ function CourseViewer({ course }: { course: Course }) {
               </span>
               <button className="icon-button" onClick={() => setFlipped(f => !f)} title="Перевернуть"><RotateCcw /></button>
             </div>
-            
-            {candidateNodes.length > 0 && (
-              <div className="mt-4 rounded-lg border p-3 bg-muted/20">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">Возможные ходы:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {candidateNodes.map(n => (
-                    <button 
-                      key={n.id} 
-                      onClick={() => setActiveMoveId(n.id)} 
-                      className="outline-button text-xs py-1.5 px-3 h-auto hover:bg-primary hover:text-primary-foreground transition-colors"
-                    >
-                      {n.turn === 'w' ? `${n.moveNumber}. ${n.san}` : `${n.moveNumber}... ${n.san}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
+        </div>
 
-          {/* Move list with variations */}
+        {/* Right: Variations and Move list */}
+        <div className="flex-1 w-full min-w-[300px] flex flex-col gap-4">
+          {candidateNodes.length > 0 && (
+            <div className="rounded-lg border p-3 bg-muted/20">
+              <p className="text-xs font-semibold mb-2 text-muted-foreground">Варианты ({candidateNodes.length}):</p>
+              <div className="flex flex-col gap-1.5">
+                {candidateNodes.map(n => (
+                  <button 
+                    key={n.id} 
+                    onClick={() => setActiveMoveId(n.id)} 
+                    className="outline-button text-xs py-2 px-3 h-auto hover:bg-primary hover:text-primary-foreground transition-colors text-left flex gap-2 items-start"
+                  >
+                    <span className="font-semibold shrink-0">{n.turn === 'w' ? `${n.moveNumber}. ${n.san}` : `${n.moveNumber}... ${n.san}`}</span>
+                    {n.comment && <span className="text-muted-foreground italic font-normal line-clamp-2">{n.comment}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border p-4 bg-white/50">
             <p className="text-sm font-semibold mb-3">Вся теория</p>
-            <div className="text-sm leading-8 font-medium">
+            <div className="text-sm leading-8 font-medium max-h-[600px] overflow-y-auto pr-2">
               {currentGame.rootMoves.length === 0 ? (
                 <span className="text-muted-foreground text-sm">Ходы не записаны</span>
               ) : (
