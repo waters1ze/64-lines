@@ -19,10 +19,10 @@ type Section =
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
 
-type Student = { id: number; name: string; rating: number }
+type Student = { id: string | number; name: string; rating: number; email?: string }
 type HW = {
-  id: number; studentId: number; title: string; assigned: string; due: string
-  progress: number; status: string; pgn: string; attempts: number; solved: boolean
+  id: string | number; studentId: string | number; title: string; assignedAt?: string; dueDate?: string | null
+  progress: number; solved: boolean; attempts: number; pgn: string; status?: string; assigned?: string; due?: string
 }
 type Course = {
   id: number; name: string; description: string; price: number
@@ -147,15 +147,21 @@ function Modal({ title, close, children, wide }: { title: string; close: () => v
   )
 }
 
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return 'Без даты'
+  if (dateStr.includes(' ')) return dateStr // mock data format
+  try { return new Date(dateStr).toLocaleDateString('ru-RU') } catch { return dateStr }
+}
+
 function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen: () => void }) {
   return (
     <article className="rounded-lg border p-5">
       <div className="flex items-center justify-between gap-3">
-        <span className="badge">{hw.status}</span>
-        <span className="text-xs text-muted-foreground">{hw.assigned}</span>
+        <span className="badge">{hw.status || (hw.progress === 100 ? 'Выполнено' : 'В работе')}</span>
+        <span className="text-xs text-muted-foreground">{formatDate(hw.assignedAt || hw.assigned)}</span>
       </div>
       <h3 className="mt-4 font-semibold">{hw.title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">Срок: {hw.due}</p>
+      <p className="mt-1 text-sm text-muted-foreground">Срок: {hw.dueDate ? `до ${formatDate(hw.dueDate)}` : hw.due}</p>
       {hw.solved && <p className="mt-1 text-xs text-green-600 dark:text-green-400">✅ Решено (попыток: {hw.attempts})</p>}
       <div className="mt-4">
         <div className="mb-1.5 flex justify-between text-xs"><span>Прогресс</span><span>{hw.progress}%</span></div>
@@ -172,18 +178,28 @@ function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen
 
 import { signOut } from 'next-auth/react'
 
-export function TeacherHub({ initialRole = 'Учитель', userName = 'Алексей' }: { initialRole?: Role, userName?: string | null }) {
+export function TeacherHub({ 
+  initialRole = 'Учитель', 
+  userName = 'Алексей',
+  initialStudents,
+  initialHomeworks
+}: { 
+  initialRole?: Role, 
+  userName?: string | null,
+  initialStudents?: Student[],
+  initialHomeworks?: HW[]
+}) {
   const [role, setRole] = useState<Role>(initialRole)
   const [section, setSection] = useState<Section>('overview')
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
-  const [students] = useState<Student[]>(INIT_STUDENTS)
-  const [homeworks, setHomeworks] = useState<HW[]>(INIT_HW)
+  const [students] = useState<Student[]>(initialStudents || INIT_STUDENTS)
+  const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
   const [courses, setCourses] = useState<Course[]>(INIT_COURSES)
   const [purchasedIds, setPurchasedIds] = useState<number[]>([])
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
-  const [selectedHwId, setSelectedHwId] = useState<number | null>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
+  const [selectedHwId, setSelectedHwId] = useState<string | number | null>(null)
 
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 2500) }
   const isStudent = role === 'Ученик'
@@ -768,8 +784,8 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate }: {
           <div className="rounded-lg border p-5">
             <h3 className="font-semibold">Детали задания</h3>
             <div className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Назначено</span><span>{hw.assigned}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Срок</span><span>{hw.due}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Назначено</span><span>{formatDate(hw.assignedAt || hw.assigned)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Срок</span><span>{hw.dueDate ? formatDate(hw.dueDate) : hw.due}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Статус</span><span className="badge">{status === 'solved' ? 'Выполнено' : hw.status}</span></div>
               {(status === 'solved' || hw.solved) && <div className="flex justify-between"><span className="text-muted-foreground">Попыток</span><span className="font-semibold">{hw.solved ? hw.attempts : wrongCount + 1}</span></div>}
             </div>
