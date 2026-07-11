@@ -15,11 +15,20 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     const studentId = params.id
 
-    // Just unlink the student from the teacher instead of deleting the account entirely
-    // This preserves their purchases and progress if they use the platform independently
-    await db.user.update({
-      where: { id: studentId, teacherId: user.id },
-      data: { teacherId: null }
+    // First verify the student belongs to the teacher
+    const student = await db.user.findUnique({ where: { id: studentId } })
+    if (student?.teacherId !== user.id) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    // Delete all homeworks associated with the student to avoid foreign key constraints
+    await db.homework.deleteMany({
+      where: { studentId: studentId }
+    })
+
+    // Delete the student account entirely
+    await db.user.delete({
+      where: { id: studentId }
     })
 
     return new NextResponse('OK', { status: 200 })

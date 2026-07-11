@@ -459,7 +459,8 @@ export function TeacherHub({
               <HomeworkPuzzle hw={selectedHw} isStudent={isStudent}
                 onSolve={(id, attempts) => { updateHomework(id, { solved: true, attempts, status: 'Выполнено', progress: 100 }); notify(`Задача решена! Попыток: ${attempts}`) }}
                 onUpdate={!isStudent ? updateHomework : undefined}
-                onDelete={!isStudent ? deleteHomework : undefined} />
+                onDelete={!isStudent ? deleteHomework : undefined}
+                notify={notify} />
             )}
             {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
@@ -902,11 +903,12 @@ function ChessBoard({
   )
 }
 
-function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
+function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete, notify }: {
   hw: HW; isStudent: boolean
   onSolve: (id: string | number, attempts: number) => void
   onUpdate?: (id: string | number, patch: Partial<HW>) => void
   onDelete?: (id: string | number) => void
+  notify?: (s: string) => void
 }) {
   const { startFen, solution } = useMemo(() => parseHwPgn(hw.pgn), [hw.pgn])
   const studentColor = useMemo(() => { try { return new Chess(startFen).turn() } catch { return 'w' as const } }, [startFen])
@@ -1048,7 +1050,7 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
               onChange={e => setTeacherNote(e.target.value)}
               placeholder="Оставьте обратную связь для ученика..." />
             <button className="outline-button mt-2 w-full text-xs"
-              onClick={() => { onUpdate?.(hw.id, {}); alert('Комментарий сохранён (в памяти)') }}>
+              onClick={() => { onUpdate?.(hw.id, { teacherNote }); notify?.('Комментарий сохранён') }}>
               Сохранить комментарий
             </button>
           </div>
@@ -1118,7 +1120,7 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
       {showEdit && onUpdate && (
         <Modal title="Редактировать задание" close={() => setShowEdit(false)}>
           <label className="field">Название<input className="input" value={editTitle} onChange={e => setEditTitle(e.target.value)} /></label>
-          <label className="field">Срок<input className="input" value={editDue} onChange={e => setEditDue(e.target.value)} placeholder="до 20 июля" /></label>
+          <label className="field">Срок<input type="date" className="input" value={editDue} onChange={e => setEditDue(e.target.value)} /></label>
           <div className="field">
             <span>PGN (решение)</span>
             <label className="drop-zone cursor-pointer">
@@ -1129,7 +1131,7 @@ function HomeworkPuzzle({ hw, isStudent, onSolve, onUpdate, onDelete }: {
             <textarea className="textarea font-mono text-xs min-h-20" value={editPgn} onChange={e => setEditPgn(e.target.value)} />
           </div>
           <button className="button" onClick={() => {
-            onUpdate(hw.id, { title: editTitle, due: editDue, pgn: editPgn })
+            onUpdate(hw.id, { title: editTitle, dueDate: editDue, pgn: editPgn })
             setShowEdit(false)
           }}>Сохранить изменения</button>
         </Modal>
