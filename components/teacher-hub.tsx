@@ -58,6 +58,11 @@ const INIT_HW: HW[] = []
 const INIT_COURSES: Course[] = []
 const INIT_VIDEOS: Video[] = []
 const INIT_OPENINGS: Opening[] = []
+const STATIC_MODULES = [
+  { name: 'Стратегия: Центр', lessons: 12, progress: 0 },
+  { name: 'Эндшпиль: Пешечный', lessons: 8, progress: 0 },
+  { name: 'Тактика: Связка', lessons: 15, progress: 0 }
+]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1058,6 +1063,9 @@ export function PgnBoard() {
   const [editComment, setEditComment] = useState<number | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
 
+  // Candidate continuations from tree at current path
+  const { nodes: candidateNodes } = walkTo(tree, path)
+
   // ── Keyboard Navigation ──
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -1097,8 +1105,6 @@ export function PgnBoard() {
   const currentGame = buildGame(path)
   const legalMoves  = currentGame.moves({ verbose: true })
 
-  // Candidate continuations from tree at current path
-  const { nodes: candidateNodes } = walkTo(tree, path)
   const candidateTos = candidateNodes.map(n => { try { const g = buildGame(path); const m = g.move(n.san); return m?.to ?? '' } catch { return '' } }).filter(Boolean)
 
   function makeMove(san: string) {
