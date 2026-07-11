@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: studentId } = await params;
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
@@ -12,8 +13,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     if (user?.role !== 'TEACHER' && user?.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 })
     }
-
-    const studentId = params.id
 
     // First verify the student belongs to the teacher
     const student = await db.user.findUnique({ where: { id: studentId } })
