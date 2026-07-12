@@ -28,18 +28,30 @@ export async function POST(req: Request) {
     const str = `${notification_type}&${operation_id}&${amount}&${currency}&${datetime}&${sender}&${codepro}&${secret}&${label}`
     const hash = crypto.createHash('sha1').update(str).digest('hex')
 
-    if (hash !== sha1_hash) {
-      console.error('YooMoney hash mismatch')
-      return new NextResponse('OK', { status: 200 })
-    }
+    // (Early hash check removed for debugging, we check it later)
 
-    // Payment is valid. Find the purchase.
+    // Payment is valid (or maybe signature failed, we want to see it). Find the purchase.
     const purchase = await db.purchase.findUnique({
       where: { id: label },
       include: { user: true, course: true, module: true }
     })
 
-    if (!purchase || purchase.status === 'APPROVED') {
+    if (!purchase) {
+      return new NextResponse('OK', { status: 200 })
+    }
+
+    // DEBUG: Save the received webhook text to the comment field so we can see it
+    await db.purchase.update({
+      where: { id: purchase.id },
+      data: { comment: `Webhook received! Hash match: ${hash === sha1_hash}. Text: ${text}` }
+    })
+
+    if (hash !== sha1_hash) {
+      console.error('YooMoney hash mismatch')
+      return new NextResponse('OK', { status: 200 })
+    }
+
+    if (purchase.status === 'APPROVED') {
       return new NextResponse('OK', { status: 200 })
     }
 
