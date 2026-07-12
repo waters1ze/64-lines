@@ -9,7 +9,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
     const user = await db.user.findUnique({ where: { email: session.user.email } })
-    if (!user || user.role !== 'TEACHER') return new NextResponse('Forbidden', { status: 403 })
+    if (!user || (user.role !== 'TEACHER' && user.role !== 'ADMIN')) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
 
     await db.purchase.delete({ where: { id: params.id } })
 
