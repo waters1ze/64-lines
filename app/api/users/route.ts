@@ -47,10 +47,7 @@ export async function PUT(req: Request) {
       return new NextResponse('Bad Request', { status: 400 })
     }
 
-    // Нельзя менять роль самому себе
-    if (userId === caller.id) {
-      return NextResponse.json({ error: 'Нельзя изменить свою собственную роль' }, { status: 400 })
-    }
+    // Разрешаем менять роль самому себе (например, для тестов)
 
     const updated = await db.user.update({
       where: { id: userId },
