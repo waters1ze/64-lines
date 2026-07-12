@@ -141,6 +141,11 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
 
   const tryMove = (from: string, to: string) => {
     try {
+      const bLatest = new Chess()
+      if (pgn) bLatest.loadPgn(pgn)
+      
+      const isLatest = bLatest.fen() === currentFen || !pgn
+
       const b = new Chess(currentFen)
       const moves = b.moves({ verbose: true })
       let move = moves.find(m => m.from === from && m.to === to)
@@ -148,10 +153,13 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
         move = moves.find(m => m.from === from && m.to === to && m.promotion === 'q') // auto queen
       }
       if (move) {
-        b.move(move)
-        const newFen = b.fen()
-        // If we want to support building PGN variations, we'd do it here, but for now just update FEN
-        updateState({ currentFen: newFen })
+        if (isLatest) {
+          bLatest.move(move)
+          updateState({ currentFen: bLatest.fen(), pgn: bLatest.pgn(), activeMoveId: null })
+        } else {
+          b.move(move)
+          updateState({ currentFen: b.fen(), pgn: b.pgn(), activeMoveId: null })
+        }
       }
     } catch {}
     setSelected(null)
@@ -229,7 +237,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
                           <img
                             draggable
                             onDragStart={() => setDragFrom(sq)}
-                            src={`/pieces/${piece.color}${piece.type.toUpperCase()}.svg`}
+                            src={`https://lichess1.org/assets/piece/cburnett/${piece.color}${piece.type.toUpperCase()}.svg`}
                             className={`w-4/5 h-4/5 ${isDrag ? 'opacity-0' : 'opacity-100'} cursor-grab active:cursor-grabbing hover:scale-105 transition-transform drop-shadow-md z-10`}
                           />
                         )}
@@ -259,9 +267,9 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 text-center px-4">
                 <FileText className="size-8 mb-2" />
-                <p>Партия не загружена</p>
+                <p>Вы можете загрузить PGN или просто начать играть на доске</p>
               </div>
             )}
           </div>
