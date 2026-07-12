@@ -420,7 +420,7 @@ export function TeacherHub({
       notify('Пожалуйста, зарегистрируйтесь, чтобы совершать покупки.')
       return
     }
-    const alreadyPending = purchases.some(p => p.courseId === id && p.status === 'PENDING')
+    const alreadyPending = purchases.some(p => p.courseId === id && p.status === 'PENDING' && p.paymentMethod !== 'yoomoney')
     if (alreadyPending) {
       notify('У вас уже есть заявка на этот курс. Ожидайте подтверждения.')
       return
@@ -2210,7 +2210,7 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
 
 function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void; onDelete: (id: string) => void }) {
   const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
-  const pending = purchases.filter(p => p.status === 'PENDING')
+  const pending = purchases.filter(p => p.status === 'PENDING' && p.paymentMethod !== 'yoomoney')
   const history = purchases.filter(p => p.status === 'APPROVED' || p.status === 'REJECTED')
   
   return (

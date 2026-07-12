@@ -34,20 +34,21 @@ export async function POST(req: Request) {
     })
 
     if (existing) {
-      // If it's already approved, return error. If pending, we can return the existing purchase to retry payment.
       if (existing.status === 'APPROVED') {
         return NextResponse.json({ error: 'Already purchased' }, { status: 400 })
       }
-      // Instead of throwing an error for pending, just update comment and return it so user can pay
       const updated = await db.purchase.update({
         where: { id: existing.id },
-        data: { senderName: senderName || null, comment: comment || null },
+        data: { 
+          senderName: senderName || null, 
+          comment: comment || null,
+          paymentMethod: paymentMethod || 'sbp'
+        },
         include: { user: true, course: true, module: true }
       })
       return NextResponse.json({ success: true, purchase: updated })
     }
 
-    // Create a pending purchase
     const purchase = await db.purchase.create({
       data: {
         userId: session.user.id,
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
         status: 'PENDING',
         senderName: senderName || null,
         comment: comment || null,
+        paymentMethod: paymentMethod || 'sbp'
       },
       include: { user: true, course: true, module: true }
     })

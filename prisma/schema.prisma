@@ -56,8 +56,9 @@ model Purchase {
   courseId   String?
   moduleId   String?
   createdAt  DateTime @default(now())
-  status     String   @default("PENDING")
-  comment    String?
+  status         String   @default("PENDING")
+  paymentMethod  String   @default("sbp")
+  comment        String?
   senderName String?
   course     Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   module     Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
