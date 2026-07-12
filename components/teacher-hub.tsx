@@ -630,14 +630,54 @@ export function TeacherHub({
             {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
-            {section === 'live'        && liveSession && (
-              <LiveLessonBoard 
-                sessionId={liveSession.id} 
-                jitsiRoomName={liveSession.jitsiRoomName}
-                userId={!isGuest && session?.user ? session.user.id : ''}
-                isTeacher={isTeacher}
-                onClose={() => { setLiveSession(null); go('overview') }}
-              />
+            {section === 'live' && (
+              liveSession ? (
+                <LiveLessonBoard 
+                  sessionId={liveSession.id} 
+                  jitsiRoomName={liveSession.jitsiRoomName}
+                  userId={!isGuest && session?.user ? session.user.id : ''}
+                  isTeacher={isTeacher}
+                  onClose={() => { setLiveSession(null); go('overview') }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8 bg-background border rounded-xl shadow-sm">
+                  <div className="size-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6">
+                    <Video className="size-8" />
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2">Интерактивные уроки</h2>
+                  {isTeacher ? (
+                    <>
+                      <p className="text-muted-foreground mb-8 max-w-md">
+                        Выберите ученика из списка ниже, чтобы начать онлайн-занятие с видеосвязью и синхронизированной шахматной доской.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl text-left">
+                        {students.length === 0 ? (
+                          <p className="text-sm text-muted-foreground col-span-full text-center">У вас пока нет учеников.</p>
+                        ) : students.map(student => (
+                          <div key={student.id} className="border rounded-lg p-4 flex flex-col gap-3 hover:border-primary/50 transition-colors bg-muted/20">
+                            <div className="flex items-center gap-3">
+                              <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <span className="font-bold">{initials(student.name)}</span>
+                              </div>
+                              <div className="flex-1 overflow-hidden">
+                                <h3 className="font-semibold truncate">{student.name}</h3>
+                                <p className="text-xs text-muted-foreground">Рейтинг: {student.rating}</p>
+                              </div>
+                            </div>
+                            <button onClick={() => startLiveSession(student.id as string)} className="button w-full justify-center">
+                              <Video className="size-4 mr-2" /> Позвонить
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground mb-8 max-w-md">
+                      Ожидайте, пока ваш преподаватель начнет урок. У вас появится уведомление о звонке.
+                    </p>
+                  )}
+                </div>
+              )
             )}
             {section === 'modules'     && (
               isTeacher
