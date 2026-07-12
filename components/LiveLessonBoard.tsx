@@ -54,12 +54,12 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
 
   const jitsiContainerRef = useRef<HTMLDivElement>(null)
   const jitsiApiRef = useRef<any>(null)
-  const scriptStatus = useScript('https://8x8.vc/external_api.js')
+  const scriptStatus = useScript('https://meet.ffmuc.net/external_api.js')
 
   // Init Jitsi
   useEffect(() => {
     if (scriptStatus === 'ready' && !jitsiApiRef.current && jitsiContainerRef.current) {
-      const domain = '8x8.vc'
+      const domain = 'meet.ffmuc.net'
       const options = {
         roomName: jitsiRoomName,
         width: '100%',
