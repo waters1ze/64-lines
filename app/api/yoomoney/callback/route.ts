@@ -15,39 +15,40 @@ export async function POST(req: Request) {
     const sender = params.get('sender') || ''
     const codepro = params.get('codepro') || ''
     const label = params.get('label') || ''
-    const sha1_hash = params.get('sha1_hash') || ''
+    // YooMoney sends sha1_hash for wallet transfers, sign for card payments
+    const sha1_hash = params.get('sha1_hash') || params.get('sign') || ''
 
     const secret = process.env.YOOMONEY_SECRET
 
     if (!secret) {
       console.error('YOOMONEY_SECRET is not set')
-      return new NextResponse('OK', { status: 200 }) // Return 200 so YooMoney stops retrying, but log error
+      return new NextResponse('OK', { status: 200 })
     }
 
-    // Verify signature
+    // Verify signature — same formula for both wallet and card
     const str = `${notification_type}&${operation_id}&${amount}&${currency}&${datetime}&${sender}&${codepro}&${secret}&${label}`
     const hash = crypto.createHash('sha1').update(str).digest('hex')
 
-    // (Early hash check removed for debugging, we check it later)
+    console.log('YooMoney webhook. label:', label, 'hashMatch:', hash === sha1_hash, 'type:', notification_type)
 
-    // Payment is valid (or maybe signature failed, we want to see it). Find the purchase.
+    // Find the purchase by label
     const purchase = await db.purchase.findUnique({
       where: { id: label },
       include: { user: true, course: true, module: true }
     })
 
     if (!purchase) {
+      console.error('Purchase not found for label:', label)
       return new NextResponse('OK', { status: 200 })
     }
 
-    // DEBUG: Save the received webhook text to the comment field so we can see it
-    await db.purchase.update({
-      where: { id: purchase.id },
-      data: { comment: `Webhook received! Hash match: ${hash === sha1_hash}. Text: ${text}` }
-    })
-
     if (hash !== sha1_hash) {
-      console.error('YooMoney hash mismatch')
+      console.error('YooMoney hash mismatch. Expected:', hash, 'Got:', sha1_hash)
+      // Store debug info
+      await db.purchase.update({
+        where: { id: purchase.id },
+        data: { comment: `Hash mismatch! expected=${hash} got=${sha1_hash} secret_len=${secret.length}` }
+      })
       return new NextResponse('OK', { status: 200 })
     }
 
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     // Approve purchase
     await db.purchase.update({
       where: { id: purchase.id },
-      data: { status: 'APPROVED' }
+      data: { status: 'APPROVED', comment: null }
     })
 
     // Grant module access if it's a module
@@ -73,10 +74,10 @@ export async function POST(req: Request) {
     // Send course email if it's a course
     if (purchase.course) {
       try {
-        const { sendCourseDeliveryEmail } = await import("@/lib/mail")
-        await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "", purchase.course.pgn)
+        const { sendCourseDeliveryEmail } = await import('@/lib/mail')
+        await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || '', purchase.course.pgn)
       } catch (err) {
-        console.error("Failed to send course delivery email via yoomoney callback", err)
+        console.error('Failed to send course delivery email via yoomoney callback', err)
       }
     }
 
