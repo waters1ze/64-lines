@@ -281,12 +281,31 @@ export function TeacherHub({
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
 
-  // Load modules on mount
   useEffect(() => {
     fetch('/api/modules').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setModules(data)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get('payment_success') === 'true') {
+      notify('Оплата успешно завершена! Доступ скоро откроется (обновите страницу, если нужно).')
+      
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('payment_success')
+      router.replace(`?${params.toString()}`, { scroll: false })
+      
+      // Refresh server components (courses/purchases)
+      router.refresh()
+      
+      // Give the webhook a few seconds to process, then fetch modules again
+      setTimeout(() => {
+        fetch('/api/modules').then(r => r.json()).then(data => {
+          if (Array.isArray(data)) setModules(data)
+        }).catch(() => {})
+      }, 3000)
+    }
+  }, [searchParams])
 
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 2500) }
   const go = (s: Section) => { setSection(s); setMobile(false) }
@@ -614,7 +633,7 @@ export function TeacherHub({
                       const form = document.createElement('form')
                       form.method = 'POST'
                       form.action = 'https://yoomoney.ru/quickpay/confirm.xml'
-                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (course.price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin }
+                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (course.price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin + '?section=store&payment_success=true' }
                       for (const k in fields) {
                         const input = document.createElement('input')
                         input.type = 'hidden'
@@ -699,7 +718,7 @@ export function TeacherHub({
                       const form = document.createElement('form')
                       form.method = 'POST'
                       form.action = 'https://yoomoney.ru/quickpay/confirm.xml'
-                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (mod.price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin }
+                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (mod.price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin + '?section=modules&payment_success=true' }
                       for (const k in fields) {
                         const input = document.createElement('input')
                         input.type = 'hidden'
