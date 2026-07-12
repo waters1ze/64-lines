@@ -21,7 +21,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users'
+  | 'leaderboard' | 'users' | 'shop'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -345,11 +345,10 @@ export function TeacherHub({
 
   const studentNavBase = [
     ['overview',    'Мой обзор',          LayoutDashboard],
-    ['modules',     'Модули',             BookOpen],
+    ['modules',     'Мои курсы',          BookOpen],
+    ['shop',        'Магазин',            Store],
     ['leaderboard', 'Рейтинг',            Trophy],
     ['videos',      'Видео с YouTube',    Video],
-    ['courses',     'Дебютные курсы',     GraduationCap],
-    ['store',       'Витрина',            Store],
     ['openings',    'Мои дебюты',         Library],
     ['settings',    'Настройки',          Settings],
   ] as const
@@ -583,8 +582,9 @@ export function TeacherHub({
             {section === 'modules'     && (
               isTeacher
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
-                : <ModulesView modules={modules} setModules={setModules} onPurchase={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} />
+                : <MyLibrary modules={modules} purchases={purchases} courses={courses} onOpen={openCourseViewer} />
             )}
+            {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} />}
             {section === 'leaderboard' && <Leaderboard />}
             {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
@@ -592,7 +592,7 @@ export function TeacherHub({
             {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
-                onPurchase={purchaseCourse}
+                onPurchase={purchaseCourse} onOpen={openCourseViewer}
                 onAdd={async c => {
                   try {
                     const res = await fetch('/api/courses', { method: 'POST', body: JSON.stringify(c) })
@@ -2160,7 +2160,200 @@ function ModulesEditor({ modules, setModules, students, notify }: {
   )
 }
 
+// ─── My Library (only purchased) ──────────────────────────────────────────────
+
+function MyLibrary({ modules, purchases, courses, onOpen }: {
+  modules: Module[]
+  purchases: any[]
+  courses: Course[]
+  onOpen: (id: string | number) => void
+}) {
+  const approvedPurchases = purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID')
+  const purchasedCourseIds = approvedPurchases.map(p => p.courseId).filter(Boolean)
+  const purchasedModuleIds = approvedPurchases.map(p => p.moduleId).filter(Boolean)
+
+  const ownedCourses = courses.filter(c => purchasedCourseIds.includes(c.id))
+  const accessibleModules = modules.filter(m => m.hasAccess || m.visibility === 'ALL')
+  const isEmpty = ownedCourses.length === 0 && accessibleModules.length === 0
+
+  return (
+    <>
+      <Head over="Библиотека" title="Мои курсы" text="Все материалы, к которым у вас есть доступ." />
+      {isEmpty && (
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <BookOpen className="size-12 text-muted-foreground" />
+          <p className="text-muted-foreground">У вас пока нет купленных курсов.</p>
+          <p className="text-sm text-muted-foreground">Перейдите в <b>Магазин</b>, чтобы приобрести курс.</p>
+        </div>
+      )}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Owned debut courses */}
+        {ownedCourses.map(c => (
+          <div key={`c-${c.id}`} className="rounded-lg border flex flex-col overflow-hidden">
+            {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full aspect-video object-cover" />}
+            <div className="p-5 flex flex-col flex-1">
+              <div className="flex flex-wrap gap-1 mb-2">
+                <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
+                <span className="badge bg-green-50 text-green-700">✅ Куплен</span>
+              </div>
+              <h3 className="font-semibold">{c.name}</h3>
+              {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
+              <div className="mt-4">
+                <button className="button w-full" onClick={() => onOpen(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-4 mt-8">
+        {accessibleModules.length > 0 && <h3 className="text-lg font-semibold mb-2">📚 Учебные модули</h3>}
+        {/* Accessible modules as wide horizontal cards */}
+        {accessibleModules.map(m => (
+          <div key={`m-${m.id}`} className="rounded-lg border flex flex-col sm:flex-row overflow-hidden items-stretch hover:shadow-md transition-shadow">
+            <div className="w-full sm:w-48 bg-muted/30 flex items-center justify-center p-6 border-b sm:border-b-0 sm:border-r">
+              <BookOpen className="size-10 text-purple-400" />
+            </div>
+            <div className="p-5 flex flex-col flex-1 justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="badge bg-purple-50 text-purple-600 text-xs">Модуль</span>
+                  {m.visibility === 'ALL'
+                    ? <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>
+                    : <span className="badge bg-green-50 text-green-700">✅ Открыт</span>}
+                  {m.tags.map(t => <span key={t} className="badge bg-blue-50 text-blue-600 text-xs">{t}</span>)}
+                </div>
+                <h3 className="text-lg font-semibold">{m.title}</h3>
+                {m.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{m.description}</p>}
+                <p className="mt-2 text-xs font-medium text-muted-foreground">{m.lessons.length} уроков</p>
+              </div>
+              <div className="sm:w-32">
+                <button className="button w-full h-full sm:h-12" onClick={() => {}}>Открыть<ChevronRight className="size-4" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// ─── Shop Section (buy courses and modules) ───────────────────────────────────
+
+function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notify, onPurchaseCourse, onPurchaseModule }: {
+  modules: Module[]
+  courses: Course[]
+  purchases: any[]
+  purchasedIds: any[]
+  isGuest: boolean
+  notify: (s: string) => void
+  onPurchaseCourse: (id: string | number) => void
+  onPurchaseModule: (id: string) => void
+}) {
+  const [detailId, setDetailId] = useState<string | number | null>(null)
+  const detail = courses.find(c => c.id === detailId)
+
+  const purchasedModuleIds = purchases
+    .filter(p => p.status === 'APPROVED' || p.status === 'PAID')
+    .map(p => p.moduleId).filter(Boolean)
+
+  const paidModules = modules.filter(m => m.visibility === 'PAID')
+
+  return (
+    <>
+      <Head over="Магазин" title="Купить курсы и модули" text="Приобретайте дебютные курсы и учебные модули." />
+
+      {/* Debut courses */}
+      {courses.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4">🎓 Дебютные курсы</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {courses.map(c => {
+              const owned = purchasedIds.includes(c.id as any)
+              return (
+                <article key={c.id} className="flex flex-col overflow-hidden rounded-lg border">
+                  <div className="flex aspect-video items-center justify-center border-b bg-muted/30">
+                    {c.imageUrl ? <img src={c.imageUrl} alt={c.name} className="size-full object-cover" /> : <Library className="size-10 text-muted-foreground" />}
+                  </div>
+                  <div className="flex flex-1 flex-col p-5">
+                    <span className="badge bg-blue-50 text-blue-600 w-fit text-xs">Дебют</span>
+                    <h3 className="mt-3 font-semibold">{c.name}</h3>
+                    <p className="mt-1 flex-1 text-sm text-muted-foreground line-clamp-2">{c.description}</p>
+                    <div className="mt-4">
+                      {c.price > 0 && !owned && <b className="block mb-2">{c.price.toLocaleString('ru-RU')} ₽</b>}
+                      {owned
+                        ? <span className="badge bg-green-50 text-green-700 w-full justify-center py-2">✅ Уже куплен</span>
+                        : <div className="flex gap-2">
+                            <button className="outline-button flex-1" onClick={() => setDetailId(c.id)}>Подробнее</button>
+                            <button className="button flex-1" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseCourse(c.id) }}><LockKeyhole className="size-4" />Купить</button>
+                          </div>}
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Paid modules */}
+      {paidModules.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">📚 Учебные модули</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {paidModules.map(m => {
+              const owned = purchasedModuleIds.includes(m.id)
+              return (
+                <div key={m.id} className="rounded-lg border flex flex-col overflow-hidden">
+                  <div className="p-5 flex flex-col flex-1">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      <span className="badge bg-purple-50 text-purple-600 text-xs">Модуль</span>
+                      <span className="badge bg-amber-50 text-amber-700">💳 {m.price.toLocaleString()} ₽</span>
+                      {m.tags.map(t => <span key={t} className="badge bg-blue-50 text-blue-600 text-xs">{t}</span>)}
+                    </div>
+                    <h3 className="font-semibold">{m.title}</h3>
+                    {m.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{m.description}</p>}
+                    <p className="mt-2 text-xs text-muted-foreground">{m.lessons.length} уроков</p>
+                    <div className="mt-4">
+                      {owned
+                        ? <span className="badge bg-green-50 text-green-700 w-full justify-center py-2">✅ Уже куплен</span>
+                        : <button className="button w-full" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseModule(m.id) }}><LockKeyhole className="size-4" />Купить доступ</button>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {courses.length === 0 && paidModules.length === 0 && (
+        <p className="text-muted-foreground">В магазине пока нет товаров.</p>
+      )}
+
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4" onMouseDown={() => setDetailId(null)}>
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col gap-5 overflow-y-auto rounded-xl border bg-background p-6" onMouseDown={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">{detail.name}</h2>
+              <button className="icon-button" onClick={() => setDetailId(null)}><X /></button>
+            </div>
+            {detail.imageUrl && <img src={detail.imageUrl} alt={detail.name} className="max-h-48 w-full rounded-lg object-cover" />}
+            <p className="text-sm text-muted-foreground">{detail.description}</p>
+            <div className="flex items-center justify-between border-t pt-4">
+              <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
+              {purchasedIds.includes(detail.id as any)
+                ? <span className="badge">✅ Куплен</span>
+                : <button className="button" onClick={() => { onPurchaseCourse(detail.id); setDetailId(null) }}><LockKeyhole />Оплатить</button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── Modules View (Student/Guest) ─────────────────────────────────────────────
+
 
 function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse, onOpenCourse }: {
   modules: Module[]
@@ -2434,9 +2627,10 @@ function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Co
 
 type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string }
 
-function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, onUpdate, onDelete, notify }: {
+function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, onAdd, onUpdate, onDelete, notify }: {
   courses: Course[]; isTeacher: boolean; purchasedIds: number[]
   onPurchase: (id: string | number) => void
+  onOpen?: (id: string | number) => void
   onAdd: (c: Omit<Course, 'id' | 'createdAt'>) => void
   onUpdate: (id: string | number, u: Partial<Course>) => void
   onDelete: (id: string | number) => void
@@ -2511,7 +2705,9 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
                   ) : (
                     <>
                       <button className="outline-button flex-1" onClick={() => { setDetailId(c.id); setModal('detail') }}>Подробнее</button>
-                      {!purchased && <button className="button flex-1" onClick={() => onPurchase(c.id)}><LockKeyhole />Купить</button>}
+                      {purchased 
+                        ? <button className="button flex-1" onClick={() => onOpen?.(c.id)}>Открыть<ChevronRight className="size-4"/></button>
+                        : <button className="button flex-1" onClick={() => onPurchase(c.id)}><LockKeyhole className="size-4"/>Купить</button>}
                     </>
                   )}
                 </div>
