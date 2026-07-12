@@ -1,13 +1,19 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
 import {
   ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
-  LockKeyhole, Menu, Pencil, Plus, RotateCcw,
-  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare
+  LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
+  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck
 } from 'lucide-react'
 import { Chess } from 'chess.js'
+import dynamic from 'next/dynamic'
+import '@uiw/react-md-editor/markdown-editor.css'
+import '@uiw/react-markdown-preview/markdown.css'
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor').then(m => m.default), { ssr: false })
+const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then(m => m.default), { ssr: false })
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,6 +21,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
+  | 'leaderboard' | 'users'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -292,27 +299,31 @@ export function TeacherHub({
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
     ['modules',        'Учебные модули',     BookOpen],
+    ['leaderboard',    'Рейтинг',            Trophy],
     ['sales',          'Продажи',            CircleDollarSign],
     ['store',          'Витрина',            Store],
+    ['users',          'Пользователи',       ShieldCheck],
     ['settings',       'Настройки',          Settings],
   ] as const
 
   const studentNavBase = [
-    ['overview',  'Мой обзор',          LayoutDashboard],
-    ['modules',   'Модули',             BookOpen],
-    ['videos',    'Видео с YouTube',    Video],
-    ['courses',   'Дебютные курсы',     GraduationCap],
-    ['store',     'Витрина',            Store],
-    ['openings',  'Мои дебюты',         Library],
-    ['settings',  'Настройки',          Settings],
+    ['overview',    'Мой обзор',          LayoutDashboard],
+    ['modules',     'Модули',             BookOpen],
+    ['leaderboard', 'Рейтинг',            Trophy],
+    ['videos',      'Видео с YouTube',    Video],
+    ['courses',     'Дебютные курсы',     GraduationCap],
+    ['store',       'Витрина',            Store],
+    ['openings',    'Мои дебюты',         Library],
+    ['settings',    'Настройки',          Settings],
   ] as const
 
   const guestNavBase = [
-    ['modules',   'Модули',             BookOpen],
-    ['videos',    'Видео с YouTube',    Video],
-    ['courses',   'Дебютные курсы',     GraduationCap],
-    ['store',     'Витрина',            Store],
-    ['openings',  'Мои дебюты',         Library],
+    ['modules',     'Модули',             BookOpen],
+    ['leaderboard', 'Рейтинг',            Trophy],
+    ['videos',      'Видео с YouTube',    Video],
+    ['courses',     'Дебютные курсы',     GraduationCap],
+    ['store',       'Витрина',            Store],
+    ['openings',    'Мои дебюты',         Library],
   ] as const
 
   const nav = isGuest ? guestNavBase : (isStudent ? studentNavBase : teacherNav)
@@ -521,22 +532,27 @@ export function TeacherHub({
               <HomeworkPuzzle hw={selectedHw} isStudent={isStudent}
                 onProgress={(id, progress, solved, attempts) => {
                   updateHomework(id, { progress, solved, attempts, ...(solved ? { status: 'Выполнено' } : {}) })
-                  if (solved) notify(`Домашнее задание полностью выполнено! Попыток: ${attempts}`)
+                  if (solved) {
+                    const pts = attempts <= 1 ? 15 : attempts === 2 ? 10 : 5
+                    notify(`Задание выполнено! +${pts} к рейтингу 🎉 (попыток: ${attempts})`)
+                  }
                 }}
                 onUpdate={!isStudent ? updateHomework : undefined}
                 onDelete={!isStudent ? deleteHomework : undefined}
                 notify={notify} />
             )}
-            {section === 'videos'   && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
-            {section === 'openings' && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
-            {section === 'modules'  && (
+            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
+            {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
+            {section === 'modules'     && (
               isTeacher
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
                 : <ModulesView modules={modules} setModules={setModules} onPurchase={(id) => { setPaymentStep('info'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} isGuest={isGuest} notify={notify} />
             )}
+            {section === 'leaderboard' && <Leaderboard />}
+            {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
-            {section === 'sales'    && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
-            {section === 'store'    && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
+            {section === 'sales'       && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
+            {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
                 onPurchase={purchaseCourse}
@@ -1910,7 +1926,7 @@ function ModulesEditor({ modules, setModules, students, notify }: {
             </div>
             {openId === m.id && (
               <div className="p-4 flex flex-col gap-2">
-                {m.description && <p className="text-sm text-muted-foreground mb-2">{m.description}</p>}
+                {m.description && <div data-color-mode="light" className="mb-2"><MarkdownPreview source={m.description} style={{ backgroundColor: 'transparent', fontSize: '0.875rem' }} /></div>}
                 {m.lessons.map(l => (
                   <div key={l.id} className="flex items-center gap-3 rounded-md border p-3">
                     <span className="flex-1">
@@ -1940,9 +1956,12 @@ function ModulesEditor({ modules, setModules, students, notify }: {
             <label className="field">Название модуля
               <input className="input" value={editModule.title || ''} onChange={e => setEditModule(p => ({ ...p!, title: e.target.value }))} placeholder="Например: Эндшпиль для начинающих" />
             </label>
-            <label className="field">Описание
-              <textarea className="textarea text-sm" rows={3} value={editModule.description || ''} onChange={e => setEditModule(p => ({ ...p!, description: e.target.value }))} placeholder="Кратко о содержании..." />
-            </label>
+            <div className="field">
+              <span className="text-sm font-medium">Описание</span>
+              <div data-color-mode="light" className="mt-1 border rounded-md overflow-hidden">
+                <MDEditor value={editModule.description || ''} onChange={val => setEditModule(p => ({ ...p!, description: val || '' }))} textareaProps={{ placeholder: "Кратко о содержании..." }} height={200} />
+              </div>
+            </div>
             <div className="field">
               <span className="text-sm font-medium">Теги</span>
               <div className="flex flex-wrap gap-2 mt-1">
@@ -2064,8 +2083,8 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
                   {m.tags.map(t => <span key={t} className="badge bg-blue-50 text-blue-600 text-xs">{t}</span>)}
                 </div>
                 <h3 className="font-semibold">{m.title}</h3>
-                {m.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{m.description}</p>}
-                <p className="mt-1 text-xs text-muted-foreground">{m.lessons.length} уроков</p>
+                {m.description && <div data-color-mode="light" className="mt-2 line-clamp-3 text-sm text-muted-foreground"><MarkdownPreview source={m.description} style={{ backgroundColor: 'transparent', fontSize: '0.875rem' }} /></div>}
+                <p className="mt-3 text-xs font-medium">{m.lessons.length} уроков</p>
                 <div className="mt-4">
                   {canOpen
                     ? <button className="button w-full" onClick={() => setOpenId(isOpen ? null : m.id)}>
@@ -2160,7 +2179,7 @@ function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[];
                 <p className="text-sm text-muted-foreground">{p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`badge ${p.status === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <span className={`badge ${p.status === 'APPROVED' ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-600'}`}>
                   {p.status === 'APPROVED' ? 'Оплачено' : 'Отклонено'}
                 </span>
                 <button className="icon-button text-red-500 hover:bg-red-50" onClick={() => onDelete(p.id)} title="Удалить из базы">
@@ -2219,7 +2238,7 @@ function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; 
       {detail && (
         <Modal title={detail.name} close={() => setDetailId(null)}>
           {detail.imageUrl && <img src={detail.imageUrl} alt={detail.name} className="max-h-48 w-full rounded-lg object-cover" />}
-          <p className="text-sm leading-6 text-muted-foreground">{detail.description}</p>
+          <div data-color-mode="light"><MarkdownPreview source={detail.desc} style={{ backgroundColor: 'transparent' }} /></div>
           <div className="flex items-center justify-between border-t pt-4">
             <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
             {purchasedIds.includes(detail.id)
@@ -2293,7 +2312,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
               </div>
               <div className="flex flex-1 flex-col p-5">
                 <h3 className="font-semibold">{c.name}</h3>
-                <p className="mt-2 flex-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>
+                <div data-color-mode="light" className="mt-2 flex-1 line-clamp-3"><MarkdownPreview source={c.description} style={{ backgroundColor: 'transparent', color: 'var(--muted-foreground)', fontSize: '0.875rem' }} /></div>
                 {isTeacher && c.pgn && (
                   <p className="mt-1 text-xs text-green-600">✅ PGN загружен ({c.pgn.split(/(?=\[Event )/).filter(Boolean).length} партий)</p>
                 )}
@@ -2327,7 +2346,12 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
       {(modal === 'add' || (modal !== null && modal !== 'detail')) && (
         <Modal title={modal === 'add' ? 'Добавить курс' : 'Редактировать курс'} close={() => setModal(null)}>
           <label className="field">Название<input className="input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Сицилианская защита" /></label>
-          <label className="field">Описание<textarea className="textarea" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Подробное описание курса..." /></label>
+          <div className="field">
+            <span className="text-sm font-medium">Описание</span>
+            <div data-color-mode="light" className="mt-1 border rounded-md overflow-hidden">
+              <MDEditor value={form.description} onChange={val => setForm(p => ({ ...p, description: val || '' }))} textareaProps={{ placeholder: 'Подробное описание курса...' }} height={200} />
+            </div>
+          </div>
           <label className="field">Цена (₽)<input className="input" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" /></label>
           <div className="field">
             <span>Превью-картинка</span>
@@ -2361,7 +2385,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onAdd, o
       {modal === 'detail' && detailCourse && (
         <Modal title={detailCourse.name} close={() => setModal(null)}>
           {detailCourse.imageUrl && <img src={detailCourse.imageUrl} alt={detailCourse.name} className="max-h-52 w-full rounded-lg object-cover" />}
-          <p className="text-sm leading-6 text-muted-foreground">{detailCourse.description}</p>
+          <div data-color-mode="light" className="text-sm leading-6"><MarkdownPreview source={detailCourse.description} style={{ backgroundColor: 'transparent' }} /></div>
           <div className="flex items-center justify-between border-t pt-5">
             <span className="text-2xl font-semibold">{detailCourse.price.toLocaleString('ru-RU')} ₽</span>
             {purchasedIds.includes(detailCourse.id)
@@ -2756,3 +2780,156 @@ function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string)
     </>
   )
 }
+
+// ─── Leaderboard ──────────────────────────────────────────────────────────────
+
+function Leaderboard() {
+  const [top, setTop] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/leaderboard')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setTop(data) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const medals = [
+    <Trophy key={1} className="size-5 text-foreground" />,
+    <Trophy key={2} className="size-5 text-muted-foreground" />,
+    <Trophy key={3} className="size-5 text-muted-foreground/50" />
+  ]
+
+  return (
+    <>
+      <Head over="Геймификация" title="Таблица рейтинга" text="Рейтинг растёт за каждое решённое домашнее задание. +15 с первой попытки, +10 со второй, +5 с третьей и далее." />
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Загрузка...</p>
+      ) : top.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Пока нет учеников с рейтингом.</p>
+      ) : (
+        <div className="rounded-xl border overflow-hidden">
+          {top.map((u, i) => (
+            <div key={u.id}
+              className={`flex items-center gap-4 px-5 py-4 border-b last:border-0 ${i === 0 ? 'bg-muted/30' : ''}`}>
+              <span className="w-8 text-center text-lg shrink-0">
+                {i < 3 ? medals[i] : <span className="text-sm font-semibold text-muted-foreground">{i + 1}</span>}
+              </span>
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-semibold">
+                {(u.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{u.name || 'Ученик'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {u._count?.homeworks ?? 0} {(u._count?.homeworks ?? 0) === 1 ? 'задание' : 'заданий'} решено
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-lg font-semibold tabular-nums">{u.rating}</p>
+                <p className="text-xs text-muted-foreground">очков</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── UsersManager ─────────────────────────────────────────────────────────────
+
+const ROLES = ['STUDENT', 'TEACHER', 'ADMIN'] as const
+type UserRole = typeof ROLES[number]
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  STUDENT: 'Ученик',
+  TEACHER: 'Учитель',
+  ADMIN: 'Администратор',
+}
+
+function UsersManager({ notify }: { notify: (s: string) => void }) {
+  const [users, setUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/users')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setUsers(data) })
+      .catch(() => notify('Ошибка загрузки пользователей'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const changeRole = async (userId: string, newRole: UserRole) => {
+    setSaving(userId)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: updated.role } : u))
+        notify(`Роль изменена на «${ROLE_LABELS[newRole]}»`)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        notify(err.error || 'Ошибка при изменении роли')
+      }
+    } catch {
+      notify('Ошибка сети')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const roleColor: Record<UserRole, string> = {
+    ADMIN: 'bg-foreground text-background',
+    TEACHER: 'bg-muted text-foreground',
+    STUDENT: 'border text-muted-foreground',
+  }
+
+  return (
+    <>
+      <Head
+        over="Администрирование"
+        title="Пользователи"
+        text={`Все зарегистрированные пользователи сайта. Всего: ${users.length}`}
+      />
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Загрузка...</p>
+      ) : (
+        <div className="rounded-xl border overflow-hidden">
+          {users.map(u => (
+            <div key={u.id} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b last:border-0">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-semibold">
+                {(u.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{u.name || '—'}</p>
+                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm tabular-nums text-muted-foreground">{u.rating} очков</p>
+              </div>
+              <div className="shrink-0">
+                <select
+                  disabled={saving === u.id}
+                  value={u.role}
+                  onChange={e => changeRole(u.id, e.target.value as UserRole)}
+                  className={`rounded-md border px-2 py-1 text-xs font-medium cursor-pointer bg-background ${roleColor[u.role as UserRole] || ''}`}
+                >
+                  {ROLES.map(r => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
