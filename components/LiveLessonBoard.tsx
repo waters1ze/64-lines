@@ -247,19 +247,30 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
 
   const [boardWidth, setBoardWidth] = useState<number | null>(null)
   const isResizing = useRef(false)
+  const [innerBoardSize, setInnerBoardSize] = useState<number | null>(null)
+  const isInnerResizing = useRef(false)
+  const boardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current) return
-      const newWidth = window.innerWidth - e.clientX
-      // Set some min and max limits
-      if (newWidth > 300 && newWidth < window.innerWidth - 300) {
-        setBoardWidth(newWidth)
+      if (isResizing.current) {
+        const newWidth = window.innerWidth - e.clientX
+        if (newWidth > 300 && newWidth < window.innerWidth - 300) {
+          setBoardWidth(newWidth)
+        }
+      }
+      if (isInnerResizing.current && boardRef.current) {
+        const rect = boardRef.current.getBoundingClientRect()
+        const newSize = e.clientX - rect.left
+        if (newSize > 250) {
+          setInnerBoardSize(newSize)
+        }
       }
     }
     const handleMouseUp = () => {
-      if (isResizing.current) {
+      if (isResizing.current || isInnerResizing.current) {
         isResizing.current = false
+        isInnerResizing.current = false
         document.body.style.cursor = 'default'
       }
     }
@@ -396,7 +407,11 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
         <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-6">
           <div className="flex-1 flex flex-col items-center">
             {/* Board */}
-            <div className="w-full aspect-square relative select-none touch-none bg-[#EAD4BA]">
+            <div 
+              ref={boardRef}
+              className="w-full aspect-square relative select-none touch-none bg-[#EAD4BA] max-w-full"
+              style={innerBoardSize ? { width: innerBoardSize + 'px', flex: 'none' } : {}}
+            >
               {/* Coordinates and squares rendering */}
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="flex h-[12.5%] w-full">
@@ -435,6 +450,14 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
                   })}
                 </div>
               ))}
+
+              {/* Resizer Handle */}
+              <div
+                className="absolute -bottom-3 -right-3 w-6 h-6 cursor-se-resize z-50 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center bg-background rounded-full shadow border"
+                onMouseDown={(e) => { e.preventDefault(); isInnerResizing.current = true; document.body.style.cursor = 'se-resize' }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v6h-6"/><path d="M21 21l-7-7"/><path d="M9 3H3v6"/><path d="M3 3l7 7"/></svg>
+              </div>
             </div>
           </div>
           
