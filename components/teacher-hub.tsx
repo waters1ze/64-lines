@@ -2100,11 +2100,10 @@ function ModulesEditor({ modules, setModules, students, notify }: {
                 <option value="STUDENTS">👤 Конкретным ученикам</option>
               </select>
             </label>
-            {editModule.visibility === 'PAID' && (
-              <label className="field">Цена (₽)
-                <input className="input" type="number" min={0} value={editModule.price || 0} onChange={e => setEditModule(p => ({ ...p!, price: Number(e.target.value) }))} />
-              </label>
-            )}
+            <label className="field">Цена (₽)
+              <input className="input" type="number" min={0} value={editModule.price || 0} onChange={e => setEditModule(p => ({ ...p!, price: Number(e.target.value) }))} disabled={editModule.visibility !== 'PAID'} />
+              {editModule.visibility !== 'PAID' && <span className="text-xs text-muted-foreground mt-1">Цена учитывается только при видимости «По оплате»</span>}
+            </label>
             <div className="flex gap-2">
               <button className="button flex-1" onClick={saveModule} disabled={!editModule.title?.trim()}>Сохранить</button>
               <button className="outline-button flex-1" onClick={() => setEditModule(null)}>Отмена</button>
