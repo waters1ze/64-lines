@@ -37,6 +37,135 @@ function useScript(url: string) {
   return status
 }
 
+type MoveNode = {
+  id: string;
+  san: string;
+  moveNumber?: number;
+  turn: 'w' | 'b';
+  variations: MoveNode[][];
+  comment?: string;
+  fen: string;
+  parentId: string | null;
+}
+
+type PgnGame = {
+  event: string;
+  white: string;
+  black: string;
+  result: string;
+  startFen: string;
+  rootMoves: MoveNode[];
+  nodeMap: Record<string, MoveNode>;
+}
+
+function parsePgnGames(pgn: string): PgnGame[] {
+  if (!pgn?.trim()) return []
+  const blocks = pgn.split(/(?=\[Event )/).map(s => s.trim()).filter(Boolean)
+  const { parse } = require('@mliebelt/pgn-parser')
+  
+  return blocks.map(block => {
+    let parsedGame: any = null
+    try {
+      parsedGame = parse(block, { startRule: 'game' })
+    } catch (e) {
+      const get = (tag: string) => block.match(new RegExp(`\\[${tag} "(.+?)"\\]`))?.[1] ?? ''
+      const fenMatch = block.match(/\[FEN "(.+?)"\]/)
+      const startFen = fenMatch?.[1] ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+      const event = get('Event') === '?' ? '' : (get('Event') || 'Партия')
+      return {
+        event,
+        white: get('White') === '?' ? '' : get('White'),
+        black: get('Black') === '?' ? '' : get('Black'),
+        result: get('Result'),
+        startFen,
+        rootMoves: [],
+        nodeMap: {}
+      }
+    }
+
+    const startFen = parsedGame.tags?.FEN ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    let nextId = 1
+    const nodeMap: Record<string, MoveNode> = {}
+    
+    function processMoves(moves: any[], currentFen: string, parentId: string | null): MoveNode[] {
+      const result: MoveNode[] = []
+      let fen = currentFen
+      const chess = new Chess(fen)
+      
+      for (const m of moves) {
+        const san = m.notation.notation
+        let newFen = fen
+        try {
+          chess.move(san)
+          newFen = chess.fen()
+        } catch (e) {}
+        
+        const node: MoveNode = {
+          id: `m${nextId++}`,
+          san,
+          moveNumber: m.moveNumber,
+          turn: m.turn,
+          fen: newFen,
+          comment: m.commentDiag?.comment,
+          variations: [],
+          parentId
+        }
+        nodeMap[node.id] = node
+        
+        if (m.variations && m.variations.length > 0) {
+          node.variations = m.variations.map((vMoves: any[]) => processMoves(vMoves, fen, parentId))
+        }
+        
+        result.push(node)
+        fen = newFen
+        parentId = node.id
+      }
+      return result
+    }
+    
+    return {
+      event: parsedGame.tags?.Event === '?' ? '' : (parsedGame.tags?.Event || 'Партия'),
+      white: parsedGame.tags?.White === '?' ? '' : (parsedGame.tags?.White || ''),
+      black: parsedGame.tags?.Black === '?' ? '' : (parsedGame.tags?.Black || ''),
+      result: parsedGame.tags?.Result || '',
+      startFen,
+      rootMoves: processMoves(parsedGame.moves || [], startFen, null),
+      nodeMap
+    }
+  })
+}
+
+function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], activeId: string|null, onSelect: (id: string) => void }) {
+  return (
+    <>
+      {nodes.map((node, i) => (
+        <React.Fragment key={node.id}>
+          {node.turn === 'w' && <span className="text-muted-foreground select-none">{node.moveNumber}. </span>}
+          {node.turn === 'b' && i === 0 && <span className="text-muted-foreground select-none">{node.moveNumber}… </span>}
+          <span
+            className={`cursor-pointer rounded px-0.5 transition-colors ${activeId === node.id ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-muted'}`}
+            onClick={() => onSelect(node.id)}
+          >
+            {node.san}
+          </span>
+          {node.comment && (
+            <> <span className="text-muted-foreground/80 italic text-xs">{'{ '}{node.comment}{' }'}</span></>
+          )}
+          {node.variations.map((v, vi) => (
+            <React.Fragment key={vi}>
+              {' '}
+              <span className="text-muted-foreground/60 select-none">(</span>
+              <MoveNodeList nodes={v} activeId={activeId} onSelect={onSelect} />
+              <span className="text-muted-foreground/60 select-none">)</span>
+            </React.Fragment>
+          ))}
+          {' '}
+        </React.Fragment>
+      ))}
+    </>
+  )
+}
+
 export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTeacher, onClose }: {
   sessionId: string
   jitsiRoomName: string
@@ -95,7 +224,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
     return () => clearInterval(interval)
   }, [sessionId, currentFen, activeMoveId, pgn])
 
-  const updateState = async (updates: any) => {
+  const updateState = React.useCallback(async (updates: any) => {
     if (updates.pgn !== undefined) setPgn(updates.pgn)
     if (updates.currentFen !== undefined) setCurrentFen(updates.currentFen)
     if (updates.activeMoveId !== undefined) setActiveMoveId(updates.activeMoveId)
@@ -107,7 +236,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
         body: JSON.stringify({ sessionId, ...updates })
       })
     } catch {}
-  }
+  }, [sessionId])
 
   const endLesson = async () => {
     if (confirm('Завершить урок?')) {
@@ -116,16 +245,67 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
     }
   }
 
-  // Chess logic
-  const currentGame = useMemo(() => {
-    try {
-      const chess = new Chess()
-      chess.loadPgn(pgn || '')
-      return chess.history({ verbose: true })
-    } catch {
-      return []
+  const [boardWidth, setBoardWidth] = useState<number | null>(null)
+  const isResizing = useRef(false)
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return
+      const newWidth = window.innerWidth - e.clientX
+      // Set some min and max limits
+      if (newWidth > 300 && newWidth < window.innerWidth - 300) {
+        setBoardWidth(newWidth)
+      }
     }
-  }, [pgn])
+    const handleMouseUp = () => {
+      if (isResizing.current) {
+        isResizing.current = false
+        document.body.style.cursor = 'default'
+      }
+    }
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
+  // Chess logic
+  const games = useMemo(() => parsePgnGames(pgn || ''), [pgn])
+  const currentGame = games[0] // Since it's a live lesson, we just use the first game in PGN
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (!currentGame) return
+      
+      if (e.key === 'ArrowLeft') {
+        if (activeMoveId) {
+          const node = currentGame.nodeMap[activeMoveId]
+          if (node) updateState({ currentFen: node.parentId ? currentGame.nodeMap[node.parentId].fen : currentGame.startFen, activeMoveId: node.parentId })
+        }
+      }
+      if (e.key === 'ArrowRight') {
+        const candidates = Object.values(currentGame.nodeMap).filter(n => n.parentId === activeMoveId)
+        if (candidates.length > 0) updateState({ currentFen: candidates[0].fen, activeMoveId: candidates[0].id })
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (!activeMoveId) return
+        const parentId = currentGame.nodeMap[activeMoveId]?.parentId ?? null
+        const siblings = Object.values(currentGame.nodeMap).filter(n => n.parentId === parentId)
+        if (siblings.length > 1) {
+          const currentIndex = siblings.findIndex(n => n.id === activeMoveId)
+          let nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1
+          if (nextIndex >= siblings.length) nextIndex = 0
+          if (nextIndex < 0) nextIndex = siblings.length - 1
+          updateState({ currentFen: siblings[nextIndex].fen, activeMoveId: siblings[nextIndex].id })
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [currentGame, activeMoveId, updateState])
 
   const boardGame = useMemo(() => {
     try { return new Chess(currentFen) } catch { return new Chess() }
@@ -189,8 +369,17 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
         <div ref={jitsiContainerRef} className="flex-1 w-full h-full" />
       </div>
 
+      {/* Resizer */}
+      <div 
+        className="hidden md:block w-1.5 bg-border hover:bg-primary/50 cursor-col-resize transition-colors"
+        onMouseDown={() => { isResizing.current = true; document.body.style.cursor = 'col-resize' }}
+      />
+
       {/* Board section */}
-      <div className="w-full md:w-[600px] lg:w-[800px] h-[60vh] md:h-full flex flex-col overflow-hidden bg-background">
+      <div 
+        className="w-full md:w-auto h-[60vh] md:h-full flex flex-col overflow-hidden bg-background shrink-0"
+        style={{ width: boardWidth ? boardWidth + 'px' : '50%' }}
+      >
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="font-semibold text-lg">Интерактивная доска</h2>
           <div className="flex gap-2">
@@ -207,7 +396,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
         <div className="flex-1 overflow-y-auto p-4 flex flex-col lg:flex-row gap-6">
           <div className="flex-1 flex flex-col items-center">
             {/* Board */}
-            <div className="w-full max-w-[500px] aspect-square relative select-none touch-none bg-[#EAD4BA]">
+            <div className="w-full aspect-square relative select-none touch-none bg-[#EAD4BA]">
               {/* Coordinates and squares rendering */}
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="flex h-[12.5%] w-full">
@@ -249,22 +438,13 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
             </div>
           </div>
           
-          <div className="w-full lg:w-64 border rounded-md bg-muted/20 p-2 flex flex-col h-64 lg:h-auto overflow-y-auto text-sm">
-            {currentGame && currentGame.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                {currentGame.map((move: any, idx: number) => {
-                  const moveNumber = Math.floor(idx / 2) + 1
-                  const moveId = idx.toString()
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => updateState({ currentFen: move.after, activeMoveId: moveId })}
-                      className={`text-left px-2 py-1 rounded hover:bg-muted ${activeMoveId === moveId ? 'bg-primary text-primary-foreground font-bold' : ''}`}
-                    >
-                      {move.color === 'w' ? `${moveNumber}. ` : ''}{move.san}
-                    </button>
-                  )
-                })}
+          <div className="w-full lg:w-72 lg:min-w-64 border rounded-md bg-muted/20 p-4 flex flex-col h-64 lg:h-auto overflow-y-auto text-sm leading-6 shrink-0">
+            {currentGame && currentGame.rootMoves.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-x-1">
+                <MoveNodeList nodes={currentGame.rootMoves} activeId={activeMoveId} onSelect={(id) => {
+                  const node = currentGame.nodeMap[id]
+                  if (node) updateState({ currentFen: node.fen, activeMoveId: id })
+                }} />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 text-center px-4">
