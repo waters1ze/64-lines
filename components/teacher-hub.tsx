@@ -2228,7 +2228,7 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
 function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void; onDelete: (id: string) => void }) {
-  const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || 0), 0)
+  const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || p.module?.price || 0), 0)
   const pending = purchases.filter(p => p.status === 'PENDING' && p.paymentMethod !== 'yoomoney')
   const history = purchases.filter(p => p.status === 'APPROVED' || p.status === 'REJECTED')
   
