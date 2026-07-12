@@ -281,10 +281,20 @@ export function TeacherHub({
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
 
+  const refreshPurchases = () => {
+    if (isStudent || role === 'Ученик') {
+      fetch('/api/purchases').then(r => r.json()).then(data => {
+        if (Array.isArray(data)) setPurchases(data)
+      }).catch(() => {})
+    }
+  }
+
   useEffect(() => {
     fetch('/api/modules').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setModules(data)
     }).catch(() => {})
+    // Always refresh purchases from server to get latest status
+    refreshPurchases()
   }, [])
 
   useEffect(() => {
@@ -298,12 +308,20 @@ export function TeacherHub({
       // Refresh server components (courses/purchases)
       router.refresh()
       
-      // Give the webhook a few seconds to process, then fetch modules again
+      // Give the webhook a few seconds to process, then fetch modules and purchases again
       setTimeout(() => {
         fetch('/api/modules').then(r => r.json()).then(data => {
           if (Array.isArray(data)) setModules(data)
         }).catch(() => {})
+        refreshPurchases()
       }, 3000)
+      // Try again after 8 seconds in case webhook is slow
+      setTimeout(() => {
+        refreshPurchases()
+        fetch('/api/modules').then(r => r.json()).then(data => {
+          if (Array.isArray(data)) setModules(data)
+        }).catch(() => {})
+      }, 8000)
     }
   }, [searchParams])
 
@@ -565,7 +583,7 @@ export function TeacherHub({
             {section === 'modules'     && (
               isTeacher
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
-                : <ModulesView modules={modules} setModules={setModules} onPurchase={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} isGuest={isGuest} notify={notify} />
+                : <ModulesView modules={modules} setModules={setModules} onPurchase={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} />
             )}
             {section === 'leaderboard' && <Leaderboard />}
             {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
@@ -2144,18 +2162,37 @@ function ModulesEditor({ modules, setModules, students, notify }: {
 
 // ─── Modules View (Student/Guest) ─────────────────────────────────────────────
 
-function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
+function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse }: {
   modules: Module[]
   setModules: React.Dispatch<React.SetStateAction<Module[]>>
   onPurchase: (id: string) => void
   isGuest: boolean
   notify: (s: string) => void
+  purchases?: any[]
+  courses?: Course[]
+  onPurchaseCourse?: (id: string | number) => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
 
-  const allTags = Array.from(new Set(modules.flatMap(m => m.tags)))
-  const filtered = activeTag ? modules.filter(m => m.tags.includes(activeTag)) : modules
+  // Compute purchased course IDs
+  const purchasedCourseIds = purchases
+    .filter(p => p.status === 'APPROVED' || p.status === 'PAID')
+    .map(p => p.courseId)
+    .filter(Boolean)
+
+  const allTags = Array.from(new Set([
+    ...modules.flatMap(m => m.tags),
+    ...(courses.length > 0 ? ['Дебют'] : [])
+  ]))
+  const filtered = activeTag
+    ? activeTag === 'Дебют'
+      ? []
+      : modules.filter(m => m.tags.includes(activeTag))
+    : modules
+  const filteredCourses = activeTag === 'Дебют' || !activeTag ? courses : []
+
+  const hasAnyContent = modules.length > 0 || courses.length > 0
 
   return (
     <>
@@ -2171,7 +2208,41 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify }: {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.length === 0 && <p className="text-muted-foreground col-span-3">Модулей пока нет.</p>}
+        {!hasAnyContent && <p className="text-muted-foreground col-span-3">Модулей пока нет.</p>}
+
+        {/* Purchased / buyable courses shown as module cards */}
+        {filteredCourses.map(c => {
+          const isPurchased = purchasedCourseIds.includes(c.id)
+          return (
+            <div key={`course-${c.id}`} className="rounded-lg border flex flex-col overflow-hidden">
+              {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full aspect-video object-cover" />}
+              <div className="p-5 flex flex-col flex-1">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
+                  {isPurchased
+                    ? <span className="badge bg-green-50 text-green-700">✅ Куплен</span>
+                    : c.price > 0
+                      ? <span className="badge bg-amber-50 text-amber-700">💳 {c.price.toLocaleString()} ₽</span>
+                      : <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>}
+                </div>
+                <h3 className="font-semibold">{c.name}</h3>
+                {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
+                <div className="mt-4">
+                  {isPurchased
+                    ? <button className="button w-full" onClick={() => { /* TODO: open course viewer */ }}>Открыть<ChevronRight className="size-4" /></button>
+                    : c.price > 0
+                      ? <button className="button w-full" onClick={() => { if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }; onPurchaseCourse?.(c.id) }}>
+                          <LockKeyhole className="size-4" />Купить доступ
+                        </button>
+                      : <button className="button w-full">Открыть<ChevronRight className="size-4" /></button>
+                  }
+                </div>
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Regular modules */}
         {filtered.map(m => {
           const canOpen = m.hasAccess || m.visibility === 'ALL'
           const isOpen = openId === m.id && canOpen
