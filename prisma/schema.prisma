@@ -1,79 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model User {
-  id                String    @id @default(cuid())
+  id                String         @id @default(cuid())
   name              String?
-  email             String    @unique
+  email             String         @unique
   passwordHash      String
-  role              Role      @default(STUDENT)
-  rating            Int       @default(1500)
-  
+  role              Role           @default(STUDENT)
+  rating            Int            @default(1500)
+  teacherId         String?
   emailVerified     DateTime?
   verificationToken String?
-  
-  // Relations
-  teacherId         String?
-  teacher           User?     @relation("TeacherStudents", fields: [teacherId], references: [id])
-  students          User[]    @relation("TeacherStudents")
-  
   homeworks         Homework[]
-  purchases         Purchase[]
   moduleAccesses    ModuleAccess[]
-}
-
-enum Role {
-  ADMIN
-  TEACHER
-  STUDENT
+  purchases         Purchase[]
+  teacher           User?          @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
+  students          User[]         @relation("TeacherStudents")
 }
 
 model Homework {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   pgn         String
-  assignedAt  DateTime @default(now())
+  assignedAt  DateTime  @default(now())
   dueDate     DateTime?
-  
-  progress    Int      @default(0)
-  solved      Boolean  @default(false)
-  attempts    Int      @default(0)
+  progress    Int       @default(0)
+  solved      Boolean   @default(false)
+  attempts    Int       @default(0)
   teacherNote String?
-
   studentId   String
-  student     User     @relation(fields: [studentId], references: [id])
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model Course {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String
   price       Int
   imageUrl    String?
+  createdAt   DateTime   @default(now())
   fileUrl     String?
-  pgn         String?  @db.Text
-  createdAt   DateTime @default(now())
-  
+  pgn         String?
   purchases   Purchase[]
 }
 
 model Purchase {
-  id          String   @id @default(cuid())
-  userId      String
-  courseId    String
-  status      String   @default("PENDING") // PENDING, APPROVED
-  senderName  String?
-  comment     String?
-  createdAt   DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  createdAt  DateTime @default(now())
+  status     String   @default("PENDING")
+  comment    String?
+  senderName String?
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Video {
@@ -101,15 +87,14 @@ model InviteLink {
 }
 
 model Module {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   title       String
   description String?
   tags        String[]
-  visibility  String   @default("ALL") // ALL | PAID | STUDENTS
-  price       Int      @default(0)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-
+  visibility  String         @default("ALL")
+  price       Int            @default(0)
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
   lessons     Lesson[]
   accesses    ModuleAccess[]
 }
@@ -121,7 +106,6 @@ model Lesson {
   fileUrl   String?
   order     Int      @default(0)
   createdAt DateTime @default(now())
-
   moduleId  String
   module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }
@@ -131,9 +115,14 @@ model ModuleAccess {
   userId    String
   moduleId  String
   grantedAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, moduleId])
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
 }
