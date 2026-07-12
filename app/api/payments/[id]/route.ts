@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
@@ -13,7 +13,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    await db.purchase.delete({ where: { id: params.id } })
+    const { id } = await params
+    await db.purchase.delete({ where: { id } })
 
     return new NextResponse('Deleted', { status: 200 })
   } catch (error) {

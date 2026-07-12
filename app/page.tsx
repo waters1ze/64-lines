@@ -50,7 +50,7 @@ export default async function Page() {
       where: { student: { teacherId: session.user.id } }
     })
     purchasesRaw = await db.purchase.findMany({
-      include: { user: true, course: true },
+      include: { user: true, course: true, module: true },
       orderBy: { createdAt: 'desc' }
     })
   } else if (isStudent && session) {
@@ -59,7 +59,7 @@ export default async function Page() {
     })
     purchasesRaw = await db.purchase.findMany({
       where: { userId: session.user.id },
-      include: { course: true }
+      include: { course: true, module: true }
     })
   }
 
