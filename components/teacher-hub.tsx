@@ -5,7 +5,8 @@ import {
   ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
-  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck
+  Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
+  CheckCircle2, Unlock, Search
 } from 'lucide-react'
 import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
@@ -584,7 +585,7 @@ export function TeacherHub({
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
                 : <MyLibrary modules={modules} purchases={purchases} courses={courses} onOpen={openCourseViewer} />
             )}
-            {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} />}
+            {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} onOpenCourse={openCourseViewer} onOpenModule={() => notify('Открытие модуля (в разработке)')} />}
             {section === 'leaderboard' && <Leaderboard />}
             {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
@@ -2168,12 +2169,19 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
   courses: Course[]
   onOpen: (id: string | number) => void
 }) {
+  const [search, setSearch] = useState('')
   const approvedPurchases = purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID')
   const purchasedCourseIds = approvedPurchases.map(p => p.courseId).filter(Boolean)
   const purchasedModuleIds = approvedPurchases.map(p => p.moduleId).filter(Boolean)
 
   const ownedCourses = courses.filter(c => purchasedCourseIds.includes(c.id))
   const accessibleModules = modules.filter(m => m.hasAccess || m.visibility === 'ALL')
+
+  const filteredModules = accessibleModules.filter(m => 
+    m.title.toLowerCase().includes(search.toLowerCase()) || 
+    m.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
+  )
+
   const isEmpty = ownedCourses.length === 0 && accessibleModules.length === 0
 
   return (
@@ -2194,7 +2202,7 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
             <div className="p-5 flex flex-col flex-1">
               <div className="flex flex-wrap gap-1 mb-2">
                 <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
-                <span className="badge bg-green-50 text-green-700">✅ Куплен</span>
+                <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-3 mr-1" />Куплен</span>
               </div>
               <h3 className="font-semibold">{c.name}</h3>
               {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
@@ -2206,9 +2214,17 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
         ))}
       </div>
       <div className="flex flex-col gap-4 mt-8">
-        {accessibleModules.length > 0 && <h3 className="text-lg font-semibold mb-2">📚 Учебные модули</h3>}
+        {accessibleModules.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2"><BookOpen className="size-5" /> Учебные модули</h3>
+            <div className="relative max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по названию или тегам..." className="input pl-9 w-full" />
+            </div>
+          </div>
+        )}
         {/* Accessible modules as wide horizontal cards */}
-        {accessibleModules.map(m => (
+        {filteredModules.map(m => (
           <div key={`m-${m.id}`} className="rounded-lg border flex flex-col sm:flex-row overflow-hidden items-stretch hover:shadow-md transition-shadow">
             <div className="w-full sm:w-48 bg-muted/30 flex items-center justify-center p-6 border-b sm:border-b-0 sm:border-r">
               <BookOpen className="size-10 text-purple-400" />
@@ -2218,8 +2234,8 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
                 <div className="flex flex-wrap gap-2 mb-2">
                   <span className="badge bg-purple-50 text-purple-600 text-xs">Модуль</span>
                   {m.visibility === 'ALL'
-                    ? <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>
-                    : <span className="badge bg-green-50 text-green-700">✅ Открыт</span>}
+                    ? <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><Unlock className="size-3 mr-1" />Бесплатно</span>
+                    : <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-3 mr-1" />Открыт</span>}
                   {m.tags.map(t => <span key={t} className="badge bg-blue-50 text-blue-600 text-xs">{t}</span>)}
                 </div>
                 <h3 className="text-lg font-semibold">{m.title}</h3>
@@ -2239,7 +2255,7 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
 
 // ─── Shop Section (buy courses and modules) ───────────────────────────────────
 
-function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notify, onPurchaseCourse, onPurchaseModule }: {
+function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notify, onPurchaseCourse, onPurchaseModule, onOpenCourse, onOpenModule }: {
   modules: Module[]
   courses: Course[]
   purchases: any[]
@@ -2248,6 +2264,8 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
   notify: (s: string) => void
   onPurchaseCourse: (id: string | number) => void
   onPurchaseModule: (id: string) => void
+  onOpenCourse: (id: string | number) => void
+  onOpenModule: (id: string) => void
 }) {
   const [detailId, setDetailId] = useState<string | number | null>(null)
   const detail = courses.find(c => c.id === detailId)
@@ -2265,7 +2283,7 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
       {/* Debut courses */}
       {courses.length > 0 && (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4">🎓 Дебютные курсы</h3>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><GraduationCap className="size-5" /> Дебютные курсы</h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {courses.map(c => {
               const owned = purchasedIds.includes(c.id as any)
@@ -2281,10 +2299,13 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
                     <div className="mt-4">
                       {c.price > 0 && !owned && <b className="block mb-2">{c.price.toLocaleString('ru-RU')} ₽</b>}
                       {owned
-                        ? <span className="badge bg-green-50 text-green-700 w-full justify-center py-2">✅ Уже куплен</span>
+                        ? <div className="flex gap-2">
+                            <button className="outline-button flex-1" onClick={() => setDetailId(c.id)}>Подробнее</button>
+                            <button className="button flex-1" onClick={() => onOpenCourse(c.id)}>Открыть<ChevronRight className="size-4 ml-1" /></button>
+                          </div>
                         : <div className="flex gap-2">
                             <button className="outline-button flex-1" onClick={() => setDetailId(c.id)}>Подробнее</button>
-                            <button className="button flex-1" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseCourse(c.id) }}><LockKeyhole className="size-4" />Купить</button>
+                            <button className="button flex-1" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseCourse(c.id) }}><LockKeyhole className="size-4 mr-1" />Купить</button>
                           </div>}
                     </div>
                   </div>
@@ -2298,7 +2319,7 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
       {/* Paid modules */}
       {paidModules.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold mb-4">📚 Учебные модули</h3>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><BookOpen className="size-5" /> Учебные модули</h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {paidModules.map(m => {
               const owned = purchasedModuleIds.includes(m.id)
@@ -2315,8 +2336,8 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
                     <p className="mt-2 text-xs text-muted-foreground">{m.lessons.length} уроков</p>
                     <div className="mt-4">
                       {owned
-                        ? <span className="badge bg-green-50 text-green-700 w-full justify-center py-2">✅ Уже куплен</span>
-                        : <button className="button w-full" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseModule(m.id) }}><LockKeyhole className="size-4" />Купить доступ</button>}
+                        ? <button className="button w-full" onClick={() => onOpenModule(m.id)}>Открыть<ChevronRight className="size-4 ml-1" /></button>
+                        : <button className="button w-full" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseModule(m.id) }}><LockKeyhole className="size-4 mr-1" />Купить доступ</button>}
                     </div>
                   </div>
                 </div>
@@ -2342,8 +2363,8 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
             <div className="flex items-center justify-between border-t pt-4">
               <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
               {purchasedIds.includes(detail.id as any)
-                ? <span className="badge">✅ Куплен</span>
-                : <button className="button" onClick={() => { onPurchaseCourse(detail.id); setDetailId(null) }}><LockKeyhole />Оплатить</button>}
+                ? <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-4 mr-1" />Куплен</span>
+                : <button className="button" onClick={() => { onPurchaseCourse(detail.id); setDetailId(null) }}><LockKeyhole className="size-4 mr-1" />Оплатить</button>}
             </div>
           </div>
         </div>
