@@ -34,13 +34,23 @@ export async function POST(req: Request) {
       data: { status: 'APPROVED' }
     })
 
-    // 2. Send Email
-    try {
-      const { sendCourseDeliveryEmail } = await import("@/lib/mail")
-      await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "", purchase.course.pgn)
-    } catch (err) {
-      console.error("Failed to send course delivery email", err)
-      // We don't fail the approval if email fails
+    // 1.5 If it's a module, grant module access
+    if (purchase.moduleId) {
+      await db.moduleAccess.upsert({
+        where: { userId_moduleId: { userId: purchase.userId, moduleId: purchase.moduleId } },
+        update: {},
+        create: { userId: purchase.userId, moduleId: purchase.moduleId }
+      })
+    }
+
+    // 2. Send Email (Only for courses with PGN currently, but can be adapted)
+    if (purchase.course) {
+      try {
+        const { sendCourseDeliveryEmail } = await import("@/lib/mail")
+        await sendCourseDeliveryEmail(purchase.user.email, purchase.course.name, purchase.course.fileUrl || "", purchase.course.pgn)
+      } catch (err) {
+        console.error("Failed to send course delivery email", err)
+      }
     }
 
     return NextResponse.json({ success: true })

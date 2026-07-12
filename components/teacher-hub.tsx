@@ -276,7 +276,7 @@ export function TeacherHub({
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
   const [selectedHwId, setSelectedHwId] = useState<string | number | null>(null)
   const [paymentCourseId, setPaymentCourseId] = useState<string | number | null>(null)
-  const [paymentStep, setPaymentStep] = useState<'info' | 'confirm'>('info')
+  const [paymentStep, setPaymentStep] = useState<'info' | 'method' | 'sbp'>('info')
   const [paymentSender, setPaymentSender] = useState('')
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
@@ -598,20 +598,73 @@ export function TeacherHub({
         if (!course) return null
         return (
           <Modal title="Оплата курса" close={() => setPaymentCourseId(null)}>
-            {paymentStep === 'info' ? (
+            {paymentStep === 'info' && (
               <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию, чтобы мы могли быстрее подтвердить ваш перевод.</p>
-                <label className="field">Ваше имя (отправитель перевода)
+                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию.</p>
+                <label className="field">Ваше имя
                   <input className="input" value={paymentSender} onChange={e => setPaymentSender(e.target.value)} placeholder="Иван Иванов" />
                 </label>
-                <label className="field">Комментарий к заказу
-                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Например: оплачиваю по акции, или ник на lichess..." />
+                <label className="field">Комментарий
+                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Опционально" />
                 </label>
-                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('confirm')}>
-                  Далее — к оплате
+                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('method')}>
+                  Далее — выбор способа оплаты
                 </button>
               </div>
-            ) : (
+            )}
+            {paymentStep === 'method' && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-center">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
+                
+                <button className="button w-full flex-col py-3 h-auto" onClick={async () => {
+                  try {
+                    const res = await fetch('/api/payments/create', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ courseId: paymentCourseId, senderName: paymentSender, comment: paymentComment, paymentMethod: 'yoomoney' })
+                    })
+                    if (res.ok) {
+                      const { purchase } = await res.json()
+                      // Submit YooMoney form
+                      const form = document.createElement('form')
+                      form.method = 'POST'
+                      form.action = 'https://yoomoney.ru/quickpay/confirm.xml'
+                      
+                      const fields: any = {
+                        receiver: '4100119573095433',
+                        label: purchase.id,
+                        'quickpay-form': 'button',
+                        sum: (course.price * 1.03).toFixed(2), // 3% commission shifted to client
+                        paymentType: 'AC',
+                        successURL: window.location.origin
+                      }
+                      for (const k in fields) {
+                        const input = document.createElement('input')
+                        input.type = 'hidden'
+                        input.name = k
+                        input.value = fields[k]
+                        form.appendChild(input)
+                      }
+                      document.body.appendChild(form)
+                      form.submit()
+                    } else notify('Ошибка создания заявки.')
+                  } catch { notify('Ошибка сети.') }
+                }}>
+                  <span className="font-bold">ЮMoney (Автоматически)</span>
+                  <span className="text-xs opacity-80 font-normal mt-1">Оплата картой. Комиссия сервиса 3% ({(course.price * 1.03).toLocaleString('ru-RU')} ₽). Доступ откроется сразу.</span>
+                </button>
+
+                <button className="outline-button w-full flex-col py-3 h-auto" onClick={() => setPaymentStep('sbp')}>
+                  <span className="font-bold text-foreground">СБП / Перевод (Ручная проверка)</span>
+                  <span className="text-xs text-muted-foreground font-normal mt-1">Без комиссии ({course.price.toLocaleString('ru-RU')} ₽). Доступ после проверки учителем.</span>
+                </button>
+
+                <button className="text-xs text-muted-foreground mt-2 w-full text-center hover:underline" onClick={() => setPaymentStep('info')}>
+                  Назад
+                </button>
+              </div>
+            )}
+            {paymentStep === 'sbp' && (
               <div className="flex flex-col gap-4 text-center">
                 <div className="rounded-xl bg-muted/30 p-6">
                   <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
@@ -623,13 +676,10 @@ export function TeacherHub({
                   <button className="button w-full" onClick={handleManualPayment}>
                     Я перевел(а) деньги
                   </button>
-                  <button className="outline-button w-full" onClick={() => setPaymentStep('info')}>
+                  <button className="outline-button w-full" onClick={() => setPaymentStep('method')}>
                     <ArrowLeft className="size-4" />Назад
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  После нажатия "Я перевел деньги" мы проверим оплату, и курс появится в вашем кабинете. Если что-то пойдет не так, смело пишите в поддержку!
-                </p>
               </div>
             )}
           </Modal>
@@ -641,20 +691,73 @@ export function TeacherHub({
         if (!mod) return null
         return (
           <Modal title="Оплата модуля" close={() => setPaymentModuleId(null)}>
-            {paymentStep === 'info' ? (
+            {paymentStep === 'info' && (
               <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию, чтобы мы могли быстрее подтвердить ваш перевод.</p>
-                <label className="field">Ваше имя (отправитель перевода)
+                <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию.</p>
+                <label className="field">Ваше имя
                   <input className="input" value={paymentSender} onChange={e => setPaymentSender(e.target.value)} placeholder="Иван Иванов" />
                 </label>
-                <label className="field">Комментарий к заказу
-                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Например: оплачиваю по акции, или ник на lichess..." />
+                <label className="field">Комментарий
+                  <textarea className="textarea text-sm" value={paymentComment} onChange={e => setPaymentComment(e.target.value)} placeholder="Опционально" />
                 </label>
-                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('confirm')}>
-                  Далее — к оплате
+                <button className="button w-full" disabled={!paymentSender.trim()} onClick={() => setPaymentStep('method')}>
+                  Далее — выбор способа оплаты
                 </button>
               </div>
-            ) : (
+            )}
+            {paymentStep === 'method' && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-center">Сумма к оплате: <b>{mod.price.toLocaleString('ru-RU')} ₽</b></p>
+                
+                <button className="button w-full flex-col py-3 h-auto" onClick={async () => {
+                  try {
+                    const res = await fetch('/api/payments/create', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ moduleId: paymentModuleId, senderName: paymentSender, comment: paymentComment, paymentMethod: 'yoomoney' })
+                    })
+                    if (res.ok) {
+                      const { purchase } = await res.json()
+                      // Submit YooMoney form
+                      const form = document.createElement('form')
+                      form.method = 'POST'
+                      form.action = 'https://yoomoney.ru/quickpay/confirm.xml'
+                      
+                      const fields: any = {
+                        receiver: '4100119573095433',
+                        label: purchase.id,
+                        'quickpay-form': 'button',
+                        sum: (mod.price * 1.03).toFixed(2), // 3% commission shifted to client
+                        paymentType: 'AC',
+                        successURL: window.location.origin
+                      }
+                      for (const k in fields) {
+                        const input = document.createElement('input')
+                        input.type = 'hidden'
+                        input.name = k
+                        input.value = fields[k]
+                        form.appendChild(input)
+                      }
+                      document.body.appendChild(form)
+                      form.submit()
+                    } else notify('Ошибка создания заявки.')
+                  } catch { notify('Ошибка сети.') }
+                }}>
+                  <span className="font-bold">ЮMoney (Автоматически)</span>
+                  <span className="text-xs opacity-80 font-normal mt-1">Оплата картой. Комиссия сервиса 3% ({(mod.price * 1.03).toLocaleString('ru-RU')} ₽). Доступ откроется сразу.</span>
+                </button>
+
+                <button className="outline-button w-full flex-col py-3 h-auto" onClick={() => setPaymentStep('sbp')}>
+                  <span className="font-bold text-foreground">СБП / Перевод (Ручная проверка)</span>
+                  <span className="text-xs text-muted-foreground font-normal mt-1">Без комиссии ({mod.price.toLocaleString('ru-RU')} ₽). Доступ после проверки учителем.</span>
+                </button>
+
+                <button className="text-xs text-muted-foreground mt-2 w-full text-center hover:underline" onClick={() => setPaymentStep('info')}>
+                  Назад
+                </button>
+              </div>
+            )}
+            {paymentStep === 'sbp' && (
               <div className="flex flex-col gap-4 text-center">
                 <div className="rounded-xl bg-muted/30 p-6">
                   <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
@@ -668,7 +771,7 @@ export function TeacherHub({
                       const res = await fetch('/api/payments/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ courseId: paymentModuleId, senderName: paymentSender, comment: `[Модуль] ${mod.title} — ${paymentComment}` })
+                        body: JSON.stringify({ moduleId: paymentModuleId, senderName: paymentSender, comment: paymentComment })
                       })
                       if (res.ok) {
                         const { purchase } = await res.json()
@@ -682,13 +785,10 @@ export function TeacherHub({
                   }}>
                     Я перевел(а) деньги
                   </button>
-                  <button className="outline-button w-full" onClick={() => setPaymentStep('info')}>
+                  <button className="outline-button w-full" onClick={() => setPaymentStep('method')}>
                     <ArrowLeft className="size-4" />Назад
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  После нажатия "Я перевел деньги" мы проверим оплату, и модуль появится в вашем кабинете.
-                </p>
               </div>
             )}
           </Modal>

@@ -53,12 +53,14 @@ model Course {
 model Purchase {
   id         String   @id @default(cuid())
   userId     String
-  courseId   String
+  courseId   String?
+  moduleId   String?
   createdAt  DateTime @default(now())
   status     String   @default("PENDING")
   comment    String?
   senderName String?
-  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course     Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module     Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -97,6 +99,7 @@ model Module {
   createdAt   DateTime       @default(now())
   lessons     Lesson[]
   accesses    ModuleAccess[]
+  purchases   Purchase[]
 }
 
 model Lesson {
