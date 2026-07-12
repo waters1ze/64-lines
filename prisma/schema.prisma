@@ -22,6 +22,10 @@ model User {
   purchases         Purchase[]
   teacher           User?          @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
   students          User[]         @relation("TeacherStudents")
+  sentMessages      Message[]      @relation("SentMessages")
+  receivedMessages  Message[]      @relation("ReceivedMessages")
+  teacherLiveSessions LiveSession[] @relation("TeacherLiveSessions")
+  studentLiveSessions LiveSession[] @relation("StudentLiveSessions")
 }
 
 model Homework {
@@ -129,4 +133,31 @@ enum Role {
   ADMIN
   TEACHER
   STUDENT
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model LiveSession {
+  id           String   @id @default(cuid())
+  teacherId    String
+  studentId    String
+  status       String   @default("ACTIVE") // ACTIVE, ENDED
+  jitsiRoomName String
+  pgn          String?
+  currentFen   String?
+  activeMoveId String?
+  lastUpdated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  teacher User @relation("TeacherLiveSessions", fields: [teacherId], references: [id], onDelete: Cascade)
+  student User @relation("StudentLiveSessions", fields: [studentId], references: [id], onDelete: Cascade)
 }

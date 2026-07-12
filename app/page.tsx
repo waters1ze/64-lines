@@ -42,6 +42,11 @@ export default async function Page() {
   let purchasesRaw: any[] = []
 
   if (isTeacher && session) {
+    // Auto cleanup expired homeworks
+    await db.homework.deleteMany({
+      where: { dueDate: { lt: new Date() } }
+    })
+    
     students = await db.user.findMany({
       where: { teacherId: session.user.id },
       select: { id: true, name: true, rating: true, email: true }
@@ -54,6 +59,11 @@ export default async function Page() {
       orderBy: { createdAt: 'desc' }
     })
   } else if (isStudent && session) {
+    // Auto cleanup expired homeworks
+    await db.homework.deleteMany({
+      where: { dueDate: { lt: new Date() } }
+    })
+    
     homeworksRaw = await db.homework.findMany({
       where: { studentId: session.user.id }
     })

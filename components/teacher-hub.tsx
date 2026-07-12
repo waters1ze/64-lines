@@ -16,13 +16,16 @@ import '@uiw/react-markdown-preview/markdown.css'
 const MDEditor = dynamic(() => import('@uiw/react-md-editor').then(m => m.default), { ssr: false })
 const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then(m => m.default), { ssr: false })
 
+import ChatComponent from './ChatComponent'
+import LiveLessonBoard from './LiveLessonBoard'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -216,7 +219,7 @@ function HwCard({ hw, isStudent, onOpen }: { hw: HW; isStudent?: boolean; onOpen
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -242,6 +245,8 @@ export function TeacherHub({
   initialOpenings?: any[],
   initialPurchases?: any[],
 }) {
+  const { data: session } = useSession()
+  
   const isTeacher = initialRole === 'Учитель' || initialRole === 'ADMIN'
   const isGuest = initialRole === 'Гость'
   const isStudent = initialRole === 'Ученик' || isGuest
@@ -281,6 +286,8 @@ export function TeacherHub({
   const [paymentSender, setPaymentSender] = useState('')
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
+  
+  const [liveSession, setLiveSession] = useState<any>(null)
 
   const refreshPurchases = () => {
     if (isStudent || role === 'Ученик') {
@@ -290,12 +297,35 @@ export function TeacherHub({
     }
   }
 
+  const startLiveSession = async (studentId: string) => {
+    try {
+      const res = await fetch('/api/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId })
+      })
+      if (res.ok) {
+        const { session } = await res.json()
+        setLiveSession(session)
+        setSection('live')
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     fetch('/api/modules').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setModules(data)
     }).catch(() => {})
     // Always refresh purchases from server to get latest status
     refreshPurchases()
+    
+    // Poll for live sessions
+    const interval = setInterval(() => {
+      fetch('/api/live').then(r => r.json()).then(data => {
+        setLiveSession(data.session)
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -331,6 +361,8 @@ export function TeacherHub({
 
   const teacherNav = [
     ['overview',       'Обзор',              LayoutDashboard],
+    ['chat',           'Сообщения',          MessageSquare],
+    ['live',           'Уроки',              Video],
     ['students',       'Мои ученики',        Users],
     ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
@@ -346,6 +378,8 @@ export function TeacherHub({
 
   const studentNavBase = [
     ['overview',    'Мой обзор',          LayoutDashboard],
+    ['chat',        'Сообщения',          MessageSquare],
+    ['live',        'Уроки',              Video],
     ['modules',     'Мои курсы',          BookOpen],
     ['shop',        'Магазин',            Store],
     ['leaderboard', 'Рейтинг',            Trophy],
@@ -552,6 +586,21 @@ export function TeacherHub({
           <button className="icon-button" onClick={() => notify('Новых уведомлений нет')}><Bell /></button>
         </header>
 
+        {liveSession && section !== 'live' && (
+          <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between shadow-md z-10">
+            <div className="flex items-center gap-3">
+              <Video className="size-5 animate-pulse" />
+              <div>
+                <p className="font-semibold text-sm">Идет интерактивный урок!</p>
+                <p className="text-xs opacity-90">Учитель ожидает вас на доске.</p>
+              </div>
+            </div>
+            <button onClick={() => go('live')} className="bg-background text-foreground hover:bg-muted text-sm px-4 py-1.5 rounded-md font-medium transition-colors">
+              Присоединиться
+            </button>
+          </div>
+        )}
+
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
@@ -580,6 +629,16 @@ export function TeacherHub({
             )}
             {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
+            {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
+            {section === 'live'        && liveSession && (
+              <LiveLessonBoard 
+                sessionId={liveSession.id} 
+                jitsiRoomName={liveSession.jitsiRoomName}
+                userId={!isGuest && session?.user ? session.user.id : ''}
+                isTeacher={isTeacher}
+                onClose={() => { setLiveSession(null); go('overview') }}
+              />
+            )}
             {section === 'modules'     && (
               isTeacher
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
