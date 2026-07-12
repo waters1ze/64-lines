@@ -589,7 +589,7 @@ export function TeacherHub({
             {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
             {section === 'sales'       && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
-            {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} />}
+            {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
                 onPurchase={purchaseCourse}
@@ -2162,7 +2162,7 @@ function ModulesEditor({ modules, setModules, students, notify }: {
 
 // ─── Modules View (Student/Guest) ─────────────────────────────────────────────
 
-function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse }: {
+function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse, onOpenCourse }: {
   modules: Module[]
   setModules: React.Dispatch<React.SetStateAction<Module[]>>
   onPurchase: (id: string) => void
@@ -2171,6 +2171,7 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
   purchases?: any[]
   courses?: Course[]
   onPurchaseCourse?: (id: string | number) => void
+  onOpenCourse?: (id: string | number) => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
@@ -2227,15 +2228,16 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
                 </div>
                 <h3 className="font-semibold">{c.name}</h3>
                 {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
-                <div className="mt-4">
-                  {isPurchased
-                    ? <button className="button w-full" onClick={() => { /* TODO: open course viewer */ }}>Открыть<ChevronRight className="size-4" /></button>
-                    : c.price > 0
-                      ? <button className="button w-full" onClick={() => { if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }; onPurchaseCourse?.(c.id) }}>
-                          <LockKeyhole className="size-4" />Купить доступ
-                        </button>
-                      : <button className="button w-full">Открыть<ChevronRight className="size-4" /></button>
-                  }
+                <div className="mt-4 flex gap-2">
+                  {isPurchased ? (
+                    <button className="button flex-1" onClick={() => onOpenCourse?.(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+                  ) : c.price > 0 ? (
+                    <button className="button flex-1" onClick={() => { if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }; onPurchaseCourse?.(c.id) }}>
+                      <LockKeyhole className="size-4" />Купить доступ
+                    </button>
+                  ) : (
+                    <button className="button flex-1" onClick={() => onOpenCourse?.(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2371,7 +2373,7 @@ function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[];
 
 // ─── Storefront (Витрина) ─────────────────────────────────────────────────────
 
-function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; purchasedIds: number[]; onPurchase: (id: string | number) => void }) {
+function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Course[]; purchasedIds: number[]; onPurchase: (id: string | number) => void; onOpen?: (id: string | number) => void }) {
   const [detailId, setDetailId] = useState<string | number | null>(null)
   const detail = courses.find(c => c.id === detailId)
 
@@ -2398,7 +2400,10 @@ function Storefront({ courses, purchasedIds, onPurchase }: { courses: Course[]; 
                 <div className="mt-4">
                   {item.price > 0 && !owned && <b className="block mb-2">{item.price.toLocaleString('ru-RU')} ₽</b>}
                   {owned
-                    ? <button className="button w-full">Открыть<ChevronRight /></button>
+                    ? <div className="flex gap-2">
+                        <button className="outline-button flex-1" onClick={() => setDetailId(item.id)}>Подробнее</button>
+                        <button className="button flex-1" onClick={() => onOpen?.(item.id)}>Открыть<ChevronRight /></button>
+                      </div>
                     : <div className="flex gap-2">
                         <button className="outline-button flex-1" onClick={() => setDetailId(item.id)}>Подробнее</button>
                         <button className="button flex-1" onClick={() => { if (item.id) onPurchase(item.id) }}><LockKeyhole />Купить</button>
