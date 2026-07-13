@@ -323,11 +323,13 @@ export function TeacherHub({
     refreshPurchases()
     
     // Poll for live sessions
-    const interval = setInterval(() => {
+    const fetchLive = () => {
       fetch('/api/live').then(r => r.json()).then(data => {
         setLiveSession(data.session)
       }).catch(() => {})
-    }, 3000)
+    }
+    fetchLive()
+    const interval = setInterval(fetchLive, 3000)
     return () => clearInterval(interval)
   }, [])
 
