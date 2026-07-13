@@ -19,6 +19,7 @@ const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then
 import ChatComponent from './ChatComponent'
 import LiveLessonBoard from './LiveLessonBoard'
 import { AvailableStudents, StudentTeacherPanel, OverviewInvitesWidget } from './InviteComponents'
+import { ResizableBoardContainer } from './ResizableBoard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1510,11 +1511,13 @@ function HomeworkPuzzle({ hw, isStudent, onProgress, onUpdate, onDelete, notify 
               </button>
             </div>
           )}
-          <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
-            <ChessBoard game={game} selected={selected} setSelected={canMove ? setSelected : () => {}}
-              dragFrom={dragFrom} setDragFrom={setDragFrom} dragOver={dragOver} setDragOver={setDragOver}
-              flipped={flipped} onMove={applyStudentMove} />
-          </div>
+          <ResizableBoardContainer initialWidth={500} minWidth={280} maxWidth={800}>
+            <div className="aspect-square overflow-hidden rounded-md" style={{ border: `3px solid ${BOARD_DARK}` }}>
+              <ChessBoard game={game} selected={selected} setSelected={canMove ? setSelected : () => {}}
+                dragFrom={dragFrom} setDragFrom={setDragFrom} dragOver={dragOver} setDragOver={setDragOver}
+                flipped={flipped} onMove={applyStudentMove} />
+            </div>
+          </ResizableBoardContainer>
 
           <div className="mt-3 flex items-center gap-2">
             <div className="size-4 rounded-full border-2" style={{ backgroundColor: game.turn() === 'w' ? '#fff' : '#111', borderColor: BOARD_DARK }} />
