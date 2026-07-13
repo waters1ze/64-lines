@@ -26,6 +26,8 @@ model User {
   receivedMessages  Message[]      @relation("ReceivedMessages")
   teacherLiveSessions LiveSession[] @relation("TeacherLiveSessions")
   studentLiveSessions LiveSession[] @relation("StudentLiveSessions")
+  teacherInvites      TeacherStudentInvite[] @relation("TeacherInvites")
+  studentInvites      TeacherStudentInvite[] @relation("StudentInvites")
 }
 
 model Homework {
@@ -127,6 +129,23 @@ model ModuleAccess {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, moduleId])
+}
+
+model TeacherStudentInvite {
+  id        String   @id @default(cuid())
+  teacherId String
+  studentId String
+  // TEACHER_INVITED = учитель пригласил ученика
+  // STUDENT_REQUESTED = ученик попросился к учителю
+  direction String
+  // PENDING, ACCEPTED, REJECTED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  teacher User @relation("TeacherInvites", fields: [teacherId], references: [id], onDelete: Cascade)
+  student User @relation("StudentInvites", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, studentId])
 }
 
 enum Role {

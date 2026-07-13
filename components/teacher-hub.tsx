@@ -18,6 +18,7 @@ const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then
 
 import ChatComponent from './ChatComponent'
 import LiveLessonBoard from './LiveLessonBoard'
+import { AvailableStudents, StudentTeacherPanel } from './InviteComponents'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -247,7 +248,8 @@ export function TeacherHub({
 }) {
   const { data: session } = useSession()
   
-  const isTeacher = initialRole === 'Учитель' || initialRole === 'ADMIN'
+  const isAdmin = initialRole === 'ADMIN'
+  const isTeacher = initialRole === 'Учитель' || isAdmin
   const isGuest = initialRole === 'Гость'
   const isStudent = initialRole === 'Ученик' || isGuest
 
@@ -365,6 +367,18 @@ export function TeacherHub({
     ['live',           'Уроки',              Video],
     ['students',       'Мои ученики',        Users],
     ['homework',       'Домашние задания',   BookOpen],
+    ['openings',       'Мои дебюты',         Library],
+    ['leaderboard',    'Рейтинг',            Trophy],
+    ['users',          'Найти учеников',     Search],
+    ['settings',       'Настройки',          Settings],
+  ] as const
+
+  const adminNav = [
+    ['overview',       'Обзор',              LayoutDashboard],
+    ['chat',           'Сообщения',          MessageSquare],
+    ['live',           'Уроки',              Video],
+    ['students',       'Мои ученики',        Users],
+    ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
@@ -380,6 +394,7 @@ export function TeacherHub({
     ['overview',    'Мой обзор',          LayoutDashboard],
     ['chat',        'Сообщения',          MessageSquare],
     ['live',        'Уроки',              Video],
+    ['findTeacher', 'Найти учителя',     UserPlus],
     ['modules',     'Мои курсы',          BookOpen],
     ['shop',        'Магазин',            Store],
     ['leaderboard', 'Рейтинг',            Trophy],
@@ -397,7 +412,7 @@ export function TeacherHub({
     ['openings',    'Мои дебюты',         Library],
   ] as const
 
-  const nav = isGuest ? guestNavBase : (isStudent ? studentNavBase : teacherNav)
+  const nav = isGuest ? guestNavBase : (isStudent ? studentNavBase : (isAdmin ? adminNav : teacherNav))
 
   const selectedStudent = students.find(s => s.id === selectedStudentId) ?? null
   const selectedHw = homeworks.find(h => h.id === selectedHwId) ?? null
@@ -540,7 +555,7 @@ export function TeacherHub({
             <span className="flex size-8 items-center justify-center rounded-md bg-primary font-mono text-sm text-primary-foreground">64</span>
             <span className="text-left">
               <b className="block text-sm">64 Lines</b>
-              <small className="text-muted-foreground">{isStudent ? 'Кабинет ученика' : 'Кабинет тренера'}</small>
+              <small className="text-muted-foreground">{isAdmin ? 'Администратор' : isStudent ? 'Кабинет ученика' : 'Кабинет тренера'}</small>
             </span>
           </button>
           <button className="icon-button md:hidden" onClick={() => setMobile(false)}><X /></button>
@@ -556,7 +571,7 @@ export function TeacherHub({
         <div className="border-t p-4 flex flex-col gap-2">
           <div>
             <p className="text-sm font-medium">{userName || 'Пользователь'}</p>
-            <p className="text-xs text-muted-foreground">{isStudent ? 'Ученик' : 'Тренер'}</p>
+            <p className="text-xs text-muted-foreground">{isAdmin ? 'Администратор' : isStudent ? 'Ученик' : 'Тренер'}</p>
           </div>
           <button 
             onClick={() => signOut()}
@@ -607,6 +622,7 @@ export function TeacherHub({
               ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} />
               : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
+            {section === 'findTeacher' && isStudent && <StudentTeacherPanel notify={notify} />}
             {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} onAddStudent={addStudent} notify={notify} />}
             {section === 'studentProfile' && selectedStudent && (
               <StudentProfile student={selectedStudent} homeworks={homeworks.filter(h => h.studentId === selectedStudent.id)} onOpenHw={openHwPuzzle} onAddHw={addHomework} onDeleteStudent={deleteStudent} notify={notify} />
@@ -627,7 +643,7 @@ export function TeacherHub({
                 onDelete={!isStudent ? deleteHomework : undefined}
                 notify={notify} />
             )}
-            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={!isStudent} notify={notify} />}
+            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} />}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
             {section === 'live' && (
@@ -680,18 +696,19 @@ export function TeacherHub({
               )
             )}
             {section === 'modules'     && (
-              isTeacher
+              isAdmin
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
                 : <MyLibrary modules={modules} purchases={purchases} courses={courses} onOpen={openCourseViewer} />
             )}
             {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} onOpenCourse={openCourseViewer} onOpenModule={() => notify('Открытие модуля (в разработке)')} />}
             {section === 'leaderboard' && <Leaderboard />}
-            {section === 'users'       && isTeacher && <UsersManager notify={notify} />}
+            {section === 'users'       && isAdmin && <UsersManager notify={notify} />}
+            {section === 'users'       && isTeacher && !isAdmin && <AvailableStudents notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
-            {section === 'sales'       && !isStudent && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
+            {section === 'sales'       && isAdmin && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
             {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
-              <OpeningCourses courses={courses} isTeacher={!isStudent} purchasedIds={purchasedIds}
+              <OpeningCourses courses={courses} isTeacher={isAdmin} purchasedIds={purchasedIds}
                 onPurchase={purchaseCourse} onOpen={openCourseViewer}
                 onAdd={async c => {
                   try {

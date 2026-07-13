@@ -18,6 +18,7 @@ export default async function Page() {
     isGuest = false
   }
 
+  let dbUserRole = 'STUDENT'
   let userRating = 1200
   let userName = 'Гость'
   if (session?.user?.email) {
@@ -25,6 +26,7 @@ export default async function Page() {
     if (dbUser) {
       userRating = dbUser.rating
       userName = dbUser.name || session.user.name || 'Гость'
+      dbUserRole = dbUser.role
       
       // Override session role with database role to prevent stale JWT session issues
       isTeacher = dbUser.role === 'TEACHER' || dbUser.role === 'ADMIN'
@@ -87,7 +89,11 @@ export default async function Page() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Загрузка...</div>}>
       <TeacherHub 
-        initialRole={isTeacher ? 'Учитель' : (isStudent ? 'Ученик' : 'Гость')} 
+        initialRole={
+          dbUserRole === 'ADMIN' ? 'ADMIN' :
+          isTeacher ? 'Учитель' : 
+          isStudent ? 'Ученик' : 'Гость'
+        }
         userName={userName} 
         userRating={userRating}
         initialStudents={students}

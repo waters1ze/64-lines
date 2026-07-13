@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   const role = (session?.user as any)?.role
-  if (role !== 'TEACHER' && role !== 'ADMIN') {
+  if (role !== 'ADMIN') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

@@ -4,7 +4,10 @@ import { db } from '@/lib/db'
 export async function GET() {
   try {
     const top = await db.user.findMany({
-      where: { role: 'STUDENT' },
+      where: { 
+        role: 'STUDENT',
+        homeworks: { some: { solved: true } }
+      },
       select: {
         id: true,
         name: true,

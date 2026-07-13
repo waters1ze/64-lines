@@ -10,7 +10,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
     const user = await db.user.findUnique({ where: { email: session.user.email } })
-    if (user?.role !== 'TEACHER' && user?.role !== 'ADMIN') {
+    if (user?.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
@@ -42,7 +42,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
     const user = await db.user.findUnique({ where: { email: session.user.email } })
-    if (user?.role !== 'TEACHER' && user?.role !== 'ADMIN') {
+    if (user?.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 })
     }
 

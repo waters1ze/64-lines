@@ -8,8 +8,8 @@ export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
-    const user = await db.user.findUnique({ where: { email: session.user.email } })
-    if (!user || (user.role !== 'TEACHER' && user.role !== 'ADMIN')) {
+    const caller = await db.user.findUnique({ where: { email: session.user.email } })
+    if (!caller || caller.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
@@ -21,6 +21,7 @@ export async function GET() {
         role: true,
         rating: true,
         emailVerified: true,
+        teacherId: true,
       },
       orderBy: { role: 'asc' }
     })
@@ -38,7 +39,7 @@ export async function PUT(req: Request) {
     if (!session?.user?.email) return new NextResponse('Unauthorized', { status: 401 })
 
     const caller = await db.user.findUnique({ where: { email: session.user.email } })
-    if (!caller || (caller.role !== 'TEACHER' && caller.role !== 'ADMIN')) {
+    if (!caller || caller.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
@@ -46,8 +47,6 @@ export async function PUT(req: Request) {
     if (!userId || !role || !['ADMIN', 'TEACHER', 'STUDENT'].includes(role)) {
       return new NextResponse('Bad Request', { status: 400 })
     }
-
-    // Разрешаем менять роль самому себе (например, для тестов)
 
     const updated = await db.user.update({
       where: { id: userId },
