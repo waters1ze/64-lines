@@ -324,9 +324,9 @@ export function TeacherHub({
     
     // Poll for live sessions
     const fetchLive = () => {
-      fetch(`/api/live?t=${Date.now()}`).then(r => r.json()).then(data => {
+      fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(data => {
         setLiveSession(data.session)
-      }).catch(() => {})
+      }).catch((e) => console.error('fetchLive error:', e))
     }
     fetchLive()
     const interval = setInterval(fetchLive, 3000)
@@ -608,6 +608,16 @@ export function TeacherHub({
           </div>
           <button className="icon-button" onClick={() => notify('Новых уведомлений нет')}><Bell /></button>
         </header>
+
+        {liveSession && section !== 'live' && (
+          <div className="bg-red-500 text-white p-4 m-4 rounded-xl flex items-center justify-between shadow-xl animate-pulse cursor-pointer" onClick={() => go('live')}>
+            <div className="flex items-center gap-3 font-bold text-lg">
+              <Video className="size-6" />
+              ВХОДЯЩИЙ ЗВОНОК ОТ ПРЕПОДАВАТЕЛЯ! НАЖМИТЕ ЧТОБЫ ОТВЕТИТЬ!
+            </div>
+            <button className="bg-white text-red-600 px-6 py-2 rounded-lg font-bold">ОТВЕТИТЬ</button>
+          </div>
+        )}
 
         {liveSession && section !== 'live' && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">

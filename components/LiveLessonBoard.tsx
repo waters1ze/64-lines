@@ -210,7 +210,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, user
   useEffect(() => {
     let interval = setInterval(async () => {
       try {
-        const res = await fetch('/api/live')
+        const res = await fetch('/api/live?t=' + Date.now(), { cache: 'no-store' })
         if (res.ok) {
           const { session } = await res.json()
           if (!session || session.status === 'ENDED' || session.id !== sessionId) {
