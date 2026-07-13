@@ -20,14 +20,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    // Delete all homeworks associated with the student to avoid foreign key constraints
-    await db.homework.deleteMany({
-      where: { studentId: studentId }
+    // Detach the student from the teacher
+    await db.user.update({
+      where: { id: studentId },
+      data: { teacherId: null }
     })
 
-    // Delete the student account entirely
-    await db.user.delete({
-      where: { id: studentId }
+    // Also remove any existing invites between this teacher and student so they can invite again later if needed
+    await db.teacherStudentInvite.deleteMany({
+      where: {
+        teacherId: user.id,
+        studentId: studentId
+      }
     })
 
     return new NextResponse('OK', { status: 200 })
