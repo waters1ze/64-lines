@@ -324,10 +324,18 @@ export function TeacherHub({
     refreshPurchases()
     
     const fetchLive = () => {
-      fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(data => {
+      fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store', credentials: 'include' }).then(async r => {
+        if (!r.ok) {
+          const text = await r.text().catch(()=>'')
+          setToast(`Error: ${r.status} ${text}`)
+        }
+        return r.json()
+      }).then(data => {
         setLiveSession(data.session)
         setPollCount(c => c + 1)
-      }).catch((e) => console.error('fetchLive error:', e))
+        if (data.error) setToast(`API Error: ${data.error}`)
+        if (data.debug) setToast(`Debug: ${data.debug.userId} / ${data.debug.role}`)
+      }).catch((e) => setToast('fetchLive catch error: ' + e.message))
     }
     fetchLive()
     const interval = setInterval(fetchLive, 3000)

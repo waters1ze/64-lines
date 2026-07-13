@@ -37,7 +37,10 @@ export async function GET(req: Request) {
   }).catch(() => {})
 
   return NextResponse.json(
-    { session: activeSession },
+    { 
+      session: activeSession,
+      debug: { userId, role: session?.user?.role }
+    },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } }
   )
 }
