@@ -64,6 +64,31 @@ export async function GET(req: Request) {
     }
   })
 
+  const currentUser = await db.user.findUnique({
+    where: { id: userId },
+    include: { teacher: true, students: true }
+  })
+
+  if (currentUser?.teacher && !contactsMap.has(currentUser.teacher.id)) {
+    contactsMap.set(currentUser.teacher.id, {
+      id: currentUser.teacher.id,
+      name: currentUser.teacher.name,
+      role: currentUser.teacher.role,
+    })
+  }
+
+  if (currentUser?.students) {
+    currentUser.students.forEach((s: any) => {
+      if (!contactsMap.has(s.id)) {
+        contactsMap.set(s.id, {
+          id: s.id,
+          name: s.name,
+          role: s.role,
+        })
+      }
+    })
+  }
+
   return NextResponse.json({
     messages,
     contacts: Array.from(contactsMap.values())

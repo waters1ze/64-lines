@@ -11,7 +11,6 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
-  const [availableTeachers, setAvailableTeachers] = useState<any[]>([])
   
   const endOfMessagesRef = useRef<HTMLDivElement>(null)
 
@@ -30,11 +29,6 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
         if (activeContactId) {
           setMessages(data.messages)
         }
-      }
-      
-      if (!isTeacher && availableTeachers.length === 0) {
-        const tRes = await fetch('/api/users/teachers')
-        if (tRes.ok) setAvailableTeachers(await tRes.json())
       }
     } catch {} finally {
       setLoading(false)
@@ -62,17 +56,10 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
     } catch {}
   }
 
-  // Combine active contacts and available teachers for students
-  const displayContacts = [...contacts]
-  if (!isTeacher) {
-    availableTeachers.forEach(t => {
-      if (!displayContacts.some(c => c.id === t.id)) displayContacts.push(t)
-    })
-  }
-
+  const displayContacts = contacts
   const activeContact = displayContacts.find(c => c.id === activeContactId)
 
-  if (loading && contacts.length === 0 && availableTeachers.length === 0) {
+  if (loading && contacts.length === 0) {
     return <div className="p-8 text-center"><Loader2 className="size-6 animate-spin mx-auto text-muted-foreground" /></div>
   }
 
@@ -97,7 +84,7 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
               <div className="flex-1 overflow-hidden">
                 <p className="font-semibold truncate">{c.name}</p>
                 {c.lastMessage && <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastMessage}</p>}
-                {!c.lastMessage && c.role === 'TEACHER' && <p className="text-xs text-blue-500 font-medium mt-0.5">Преподаватель</p>}
+                {!c.lastMessage && (c.role === 'TEACHER' || c.role === 'ADMIN') && <p className="text-xs text-blue-500 font-medium mt-0.5">Преподаватель</p>}
               </div>
             </button>
           ))}
