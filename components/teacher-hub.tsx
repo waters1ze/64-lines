@@ -324,7 +324,7 @@ export function TeacherHub({
     
     // Poll for live sessions
     const fetchLive = () => {
-      fetch('/api/live').then(r => r.json()).then(data => {
+      fetch(`/api/live?t=${Date.now()}`).then(r => r.json()).then(data => {
         setLiveSession(data.session)
       }).catch(() => {})
     }
