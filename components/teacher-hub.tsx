@@ -6,7 +6,7 @@ import {
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
-  CheckCircle2, Unlock, Search
+  CheckCircle2, Unlock, Search, Phone
 } from 'lucide-react'
 import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
@@ -610,17 +610,25 @@ export function TeacherHub({
         </header>
 
         {liveSession && section !== 'live' && (
-          <div className="bg-primary px-4 py-3 text-primary-foreground flex items-center justify-between shadow-md z-10">
-            <div className="flex items-center gap-3">
-              <Video className="size-5 animate-pulse" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="bg-card text-card-foreground border shadow-2xl rounded-2xl p-8 max-w-sm w-full text-center flex flex-col items-center gap-6 animate-in zoom-in-95 fade-in duration-200">
+              <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center relative">
+                <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
+                <Video className="size-10 text-primary animate-pulse" />
+              </div>
+              
               <div>
-                <p className="font-semibold text-sm">Идет интерактивный урок!</p>
-                <p className="text-xs opacity-90">Учитель ожидает вас на доске.</p>
+                <h2 className="text-2xl font-bold tracking-tight mb-2">Входящий звонок!</h2>
+                <p className="text-muted-foreground">Учитель приглашает вас на интерактивный урок.</p>
+              </div>
+
+              <div className="flex gap-4 w-full mt-2">
+                <button onClick={() => go('live')} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+                  <Phone className="size-5" />
+                  Ответить
+                </button>
               </div>
             </div>
-            <button onClick={() => go('live')} className="bg-background text-foreground hover:bg-muted text-sm px-4 py-1.5 rounded-md font-medium transition-colors">
-              Присоединиться
-            </button>
           </div>
         )}
 

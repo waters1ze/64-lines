@@ -166,10 +166,11 @@ function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], active
   )
 }
 
-export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTeacher, onClose }: {
+export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, userName, isTeacher, onClose }: {
   sessionId: string
   jitsiRoomName: string
   userId: string
+  userName: string
   isTeacher: boolean
   onClose: () => void
 }) {
@@ -183,17 +184,18 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, isTe
 
   const jitsiContainerRef = useRef<HTMLDivElement>(null)
   const jitsiApiRef = useRef<any>(null)
-  const scriptStatus = useScript('https://meet.jit.si/external_api.js')
+  const scriptStatus = useScript('https://meet.ffmuc.net/external_api.js')
 
   // Init Jitsi
   useEffect(() => {
     if (scriptStatus === 'ready' && !jitsiApiRef.current && jitsiContainerRef.current) {
-      const domain = 'meet.jit.si'
+      const domain = 'meet.ffmuc.net'
       const options = {
         roomName: jitsiRoomName,
         width: '100%',
         height: '100%',
         parentNode: jitsiContainerRef.current,
+        userInfo: { displayName: userName },
         configOverwrite: { startWithAudioMuted: false, startWithVideoMuted: false },
         interfaceConfigOverwrite: { filmStripOnly: false },
       }
