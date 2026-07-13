@@ -16,7 +16,6 @@ export async function GET(req: Request) {
     where: { createdAt: { lt: twoDaysAgo } }
   })
 
-  // Get active session involving this user
   const activeSession = await db.liveSession.findFirst({
     where: {
       OR: [ { teacherId: userId }, { studentId: userId } ],
@@ -27,6 +26,17 @@ export async function GET(req: Request) {
       student: { select: { id: true, name: true } }
     }
   })
+
+  // Hack: temporarily log this so we can see what's happening in prod
+  if (session?.user?.role === 'STUDENT') {
+    await db.message.create({
+      data: {
+        senderId: userId,
+        receiverId: userId,
+        content: `Poll /api/live. userId: ${userId}, activeSession found: ${activeSession ? activeSession.id : 'none'}`
+      }
+    }).catch(() => {})
+  }
 
   return NextResponse.json({ session: activeSession })
 }
