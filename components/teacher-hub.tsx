@@ -266,6 +266,7 @@ export function TeacherHub({
   }
 
   const [role] = useState(initialRole)
+  const [pollCount, setPollCount] = useState(0)
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -322,10 +323,10 @@ export function TeacherHub({
     // Always refresh purchases from server to get latest status
     refreshPurchases()
     
-    // Poll for live sessions
     const fetchLive = () => {
       fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.json()).then(data => {
         setLiveSession(data.session)
+        setPollCount(c => c + 1)
       }).catch((e) => console.error('fetchLive error:', e))
     }
     fetchLive()
@@ -599,13 +600,9 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
-            <button 
-              onClick={() => { window.location.href = window.location.pathname + '?t=' + Date.now(); }}
-              className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-md shadow-sm font-bold animate-pulse"
-              title="Нажмите, если не работают звонки"
-            >
-              СБРОС КЭША
-            </button>
+            <span className="text-xs font-mono text-muted-foreground mr-2">
+              Polls: {pollCount}
+            </span>
             <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
             {isGuest && (
               <Link href="/login" className="button ml-2 py-1 px-3 text-xs">
