@@ -368,9 +368,8 @@ export function TeacherHub({
     ['students',       'Мои ученики',        Users],
     ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
-    ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
-    ['modules',        'Учебные модули',     BookOpen],
+    ['modules',        'Мои курсы',          BookOpen],
     ['shop',           'Магазин модулей',    Store],
     ['store',          'Витрина дебютов',    Store],
     ['leaderboard',    'Рейтинг',            Trophy],
@@ -403,7 +402,6 @@ export function TeacherHub({
     ['modules',     'Мои курсы',          BookOpen],
     ['shop',        'Магазин модулей',    Store],
     ['store',       'Витрина дебютов',    Store],
-    ['courses',     'Дебютные курсы',     GraduationCap],
     ['leaderboard', 'Рейтинг',            Trophy],
     ['videos',      'Видео с YouTube',    Video],
     ['openings',    'Мои дебюты',         Library],
@@ -414,7 +412,6 @@ export function TeacherHub({
     ['modules',     'Модули',             BookOpen],
     ['leaderboard', 'Рейтинг',            Trophy],
     ['videos',      'Видео с YouTube',    Video],
-    ['courses',     'Дебютные курсы',     GraduationCap],
     ['shop',        'Магазин модулей',    Store],
     ['store',       'Витрина дебютов',    Store],
     ['openings',    'Мои дебюты',         Library],
@@ -706,7 +703,7 @@ export function TeacherHub({
             {section === 'modules'     && (
               isAdmin
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
-                : <MyLibrary modules={modules} purchases={purchases} courses={courses} onOpen={openCourseViewer} />
+                : <ModulesView modules={modules} setModules={setModules} onPurchase={purchaseCourse} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} onOpenCourse={openCourseViewer} />
             )}
             {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} onOpenCourse={openCourseViewer} onOpenModule={() => notify('Открытие модуля (в разработке)')} />}
             {section === 'leaderboard' && <Leaderboard />}
@@ -2404,42 +2401,6 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
     <>
       <Head over="Магазин" title="Купить курсы и модули" text="Приобретайте дебютные курсы и учебные модули." />
 
-      {/* Debut courses */}
-      {courses.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><GraduationCap className="size-5" /> Дебютные курсы</h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {courses.map(c => {
-              const owned = purchasedIds.includes(c.id as any)
-              return (
-                <article key={c.id} className="flex flex-col overflow-hidden rounded-lg border">
-                  <div className="flex aspect-video items-center justify-center border-b bg-muted/30">
-                    {c.imageUrl ? <img src={c.imageUrl} alt={c.name} className="size-full object-cover" /> : <Library className="size-10 text-muted-foreground" />}
-                  </div>
-                  <div className="flex flex-1 flex-col p-5">
-                    <span className="badge bg-blue-50 text-blue-600 w-fit text-xs">Дебют</span>
-                    <h3 className="mt-3 font-semibold">{c.name}</h3>
-                    <p className="mt-1 flex-1 text-sm text-muted-foreground line-clamp-2">{c.description}</p>
-                    <div className="mt-4">
-                      {c.price > 0 && !owned && <b className="block mb-2">{c.price.toLocaleString('ru-RU')} ₽</b>}
-                      {owned
-                        ? <div className="flex gap-2">
-                            <button className="outline-button flex-1" onClick={() => setDetailId(c.id)}>Подробнее</button>
-                            <button className="button flex-1" onClick={() => onOpenCourse(c.id)}>Открыть<ChevronRight className="size-4 ml-1" /></button>
-                          </div>
-                        : <div className="flex gap-2">
-                            <button className="outline-button flex-1" onClick={() => setDetailId(c.id)}>Подробнее</button>
-                            <button className="button flex-1" onClick={() => { if (isGuest) { notify('Зарегистрируйтесь для покупки.'); return }; onPurchaseCourse(c.id) }}><LockKeyhole className="size-4 mr-1" />Купить</button>
-                          </div>}
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Paid modules */}
       {paidModules.length > 0 && (
         <div>
@@ -2471,27 +2432,8 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
         </div>
       )}
 
-      {courses.length === 0 && paidModules.length === 0 && (
+      {paidModules.length === 0 && (
         <p className="text-muted-foreground">В магазине пока нет товаров.</p>
-      )}
-
-      {detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4" onMouseDown={() => setDetailId(null)}>
-          <div className="flex max-h-[90vh] w-full max-w-xl flex-col gap-5 overflow-y-auto rounded-xl border bg-background p-6" onMouseDown={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{detail.name}</h2>
-              <button className="icon-button" onClick={() => setDetailId(null)}><X /></button>
-            </div>
-            {detail.imageUrl && <img src={detail.imageUrl} alt={detail.name} className="max-h-48 w-full rounded-lg object-cover" />}
-            <p className="text-sm text-muted-foreground">{detail.description}</p>
-            <div className="flex items-center justify-between border-t pt-4">
-              <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
-              {purchasedIds.includes(detail.id as any)
-                ? <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-4 mr-1" />Куплен</span>
-                : <button className="button" onClick={() => { onPurchaseCourse(detail.id); setDetailId(null) }}><LockKeyhole className="size-4 mr-1" />Оплатить</button>}
-            </div>
-          </div>
-        </div>
       )}
     </>
   )
