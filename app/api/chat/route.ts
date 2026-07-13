@@ -69,12 +69,18 @@ export async function GET(req: Request) {
     include: { teacher: true, students: true }
   })
 
-  if (currentUser?.teacher && !contactsMap.has(currentUser.teacher.id)) {
-    contactsMap.set(currentUser.teacher.id, {
-      id: currentUser.teacher.id,
-      name: currentUser.teacher.name,
-      role: currentUser.teacher.role,
-    })
+  // Mark the assigned teacher with a special flag
+  if (currentUser?.teacher) {
+    if (contactsMap.has(currentUser.teacher.id)) {
+      contactsMap.get(currentUser.teacher.id).isMyTeacher = true
+    } else {
+      contactsMap.set(currentUser.teacher.id, {
+        id: currentUser.teacher.id,
+        name: currentUser.teacher.name,
+        role: currentUser.teacher.role,
+        isMyTeacher: true
+      })
+    }
   }
 
   if (currentUser?.students) {
