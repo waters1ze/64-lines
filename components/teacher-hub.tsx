@@ -599,6 +599,13 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
+            <button 
+              onClick={() => { window.location.href = window.location.pathname + '?t=' + Date.now(); }}
+              className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-md shadow-sm font-bold animate-pulse"
+              title="Нажмите, если не работают звонки"
+            >
+              СБРОС КЭША
+            </button>
             <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
             {isGuest && (
               <Link href="/login" className="button ml-2 py-1 px-3 text-xs">
