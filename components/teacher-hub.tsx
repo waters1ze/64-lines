@@ -2462,18 +2462,23 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
     .map(p => p.courseId)
     .filter(Boolean)
 
+  const ownedCourses = (courses || []).filter(c => purchasedCourseIds.includes(c.id))
+  const accessibleModules = modules.filter(m => m.hasAccess || m.visibility === 'ALL')
+
   const allTags = Array.from(new Set([
-    ...modules.flatMap(m => m.tags),
-    ...(courses.length > 0 ? ['Дебют'] : [])
+    ...accessibleModules.flatMap(m => m.tags),
+    ...(ownedCourses.length > 0 ? ['Дебют'] : [])
   ]))
+
   const filtered = activeTag
     ? activeTag === 'Дебют'
       ? []
-      : modules.filter(m => m.tags.includes(activeTag))
-    : modules
-  const filteredCourses = activeTag === 'Дебют' || !activeTag ? courses : []
+      : accessibleModules.filter(m => m.tags.includes(activeTag))
+    : accessibleModules
 
-  const hasAnyContent = modules.length > 0 || courses.length > 0
+  const filteredCourses = activeTag === 'Дебют' || !activeTag ? ownedCourses : []
+
+  const hasAnyContent = accessibleModules.length > 0 || ownedCourses.length > 0
 
   return (
     <>
