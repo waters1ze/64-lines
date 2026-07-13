@@ -321,3 +321,68 @@ export function StudentTeacherPanel({ teacherId, notify }: { teacherId?: string 
     </div>
   )
 }
+
+export function OverviewInvitesWidget({ role, notify, onUpdate }: { role: string; notify: (s: string) => void; onUpdate?: () => void }) {
+  const [invites, setInvites] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = () => {
+    fetch('/api/invites').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setInvites(data)
+    }).finally(() => setLoading(false))
+  }
+  
+  useEffect(() => { load() }, [])
+
+  const incoming = invites.filter(i => i.status === 'PENDING' && (
+    (role === 'TEACHER' || role === 'ADMIN') ? i.direction === 'STUDENT_REQUESTED' : i.direction === 'TEACHER_INVITED'
+  ))
+
+  const handleAction = async (id: string, action: 'accept' | 'reject') => {
+    try {
+      const res = await fetch(`/api/invites?id=${id}&action=${action}`, { method: 'PUT' })
+      if (res.ok) {
+        notify(action === 'accept' ? 'РџСЂРёРіР»Р°С€РµРЅРёРµ РїСЂРёРЅСЏС‚Рѕ' : 'РџСЂРёРіР»Р°С€РµРЅРёРµ РѕС‚РєР»РѕРЅРµРЅРѕ')
+        load()
+        if (onUpdate) onUpdate()
+      } else notify('РћС€РёР±РєР°')
+    } catch { notify('РћС€РёР±РєР° СЃРµС‚Рё') }
+  }
+
+  if (loading || incoming.length === 0) return null
+
+  return (
+    <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900 rounded-2xl p-4 mb-6 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Bell className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <h3 className="font-medium text-blue-900 dark:text-blue-100">
+          РЈ РІР°СЃ РµСЃС‚СЊ РЅРѕРІС‹Рµ Р·Р°РїСЂРѕСЃС‹!
+        </h3>
+      </div>
+      <div className="space-y-2">
+        {incoming.map(inv => (
+          <div key={inv.id} className="bg-white dark:bg-zinc-900 p-3 rounded-xl border shadow-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src={((role === 'TEACHER' || role === 'ADMIN') ? inv.student.avatar : inv.teacher.avatar) || "https://api.dicebear.com/7.x/avataaars/svg?seed=fallback"} className="w-10 h-10 rounded-full bg-zinc-100" />
+              <div>
+                <p className="font-medium text-sm">{((role === 'TEACHER' || role === 'ADMIN') ? inv.student.name : inv.teacher.name) || 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {((role === 'TEACHER' || role === 'ADMIN') ? 'РїСЂРѕСЃРёС‚СЃСЏ Рє РІР°Рј РІ СѓС‡РµРЅРёРєРё' : 'РїСЂРёРіР»Р°С€Р°РµС‚ РІР°СЃ СЃС‚Р°С‚СЊ СѓС‡РµРЅРёРєРѕРј')}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => handleAction(inv.id, 'accept')} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <Check className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleAction(inv.id, 'reject')} className="p-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+

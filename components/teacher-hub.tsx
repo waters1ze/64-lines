@@ -18,7 +18,7 @@ const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then
 
 import ChatComponent from './ChatComponent'
 import LiveLessonBoard from './LiveLessonBoard'
-import { AvailableStudents, StudentTeacherPanel } from './InviteComponents'
+import { AvailableStudents, StudentTeacherPanel, OverviewInvitesWidget } from './InviteComponents'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -627,7 +627,7 @@ export function TeacherHub({
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
-              ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} />
+              ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} notify={notify} />
               : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
             {section === 'findTeacher' && isStudent && <StudentTeacherPanel notify={notify} />}
@@ -1024,7 +1024,7 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
   )
 }
 
-function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: string | number) => void }) {
+function StudentOverview({ userName, userRating, homeworks, onOpenHw, notify }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: string | number) => void; notify: (s: string) => void }) {
   const solved = homeworks.filter(h => h.solved).length
   const totalAttempts = homeworks.filter(h => h.solved).reduce((a, h) => a + h.attempts, 0)
   
@@ -1046,6 +1046,7 @@ function StudentOverview({ userName, userRating, homeworks, onOpenHw }: { userNa
   return (
     <>
       <Head over="Личный кабинет" title={`${userName}, продолжим тренировку`} text="Статистика и задания тренера." />
+      <OverviewInvitesWidget role="STUDENT" notify={notify} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Рейтинг"       value={String(userRating)} note="Текущий Эло" />
         <Metric label="Выполнено"     value={`${solved}/${homeworks.length}`} note="заданий" />
