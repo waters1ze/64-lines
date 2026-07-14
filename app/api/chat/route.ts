@@ -11,19 +11,28 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const withUserId = url.searchParams.get('with')
 
-  // Auto cleanup messages older than 48 hours
-  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000)
-  await db.message.deleteMany({
-    where: { createdAt: { lt: twoDaysAgo } }
+  const currentUser = await db.user.findUnique({
+    where: { id: userId },
+    select: { isPremium: true }
   })
+  
+  const isPremium = currentUser?.isPremium ?? false
+  
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
   let messages: any[] = []
   if (withUserId) {
     messages = await db.message.findMany({
       where: {
-        OR: [
-          { senderId: userId, receiverId: withUserId },
-          { senderId: withUserId, receiverId: userId }
+        AND: [
+          {
+            OR: [
+              { senderId: userId, receiverId: withUserId },
+              { senderId: withUserId, receiverId: userId }
+            ]
+          },
+          ...(isPremium ? [] : [{ createdAt: { gte: thirtyDaysAgo } }])
         ]
       },
       orderBy: { createdAt: 'asc' },
@@ -37,9 +46,14 @@ export async function GET(req: Request) {
   // Also get the latest message for each conversation for the contacts list
   const allUserMessages = await db.message.findMany({
     where: {
-      OR: [
-        { senderId: userId },
-        { receiverId: userId }
+      AND: [
+        {
+          OR: [
+            { senderId: userId },
+            { receiverId: userId }
+          ]
+        },
+        ...(isPremium ? [] : [{ createdAt: { gte: thirtyDaysAgo } }])
       ]
     },
     orderBy: { createdAt: 'desc' },
@@ -64,27 +78,27 @@ export async function GET(req: Request) {
     }
   })
 
-  const currentUser = await db.user.findUnique({
+  const fullCurrentUser = await db.user.findUnique({
     where: { id: userId },
     include: { teacher: true, students: true }
   })
 
   // Mark the assigned teacher with a special flag
-  if (currentUser?.teacher) {
-    if (contactsMap.has(currentUser.teacher.id)) {
-      contactsMap.get(currentUser.teacher.id).isMyTeacher = true
+  if (fullCurrentUser?.teacher) {
+    if (contactsMap.has(fullCurrentUser.teacher.id)) {
+      contactsMap.get(fullCurrentUser.teacher.id).isMyTeacher = true
     } else {
-      contactsMap.set(currentUser.teacher.id, {
-        id: currentUser.teacher.id,
-        name: currentUser.teacher.name,
-        role: currentUser.teacher.role,
+      contactsMap.set(fullCurrentUser.teacher.id, {
+        id: fullCurrentUser.teacher.id,
+        name: fullCurrentUser.teacher.name,
+        role: fullCurrentUser.teacher.role,
         isMyTeacher: true
       })
     }
   }
 
-  if (currentUser?.students) {
-    currentUser.students.forEach((s: any) => {
+  if (fullCurrentUser?.students) {
+    fullCurrentUser.students.forEach((s: any) => {
       if (!contactsMap.has(s.id)) {
         contactsMap.set(s.id, {
           id: s.id,

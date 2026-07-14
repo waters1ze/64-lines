@@ -62,6 +62,21 @@ export async function POST(req: Request) {
       data: { status: 'APPROVED', comment: null }
     })
 
+    // Grant premium if it's a subscription
+    if (purchase.type === 'PREMIUM' || purchase.type === 'SUBSCRIPTION') {
+      const now = new Date()
+      const until = new Date(now)
+      until.setDate(until.getDate() + 30) // 30 days subscription
+      
+      await db.user.update({
+        where: { id: purchase.userId },
+        data: {
+          isPremium: true,
+          premiumUntil: until
+        }
+      })
+    }
+
     // Grant module access if it's a module
     if (purchase.moduleId) {
       await db.moduleAccess.upsert({

@@ -53,7 +53,7 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
       try {
         await fetch(`/api/chat?with=${activeContactId}`, { method: 'DELETE' })
         setMessages([])
-        fetchData()
+        fetchChatData()
       } catch (e) {
         console.error('Failed to delete chat:', e)
       }
@@ -144,7 +144,7 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
               {messages.length === 0 && (
                 <div className="m-auto text-center text-muted-foreground">
                   <p>Сообщений пока нет.</p>
-                  <p className="text-sm">Они будут автоматически удалены через 48 часов.</p>
+                  <p className="text-sm">История за 30+ дней доступна только с Premium.</p>
                 </div>
               )}
               {messages.map(m => {

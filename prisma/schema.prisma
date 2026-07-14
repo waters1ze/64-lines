@@ -31,6 +31,8 @@ model User {
   studentLiveSessions LiveSession[] @relation("StudentLiveSessions")
   teacherInvites      TeacherStudentInvite[] @relation("TeacherInvites")
   studentInvites      TeacherStudentInvite[] @relation("StudentInvites")
+  puzzlesSolvedToday  Int            @default(0)
+  lastPuzzleDate      DateTime?
 }
 
 model Homework {
@@ -81,6 +83,7 @@ model Video {
   title     String
   meta      String
   url       String
+  isPremium Boolean @default(false)
   createdAt DateTime @default(now())
 }
 
@@ -204,4 +207,14 @@ model GameAnalysisRequest {
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Puzzle {
+  id         String   @id
+  fen        String
+  moves      String
+  rating     Int
+  ratingDeviation Int @default(0)
+  themes     String
+  openingTags String?
 }

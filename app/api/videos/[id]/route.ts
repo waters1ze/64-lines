@@ -14,7 +14,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { title, meta, url } = await req.json()
+    const { title, meta, url, isPremium } = await req.json()
 
     const video = await db.video.update({
       where: { id },
@@ -22,6 +22,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(title && { title }),
         ...(meta !== undefined && { meta }),
         ...(url && { url }),
+        ...(isPremium !== undefined && { isPremium: !!isPremium }),
       }
     })
 

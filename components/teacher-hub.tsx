@@ -20,6 +20,7 @@ import ChatComponent from './ChatComponent'
 import LiveLessonBoard from './LiveLessonBoard'
 import { AvailableStudents, StudentTeacherPanel, OverviewInvitesWidget } from './InviteComponents'
 import { ResizableBoardContainer } from './ResizableBoard'
+import { Puzzles } from './Puzzles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -55,6 +56,7 @@ type Video = {
   title: string;
   meta: string;
   url: string;
+  isPremium?: boolean;
 }
 
 type Opening = {
@@ -465,6 +467,7 @@ export function TeacherHub({
     ['students',       'Мои ученики',        Users],
     ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
+    ['puzzles',        'Задачи',             Trophy],
     ['openings',       'Мои дебюты',         Library],
     ['modules',        'Мои курсы',          BookOpen],
     ['shop',           'Магазин модулей',    Store],
@@ -482,6 +485,7 @@ export function TeacherHub({
     ['students',       'Мои ученики',        Users],
     ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
+    ['puzzles',        'Задачи',             Trophy],
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
     ['modules',        'Учебные модули',     BookOpen],
@@ -791,7 +795,15 @@ export function TeacherHub({
                 onDelete={!isStudent ? deleteHomework : undefined}
                 notify={notify} />
             )}
-            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} />}
+            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} isUserPremium={isPremium} onPremiumClick={purchaseSubscription} />}
+            {section === 'puzzles'     && (
+              <>
+                <Head over="Тренировка" title="Тактические задачи" text="Решайте шахматные задачи для повышения своего рейтинга" />
+                <div className="mt-8">
+                  <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} />
+                </div>
+              </>
+            )}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
             {section === 'live' && (
@@ -1779,23 +1791,27 @@ function VideosSection({
   videos, 
   setVideos, 
   teacher, 
-  notify 
+  notify,
+  isUserPremium,
+  onPremiumClick
 }: { 
   videos: Video[]; 
   setVideos: React.Dispatch<React.SetStateAction<Video[]>>; 
   teacher: boolean; 
-  notify: (s: string) => void 
+  notify: (s: string) => void;
+  isUserPremium?: boolean;
+  onPremiumClick?: () => void;
 }) {
   const [modal, setModal] = useState<null | 'add' | string | number>(null)
-  const [form, setForm] = useState({ title: '', meta: '', url: '' })
+  const [form, setForm] = useState({ title: '', meta: '', url: '', isPremium: false })
 
   function openAdd() {
-    setForm({ title: '', meta: '', url: '' })
+    setForm({ title: '', meta: '', url: '', isPremium: false })
     setModal('add')
   }
 
   function openEdit(v: Video) {
-    setForm({ title: v.title, meta: v.meta, url: v.url })
+    setForm({ title: v.title, meta: v.meta, url: v.url, isPremium: !!v.isPremium })
     setModal(v.id)
   }
 
@@ -1875,11 +1891,20 @@ function VideosSection({
                 )}
               </div>
               <div className="p-5 flex flex-col flex-1">
-                <h3 className="font-semibold">{v.title}</h3>
+                <h3 className="font-semibold flex items-center gap-2">
+                  {v.title}
+                  {v.isPremium && <Crown className="w-4 h-4 text-yellow-500" />}
+                </h3>
                 <p className="mt-1 text-sm text-muted-foreground flex-1">{v.meta}</p>
-                <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
-                  Смотреть на YouTube<ExternalLink />
-                </a>
+                {(!v.isPremium || isUserPremium || teacher) ? (
+                  <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
+                    Смотреть на YouTube<ExternalLink />
+                  </a>
+                ) : (
+                  <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition-all mt-5 w-full flex justify-center items-center gap-2" onClick={onPremiumClick}>
+                    <LockKeyhole className="w-4 h-4" /> Купить Premium
+                  </button>
+                )}
                 {teacher && (
                   <div className="flex items-center gap-2 mt-2 shrink-0">
                     <button className="outline-button flex-1 py-1 text-xs h-auto" onClick={() => openEdit(v)}><Pencil className="size-3" /> Изменить</button>
@@ -1896,7 +1921,11 @@ function VideosSection({
           <label className="field">Название<input className="input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></label>
           <label className="field">Длительность и тема<input className="input" value={form.meta} onChange={e => setForm(p => ({ ...p, meta: e.target.value }))} placeholder="18 мин · Тактика" /></label>
           <label className="field">Ссылка YouTube<input className="input" type="url" value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://youtube.com/watch?v=..." /></label>
-          <button className="button" onClick={handleSave}>{modal === 'add' ? 'Опубликовать' : 'Сохранить'}</button>
+          <label className="flex items-center gap-2 mt-2 cursor-pointer">
+            <input type="checkbox" checked={form.isPremium} onChange={e => setForm(p => ({ ...p, isPremium: e.target.checked }))} className="rounded border-border" />
+            <span>Premium видео</span>
+          </label>
+          <button className="button mt-4" onClick={handleSave}>{modal === 'add' ? 'Опубликовать' : 'Сохранить'}</button>
         </Modal>
       )}
     </>
@@ -3646,11 +3675,11 @@ function Leaderboard() {
         <div className="rounded-xl border overflow-hidden">
           {top.map((u, i) => (
             <div key={u.id}
-              className={`flex items-center gap-4 px-5 py-4 border-b last:border-0 ${i === 0 ? 'bg-muted/30' : ''}`}>
+              className={`flex items-center gap-4 px-5 py-4 border-b last:border-0 ${i === 0 && !u.isPremium ? 'bg-muted/30' : ''} ${u.isPremium ? 'bg-gradient-to-r from-yellow-500/10 to-transparent border-yellow-500/30' : ''}`}>
               <span className="w-8 text-center text-lg shrink-0">
                 {i < 3 ? medals[i] : <span className="text-sm font-semibold text-muted-foreground">{i + 1}</span>}
               </span>
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-semibold">
+              <div className={`flex size-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${u.isPremium ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-600' : 'bg-muted'}`}>
                 {(u.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -3663,7 +3692,7 @@ function Leaderboard() {
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-lg font-semibold tabular-nums">{u.rating}</p>
+                <p className={`text-lg font-semibold tabular-nums ${u.isPremium ? 'text-yellow-600' : ''}`}>{u.rating}</p>
                 <p className="text-xs text-muted-foreground">очков</p>
               </div>
             </div>

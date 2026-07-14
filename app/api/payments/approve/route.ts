@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
     
     // 1.6 If it's a SUBSCRIPTION, grant premium
-    if (purchase.type === 'SUBSCRIPTION') {
+    if (purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM') {
       const now = new Date()
       const until = new Date(now)
       until.setDate(until.getDate() + 30) // 30 days subscription
