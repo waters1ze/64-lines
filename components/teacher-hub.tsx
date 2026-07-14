@@ -6,7 +6,7 @@ import {
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
-  CheckCircle2, Unlock, Search, Phone
+  CheckCircle2, Unlock, Search, Phone, FileSearch, Crown
 } from 'lucide-react'
 import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
@@ -27,7 +27,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -46,6 +46,7 @@ type Course = {
   imageUrl?: string | null;
   fileUrl?: string | null;
   pgn?: string | null;
+  isPremium?: boolean;
   createdAt: any;
 }
 
@@ -255,7 +256,7 @@ function Metric({ label, value, note }: { label: string; value: string; note: st
   )
 }
 
-function Modal({ title, close, children, wide }: { title: string; close: () => void; children: React.ReactNode; wide?: boolean }) {
+function Modal({ title, close, children, wide }: { title: string | React.ReactNode; close: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4" onMouseDown={close}>
       <div role="dialog" aria-modal="true"
@@ -315,6 +316,7 @@ export function TeacherHub({
   initialVideos,
   initialOpenings,
   initialPurchases = [],
+  isPremium = false,
 }: { 
   initialRole?: string, 
   userName?: string, 
@@ -325,6 +327,7 @@ export function TeacherHub({
   initialVideos?: any[],
   initialOpenings?: any[],
   initialPurchases?: any[],
+  isPremium?: boolean,
 }) {
   const { data: session } = useSession()
   
@@ -361,15 +364,28 @@ export function TeacherHub({
     return purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID').map(p => p.courseId)
   }, [purchases])
   
+  const hasAccessToCourse = (c: Course) => {
+    return purchasedIds.includes(c.id) || !!(c.isPremium && isPremium)
+  }
+  
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
   const [selectedHwId, setSelectedHwId] = useState<string | number | null>(null)
   const [paymentCourseId, setPaymentCourseId] = useState<string | number | null>(null)
+  const [paymentType, setPaymentType] = useState<'COURSE' | 'MODULE' | 'SUBSCRIPTION' | 'ANALYSIS'>('COURSE')
+  const [paymentAnalysisPgn, setPaymentAnalysisPgn] = useState('')
   const [paymentStep, setPaymentStep] = useState<'info' | 'method' | 'sbp'>('info')
   const [paymentSender, setPaymentSender] = useState('')
   const [paymentComment, setPaymentComment] = useState('')
   const [viewingCourseId, setViewingCourseId] = useState<string | number | null>(null)
   
   const [liveSession, setLiveSession] = useState<any>(null)
+  const [globalSettings, setGlobalSettings] = useState<{ subscriptionPrice: number, analysisPrice: number }>({ subscriptionPrice: 300, analysisPrice: 70 })
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(data => {
+      if (data && !data.error) setGlobalSettings(data)
+    }).catch(() => {})
+  }, [])
 
   const refreshPurchases = () => {
     if (isStudent || role === 'Ученик') {
@@ -453,6 +469,7 @@ export function TeacherHub({
     ['modules',        'Мои курсы',          BookOpen],
     ['shop',           'Магазин модулей',    Store],
     ['store',          'Витрина дебютов',    Store],
+    ['analysis',       'Разборы партий',     FileSearch],
     ['leaderboard',    'Рейтинг',            Trophy],
     ['users',          'Найти учеников',     Search],
     ['settings',       'Настройки',          Settings],
@@ -468,6 +485,7 @@ export function TeacherHub({
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
     ['modules',        'Учебные модули',     BookOpen],
+    ['analysis',       'Разборы партий',     FileSearch],
     ['leaderboard',    'Рейтинг',            Trophy],
     ['sales',          'Продажи',            CircleDollarSign],
     ['store',          'Витрина дебютов',    Store],
@@ -597,10 +615,36 @@ export function TeacherHub({
       notify('У вас уже есть заявка на этот курс. Ожидайте подтверждения.')
       return
     }
+    setPaymentType('COURSE')
     setPaymentStep('method')
     setPaymentSender('')
     setPaymentComment('')
     setPaymentCourseId(id)
+  }
+
+  const purchaseSubscription = () => {
+    if (isGuest) {
+      notify('Пожалуйста, зарегистрируйтесь, чтобы купить подписку.')
+      return
+    }
+    setPaymentType('SUBSCRIPTION')
+    setPaymentStep('method')
+    setPaymentSender('')
+    setPaymentComment('')
+    setPaymentCourseId('subscription')
+  }
+
+  const purchaseAnalysis = (pgn: string, comment: string) => {
+    if (isGuest) {
+      notify('Пожалуйста, зарегистрируйтесь, чтобы заказать разбор.')
+      return
+    }
+    setPaymentType('ANALYSIS')
+    setPaymentStep('method')
+    setPaymentSender('')
+    setPaymentComment(comment)
+    setPaymentAnalysisPgn(pgn)
+    setPaymentCourseId('analysis')
   }
 
   const handleManualPayment = async () => {
@@ -810,9 +854,9 @@ export function TeacherHub({
             {section === 'users'       && isTeacher && !isAdmin && <AvailableStudents notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
             {section === 'sales'       && isAdmin && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
-            {section === 'store'       && <Storefront courses={courses} purchasedIds={purchasedIds} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
+            {section === 'store'       && <Storefront courses={courses} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
-              <OpeningCourses courses={courses} isTeacher={isAdmin} purchasedIds={purchasedIds}
+              <OpeningCourses courses={courses} isTeacher={isAdmin} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)}
                 onPurchase={purchaseCourse} onOpen={openCourseViewer}
                 onAdd={async c => {
                   try {
@@ -846,33 +890,49 @@ export function TeacherHub({
                 }}
                 notify={notify} />
             )}
-            {section === 'settings' && <SettingsPanel notify={notify} initialName={userName || ''} isStudent={isStudent} />}
+            {section === 'analysis' && <AnalysisRequests notify={notify} />}
+            {section === 'settings' && <SettingsPanel notify={notify} initialName={userName || ''} isStudent={isStudent} isAdmin={isAdmin} globalSettings={globalSettings} onPurchaseSubscription={purchaseSubscription} onPurchaseAnalysis={purchaseAnalysis} />}
           </div>
         </main>
       </div>
 
       {paymentCourseId && (() => {
-        const course = courses.find(c => c.id === paymentCourseId)
-        if (!course) return null
+        const isSub = paymentCourseId === 'subscription'
+        const isAnalysis = paymentCourseId === 'analysis'
+        const course = !isSub && !isAnalysis ? courses.find(c => c.id === paymentCourseId) : null
+        
+        if (!course && !isSub && !isAnalysis) return null
+        
+        const price = isSub ? globalSettings.subscriptionPrice : (isAnalysis ? globalSettings.analysisPrice : (course?.price || 0))
+        const title = isSub ? 'Оплата подписки (Premium)' : (isAnalysis ? 'Оплата разбора партии' : 'Оплата курса')
+        const isYooMoneyOnly = isSub || isAnalysis
+
         return (
-          <Modal title="Оплата курса" close={() => setPaymentCourseId(null)}>
+          <Modal title={title} close={() => setPaymentCourseId(null)}>
             {paymentStep === 'method' && (
               <div className="flex flex-col gap-4">
-                <p className="text-sm text-center">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
+                <p className="text-sm text-center">Сумма к оплате: <b>{price.toLocaleString('ru-RU')} ₽</b></p>
                 
                 <button className="button w-full flex-col py-3 h-auto" onClick={async () => {
                   try {
                     const res = await fetch('/api/payments/create', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ courseId: paymentCourseId, senderName: '', comment: '', paymentMethod: 'yoomoney' })
+                      body: JSON.stringify({ 
+                        courseId: (!isSub && !isAnalysis) ? paymentCourseId : undefined,
+                        type: paymentType,
+                        pgn: paymentAnalysisPgn,
+                        senderName: '', 
+                        comment: paymentComment, 
+                        paymentMethod: 'yoomoney' 
+                      })
                     })
                     if (res.ok) {
                       const { purchase } = await res.json()
                       const form = document.createElement('form')
                       form.method = 'POST'
                       form.action = 'https://yoomoney.ru/quickpay/confirm.xml'
-                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (course.price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin + '?section=store&payment_success=true' }
+                      const fields: any = { receiver: '4100119573095433', label: purchase.id, 'quickpay-form': 'button', sum: (price * 1.03).toFixed(2), paymentType: 'AC', successURL: window.location.origin + '?section=' + (isSub || isAnalysis ? 'settings' : 'store') + '&payment_success=true' }
                       for (const k in fields) {
                         const input = document.createElement('input')
                         input.type = 'hidden'
@@ -886,16 +946,19 @@ export function TeacherHub({
                   } catch { notify('Ошибка сети.') }
                 }}>
                   <span className="font-bold">ЮMoney (Автоматически)</span>
-                  <span className="text-xs opacity-80 font-normal mt-1">Оплата картой. Комиссия сервиса 3% ({(course.price * 1.03).toLocaleString('ru-RU')} ₽). Доступ откроется сразу.</span>
+                  <span className="text-xs opacity-80 font-normal mt-1">Оплата картой. Комиссия сервиса 3% ({(price * 1.03).toLocaleString('ru-RU')} ₽). Доступ откроется сразу.</span>
                 </button>
 
-                <button className="outline-button w-full flex-col py-3 h-auto" onClick={() => setPaymentStep('info')}>
-                  <span className="font-bold text-foreground">СБП / Перевод (Ручная проверка)</span>
-                  <span className="text-xs text-muted-foreground font-normal mt-1">Без комиссии ({course.price.toLocaleString('ru-RU')} ₽). Потребуется ввести ваше имя и нажать кнопку.</span>
-                </button>
+                {!isYooMoneyOnly && (
+                  <button className="outline-button w-full flex-col py-3 h-auto" onClick={() => setPaymentStep('info')}>
+                    <span className="font-bold text-foreground">СБП / Перевод (Ручная проверка)</span>
+                    <span className="text-xs text-muted-foreground font-normal mt-1">Без комиссии ({price.toLocaleString('ru-RU')} ₽). Потребуется ввести ваше имя и нажать кнопку.</span>
+                  </button>
+                )}
               </div>
             )}
-            {paymentStep === 'info' && (
+            
+            {!isYooMoneyOnly && paymentStep === 'info' && (
               <div className="flex flex-col gap-4">
                 <p className="text-sm text-muted-foreground">Перед оплатой заполните информацию.</p>
                 <label className="field">Ваше имя
@@ -914,14 +977,15 @@ export function TeacherHub({
                 </div>
               </div>
             )}
-            {paymentStep === 'sbp' && (
+            
+            {!isYooMoneyOnly && paymentStep === 'sbp' && (
               <div className="flex flex-col gap-4 text-center">
                 <div className="rounded-xl bg-muted/30 p-6">
                   <p className="text-muted-foreground">Переведите по номеру телефона (СБП):</p>
                   <b className="mt-2 block text-2xl tracking-widest">+7 (999) 813-78-70</b>
                   <p className="mt-1 text-sm text-muted-foreground">Банк: Альфа-Банк / Получатель: Кирилл П.</p>
                 </div>
-                <p className="text-sm">Сумма к оплате: <b>{course.price.toLocaleString('ru-RU')} ₽</b></p>
+                <p className="text-sm">Сумма к оплате: <b>{price.toLocaleString('ru-RU')} ₽</b></p>
                 <div className="mt-2 flex flex-col gap-3">
                   <button className="button w-full" onClick={handleManualPayment}>
                     Я перевел(а) деньги
@@ -2801,7 +2865,7 @@ function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Co
 
 // ─── Opening Courses (CRUD) ───────────────────────────────────────────────────
 
-type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string }
+type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string; isPremium: boolean }
 
 function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, onAdd, onUpdate, onDelete, notify }: {
   courses: Course[]; isTeacher: boolean; purchasedIds: number[]
@@ -2814,15 +2878,15 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
 }) {
   const [modal, setModal] = useState<null | 'add' | 'detail' | string | number>(null)
   const [detailId, setDetailId] = useState<string | number | null>(null)
-  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '' })
+  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false })
   const fileRef = useRef<HTMLInputElement>(null)
   const pgnFileRef = useRef<HTMLInputElement>(null)
 
   const sorted = [...courses].sort((a, b) => b.createdAt - a.createdAt)
   const detailCourse = courses.find(c => c.id === detailId)
 
-  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '' }); setModal('add') }
-  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '' }); setModal(c.id) }
+  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false }); setModal('add') }
+  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '', isPremium: !!c.isPremium }); setModal(c.id) }
   async function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     const formData = new FormData()
@@ -2838,7 +2902,7 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
   }
   function handleSave() {
     if (!form.name || !form.price) { notify('Заполните название и цену'); return }
-    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined }
+    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined, isPremium: form.isPremium }
     const isEdit = modal !== 'add' && modal !== 'detail' && modal !== null
     if (modal === 'add') onAdd(data)
     else if (isEdit) onUpdate(modal as string | number, data)
@@ -2860,7 +2924,10 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
                 {c.imageUrl ? <img src={c.imageUrl} alt={c.name} className="size-full object-cover" /> : <GraduationCap className="size-10 text-muted-foreground" />}
               </div>
               <div className="flex flex-1 flex-col p-5">
-                <h3 className="font-semibold">{c.name}</h3>
+                <h3 className="font-semibold flex items-center gap-2">
+                  {c.name}
+                  {c.isPremium && <Crown className="size-4 text-yellow-500 shrink-0" title="Доступно по подписке Premium" />}
+                </h3>
                 <div data-color-mode="light" className="mt-2 flex-1 line-clamp-3"><MarkdownPreview source={c.description} style={{ backgroundColor: 'transparent', color: 'var(--muted-foreground)', fontSize: '0.875rem' }} /></div>
                 {isTeacher && c.pgn && (
                   <p className="mt-1 text-xs text-green-600">✅ PGN загружен ({c.pgn.split(/(?=\[Event )/).filter(Boolean).length} партий)</p>
@@ -2905,6 +2972,13 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
             </div>
           </div>
           <label className="field">Цена (₽)<input className="input" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" /></label>
+          <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors">
+            <input type="checkbox" className="size-5 rounded border-yellow-500 text-yellow-500 focus:ring-yellow-500" checked={form.isPremium} onChange={e => setForm(p => ({ ...p, isPremium: e.target.checked }))} />
+            <div className="flex flex-col">
+              <span className="font-semibold text-yellow-700 flex items-center gap-1"><Crown className="size-4"/>Доступно по подписке (Premium)</span>
+              <span className="text-xs text-muted-foreground">Если включено, подписчики получат этот курс бесплатно. Остальные смогут купить его за цену выше.</span>
+            </div>
+          </label>
           <div className="field">
             <span>Превью-картинка</span>
             <label className="drop-zone cursor-pointer">
@@ -2935,7 +3009,12 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
 
       {/* Detail modal (student) */}
       {modal === 'detail' && detailCourse && (
-        <Modal title={detailCourse.name} close={() => setModal(null)}>
+        <Modal title={
+          <div className="flex items-center gap-2">
+            {detailCourse.name}
+            {detailCourse.isPremium && <Crown className="size-5 text-yellow-500" title="Доступно по подписке Premium" />}
+          </div>
+        } close={() => setModal(null)}>
           {detailCourse.imageUrl && <img src={detailCourse.imageUrl} alt={detailCourse.name} className="max-h-52 w-full rounded-lg object-cover" />}
           <div data-color-mode="light" className="text-sm leading-6"><MarkdownPreview source={detailCourse.description} style={{ backgroundColor: 'transparent' }} /></div>
           <div className="flex items-center justify-between border-t pt-5">
@@ -3284,11 +3363,132 @@ function CourseViewer({ course }: { course: Course }) {
   )
 }
 
+// ─── Analysis Requests ────────────────────────────────────────────────────────
+function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
+  const [requests, setRequests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeReqId, setActiveReqId] = useState<string | null>(null)
+  
+  const [answerPgn, setAnswerPgn] = useState('')
+  const [answerVideo, setAnswerVideo] = useState('')
+
+  useEffect(() => {
+    fetch('/api/analysis')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRequests(data) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSubmitAnswer = async (id: string) => {
+    try {
+      const res = await fetch('/api/analysis', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, answerPgn, answerVideo, status: 'COMPLETED' })
+      })
+      if (res.ok) {
+        notify('Ответ успешно отправлен ученику!')
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'COMPLETED', answerPgn, answerVideo } : r))
+        setActiveReqId(null)
+      } else notify('Ошибка сохранения ответа')
+    } catch { notify('Ошибка сети') }
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground p-8">Загрузка заявок...</p>
+
+  return (
+    <>
+      <Head over="Заказы" title="Разборы партий" text="Ученики заказывают разбор партии. Вы можете отправить им проанализированный PGN и ссылку на видеоразбор." />
+      <div className="mt-6 flex flex-col gap-4">
+        {requests.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Нет заявок на разбор.</p>
+        ) : requests.map(req => (
+          <article key={req.id} className="rounded-xl border p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">{req.user?.name || 'Ученик'}</h3>
+              <span className={`badge ${req.status === 'COMPLETED' ? 'bg-green-500/10 text-green-600' : 'bg-yellow-500/10 text-yellow-600'}`}>
+                {req.status === 'COMPLETED' ? 'Выполнено' : 'Ожидает разбора'}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">От: {new Date(req.createdAt).toLocaleString('ru-RU')}</p>
+            
+            <div className="mt-4 p-4 rounded-lg bg-muted/30">
+              <p className="text-sm font-semibold mb-2">Исходный PGN:</p>
+              <div className="text-xs font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-background p-2 rounded border">
+                {req.pgn}
+              </div>
+              
+              {req.comment && (
+                <div className="mt-4">
+                  <p className="text-sm font-semibold mb-1">Вопросы / Комментарий ученика:</p>
+                  <p className="text-sm italic">{req.comment}</p>
+                </div>
+              )}
+            </div>
+
+            {req.status === 'COMPLETED' ? (
+              <div className="mt-4 border-t pt-4">
+                <p className="text-sm font-semibold text-green-600 mb-2">Ответ тренера отправлен:</p>
+                {req.answerVideo && (
+                  <a href={req.answerVideo} target="_blank" rel="noreferrer" className="text-sm text-blue-500 underline mb-2 block">Смотреть видеоразбор</a>
+                )}
+                {req.answerPgn && (
+                  <div className="text-xs font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-background p-2 rounded border mt-2">
+                    {req.answerPgn}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 border-t pt-4">
+                {activeReqId === req.id ? (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold">Ответить ученику:</p>
+                    <textarea 
+                      className="input min-h-[100px] font-mono text-xs" 
+                      placeholder="Вставьте PGN с вашими комментариями и вариантами..."
+                      value={answerPgn}
+                      onChange={e => setAnswerPgn(e.target.value)}
+                    />
+                    <input 
+                      className="input" 
+                      placeholder="Ссылка на видео (YouTube / Cloud / и т.д.) (необязательно)"
+                      value={answerVideo}
+                      onChange={e => setAnswerVideo(e.target.value)}
+                    />
+                    <div className="flex gap-3">
+                      <button className="button" onClick={() => handleSubmitAnswer(req.id)}>Отправить ответ</button>
+                      <button className="outline-button" onClick={() => setActiveReqId(null)}>Отмена</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button 
+                    className="button w-full sm:w-auto" 
+                    onClick={() => { setActiveReqId(req.id); setAnswerPgn(''); setAnswerVideo('') }}
+                  >
+                    Взять в работу и отправить ответ
+                  </button>
+                )}
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </>
+  )
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
-function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string) => void; initialName: string; isStudent: boolean }) {
+function SettingsPanel({ notify, initialName, isStudent, isAdmin, globalSettings, onPurchaseSubscription, onPurchaseAnalysis }: { notify: (s: string) => void; initialName: string; isStudent: boolean; isAdmin?: boolean; globalSettings?: { subscriptionPrice: number, analysisPrice: number }; onPurchaseSubscription?: () => void; onPurchaseAnalysis?: (pgn: string, comment: string) => void }) {
   const [name, setName] = useState(initialName)
   const [loading, setLoading] = useState(false)
+  const [subPrice, setSubPrice] = useState(globalSettings?.subscriptionPrice?.toString() || '300')
+  const [anPrice, setAnPrice] = useState(globalSettings?.analysisPrice?.toString() || '70')
+  
+  const [analysisPgn, setAnalysisPgn] = useState('')
+  const [analysisComment, setAnalysisComment] = useState('')
+  
   const router = useRouter()
 
   const handleSave = async () => {
@@ -3302,7 +3502,7 @@ function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string)
       
       if (res.ok) {
         notify('Профиль успешно обновлен!')
-        router.refresh() // Обновляем сессию на клиенте
+        router.refresh()
       } else {
         const err = await res.json()
         notify('Ошибка: ' + err.error)
@@ -3314,9 +3514,25 @@ function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string)
     }
   }
 
+  const handleSaveSettings = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionPrice: Number(subPrice), analysisPrice: Number(anPrice) })
+      })
+      if (res.ok) {
+        notify('Глобальные цены сохранены!')
+      } else notify('Ошибка сохранения цен')
+    } catch { notify('Ошибка сети') }
+    finally { setLoading(false) }
+  }
+
   return (
     <>
-      <Head over="Управление" title="Настройки профиля" text="Редактирование ваших личных данных." />
+      <Head over="Управление" title="Настройки профиля" text="Редактирование ваших личных данных и услуг." />
+      
       <section className="settings-section">
         <h2>Основные настройки</h2>
         <div className="setting-row">
@@ -3329,6 +3545,72 @@ function SettingsPanel({ notify, initialName, isStudent }: { notify: (s: string)
           </button>
         </div>
       </section>
+
+      {isAdmin && (
+        <section className="settings-section mt-8">
+          <h2>Глобальные настройки цен</h2>
+          <div className="setting-row">
+            <div><b>Цена подписки (₽ / мес)</b><p>Стоимость Premium-подписки на месяц.</p></div>
+            <input type="number" className="input max-w-xs" value={subPrice} onChange={e => setSubPrice(e.target.value)} />
+          </div>
+          <div className="setting-row">
+            <div><b>Цена разбора партии (₽)</b><p>Стоимость заказа разбора одной партии.</p></div>
+            <input type="number" className="input max-w-xs" value={anPrice} onChange={e => setAnPrice(e.target.value)} />
+          </div>
+          <div className="mt-4">
+            <button disabled={loading} className="button" onClick={handleSaveSettings}>
+              {loading ? 'Сохранение...' : 'Сохранить цены'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {isStudent && (
+        <>
+          <section className="settings-section mt-8">
+            <h2>Premium Подписка</h2>
+            <div className="setting-row">
+              <div>
+                <b>Доступ к закрытым материалам</b>
+                <p>Получите доступ ко всем курсам и урокам по подписке, а также золотую корону в лидерборде. Стоимость: {globalSettings?.subscriptionPrice ?? 300} ₽ в месяц.</p>
+              </div>
+              <button className="button bg-yellow-500 hover:bg-yellow-600 text-white" onClick={onPurchaseSubscription}>Оформить подписку</button>
+            </div>
+          </section>
+
+          <section className="settings-section mt-8">
+            <h2>Заказать Разбор Партии</h2>
+            <div className="flex flex-col gap-4 max-w-2xl mt-4">
+              <p className="text-sm text-muted-foreground">Загрузите PGN вашей партии и напишите вопросы тренеру. Тренер пришлет вам PGN с комментариями и видеоразбор! Стоимость: {globalSettings?.analysisPrice ?? 70} ₽.</p>
+              
+              <textarea 
+                className="input min-h-[100px] font-mono text-xs" 
+                placeholder="Вставьте PGN партии сюда..."
+                value={analysisPgn}
+                onChange={e => setAnalysisPgn(e.target.value)}
+              />
+              <textarea 
+                className="input min-h-[80px]" 
+                placeholder="Ваши вопросы, на что обратить внимание..."
+                value={analysisComment}
+                onChange={e => setAnalysisComment(e.target.value)}
+              />
+              
+              <button 
+                className="button w-fit" 
+                onClick={() => {
+                  if (!analysisPgn.trim()) {
+                    notify('Вставьте PGN партии!'); return;
+                  }
+                  onPurchaseAnalysis?.(analysisPgn, analysisComment)
+                }}
+              >
+                Оплатить разбор партии ({globalSettings?.analysisPrice ?? 70} ₽)
+              </button>
+            </div>
+          </section>
+        </>
+      )}
     </>
   )
 }
@@ -3372,7 +3654,10 @@ function Leaderboard() {
                 {(u.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{u.name || 'Ученик'}</p>
+                <p className="font-semibold truncate flex items-center gap-2">
+                  {u.name || 'Ученик'}
+                  {u.isPremium && <Crown className="size-4 text-yellow-500" title="Premium Пользователь" />}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {u._count?.homeworks ?? 0} {(u._count?.homeworks ?? 0) === 1 ? 'задание' : 'заданий'} решено
                 </p>
@@ -3459,7 +3744,10 @@ function UsersManager({ notify }: { notify: (s: string) => void }) {
                 {(u.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{u.name || '—'}</p>
+                <p className="font-semibold truncate flex items-center gap-2">
+                  {u.name || '—'}
+                  {u.isPremium && <Crown className="size-4 text-yellow-500" title="Premium Пользователь" />}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
               </div>
               <div className="shrink-0 text-right">

@@ -10,43 +10,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { courseId, moduleId, senderName, comment, paymentMethod } = await req.json()
-    if (!courseId && !moduleId) {
-      return NextResponse.json({ error: 'Course ID or Module ID is required' }, { status: 400 })
+    const { courseId, moduleId, type, senderName, comment, paymentMethod, pgn } = await req.json()
+    
+    // For course/module
+    if (!type || type === 'COURSE' || type === 'MODULE') {
+      if (!courseId && !moduleId) {
+        return NextResponse.json({ error: 'Course ID or Module ID is required' }, { status: 400 })
+      }
+      if (courseId) {
+        const course = await db.course.findUnique({ where: { id: String(courseId) } })
+        if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+      } else if (moduleId) {
+        const mod = await db.module.findUnique({ where: { id: String(moduleId) } })
+        if (!mod) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+      }
     }
 
-    // Check if item exists
-    if (courseId) {
-      const course = await db.course.findUnique({ where: { id: String(courseId) } })
-      if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
-    } else if (moduleId) {
-      const mod = await db.module.findUnique({ where: { id: String(moduleId) } })
-      if (!mod) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
-    }
-
-    // Check if purchase already exists
-    const existing = await db.purchase.findFirst({
-      where: {
-        userId: session.user.id,
-        ...(courseId ? { courseId: String(courseId) } : {}),
-        ...(moduleId ? { moduleId: String(moduleId) } : {}),
-      }
-    })
-
-    if (existing) {
-      if (existing.status === 'APPROVED') {
-        return NextResponse.json({ error: 'Already purchased' }, { status: 400 })
-      }
-      const updated = await db.purchase.update({
-        where: { id: existing.id },
-        data: { 
-          senderName: senderName || null, 
-          comment: comment || null,
-          paymentMethod: paymentMethod || 'sbp'
-        },
-        include: { user: true, course: true, module: true }
+    // Check if purchase already exists (only for COURSE/MODULE)
+    if (!type || type === 'COURSE' || type === 'MODULE') {
+      const existing = await db.purchase.findFirst({
+        where: {
+          userId: session.user.id,
+          ...(courseId ? { courseId: String(courseId) } : {}),
+          ...(moduleId ? { moduleId: String(moduleId) } : {}),
+        }
       })
-      return NextResponse.json({ success: true, purchase: updated })
+
+      if (existing) {
+        if (existing.status === 'APPROVED') {
+          return NextResponse.json({ error: 'Already purchased' }, { status: 400 })
+        }
+        const updated = await db.purchase.update({
+          where: { id: existing.id },
+          data: { 
+            senderName: senderName || null, 
+            comment: comment || null,
+            paymentMethod: paymentMethod || 'sbp'
+          },
+          include: { user: true, course: true, module: true }
+        })
+        return NextResponse.json({ success: true, purchase: updated })
+      }
     }
 
     const purchase = await db.purchase.create({
@@ -54,9 +58,10 @@ export async function POST(req: Request) {
         userId: session.user.id,
         courseId: courseId ? String(courseId) : null,
         moduleId: moduleId ? String(moduleId) : null,
+        type: type || 'COURSE',
         status: 'PENDING',
         senderName: senderName || null,
-        comment: comment || null,
+        comment: (type === 'ANALYSIS' && pgn) ? `PGN: ${pgn}\n\n${comment || ''}` : (comment || null),
         paymentMethod: paymentMethod || 'sbp'
       },
       include: { user: true, course: true, module: true }

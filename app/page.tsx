@@ -21,12 +21,14 @@ export default async function Page() {
   let dbUserRole = 'STUDENT'
   let userRating = 1200
   let userName = 'Гость'
+  let isPremium = false
   if (session?.user?.email) {
     const dbUser = await db.user.findUnique({ where: { email: session.user.email } })
     if (dbUser) {
       userRating = dbUser.rating
       userName = dbUser.name || session.user.name || 'Гость'
       dbUserRole = dbUser.role
+      isPremium = dbUser.isPremium
       
       // Override session with database data to prevent stale JWT session issues
       session.user.id = dbUser.id
@@ -101,6 +103,7 @@ export default async function Page() {
         }
         userName={userName} 
         userRating={userRating}
+        isPremium={isPremium}
         initialStudents={students}
         initialHomeworks={homeworks}
         initialCourses={courses}

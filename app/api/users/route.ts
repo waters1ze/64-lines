@@ -22,8 +22,12 @@ export async function GET() {
         rating: true,
         emailVerified: true,
         teacherId: true,
+        isPremium: true,
       },
-      orderBy: { role: 'asc' }
+      orderBy: [
+        { isPremium: 'desc' },
+        { role: 'asc' },
+      ]
     })
 
     return NextResponse.json(users)

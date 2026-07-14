@@ -12,6 +12,7 @@ export async function GET() {
         id: true,
         name: true,
         rating: true,
+        isPremium: true,
         _count: { select: { homeworks: true } }
       },
       orderBy: { rating: 'desc' },

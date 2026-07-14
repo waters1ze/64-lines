@@ -32,8 +32,8 @@ export async function GET(req: Request) {
           teacherId: null,
           NOT: pendingStudentIds.length > 0 ? { id: { in: pendingStudentIds } } : undefined
         },
-        select: { id: true, name: true, email: true, rating: true },
-        orderBy: { name: 'asc' }
+        select: { id: true, name: true, email: true, rating: true, isPremium: true },
+        orderBy: [{ isPremium: 'desc' }, { name: 'asc' }]
       })
       return NextResponse.json(students)
     }
@@ -41,8 +41,8 @@ export async function GET(req: Request) {
     // Свои ученики
     const students = await db.user.findMany({
       where: { teacherId: user.id },
-      select: { id: true, name: true, email: true, rating: true },
-      orderBy: { name: 'asc' }
+      select: { id: true, name: true, email: true, rating: true, isPremium: true },
+      orderBy: [{ isPremium: 'desc' }, { name: 'asc' }]
     })
     return NextResponse.json(students)
   } catch (error) {

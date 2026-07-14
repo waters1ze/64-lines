@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { name, description, price, imageUrl, fileUrl, pgn } = await req.json()
+    const { name, description, price, imageUrl, fileUrl, pgn, isPremium } = await req.json()
     if (!name) return new NextResponse('Bad Request', { status: 400 })
 
     const course = await db.course.create({
@@ -23,7 +23,8 @@ export async function POST(req: Request) {
         price: Number(price) || 0,
         imageUrl,
         fileUrl,
-        pgn
+        pgn,
+        isPremium: Boolean(isPremium)
       }
     })
 

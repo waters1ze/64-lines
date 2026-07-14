@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Bell, Check, Search, UserPlus, X, CheckCircle2 } from 'lucide-react'
+import { Bell, Check, Search, UserPlus, X, CheckCircle2, Crown } from 'lucide-react'
 
 function Head({ over, title, text }: { over: string; title: string; text: string }) {
   return (

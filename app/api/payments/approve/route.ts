@@ -42,6 +42,37 @@ export async function POST(req: Request) {
         create: { userId: purchase.userId, moduleId: purchase.moduleId }
       })
     }
+    
+    // 1.6 If it's a SUBSCRIPTION, grant premium
+    if (purchase.type === 'SUBSCRIPTION') {
+      const now = new Date()
+      const until = new Date(now)
+      until.setDate(until.getDate() + 30) // 30 days subscription
+      
+      await db.user.update({
+        where: { id: purchase.userId },
+        data: {
+          isPremium: true,
+          premiumUntil: until
+        }
+      })
+    }
+    
+    // 1.7 If it's an ANALYSIS, create GameAnalysisRequest
+    if (purchase.type === 'ANALYSIS') {
+      const pgnMatch = purchase.comment?.match(/PGN: ([\s\S]*?)(?:\n\n|$)/)
+      const pgn = pgnMatch ? pgnMatch[1] : ''
+      const userComment = purchase.comment?.replace(/PGN: [\s\S]*?(?:\n\n|$)/, '').trim()
+      
+      await db.gameAnalysisRequest.create({
+        data: {
+          userId: purchase.userId,
+          pgn: pgn || 'PGN not provided',
+          comment: userComment || null,
+          status: 'PENDING'
+        }
+      })
+    }
 
     // 2. Send Email (Only for courses with PGN currently, but can be adapted)
     if (purchase.course) {

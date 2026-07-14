@@ -14,12 +14,15 @@ model User {
   passwordHash      String
   role              Role           @default(STUDENT)
   rating            Int            @default(1500)
+  isPremium         Boolean        @default(false)
+  premiumUntil      DateTime?
   teacherId         String?
   emailVerified     DateTime?
   verificationToken String?
   homeworks         Homework[]
   moduleAccesses    ModuleAccess[]
   purchases         Purchase[]
+  analysisRequests  GameAnalysisRequest[]
   teacher           User?          @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
   students          User[]         @relation("TeacherStudents")
   sentMessages      Message[]      @relation("SentMessages")
@@ -53,6 +56,7 @@ model Course {
   createdAt   DateTime   @default(now())
   fileUrl     String?
   pgn         String?
+  isPremium   Boolean    @default(false)
   purchases   Purchase[]
 }
 
@@ -61,6 +65,7 @@ model Purchase {
   userId     String
   courseId   String?
   moduleId   String?
+  type       String   @default("COURSE") // COURSE, MODULE, SUBSCRIPTION, ANALYSIS
   createdAt  DateTime @default(now())
   status         String   @default("PENDING")
   paymentMethod  String   @default("sbp")
@@ -179,4 +184,24 @@ model LiveSession {
 
   teacher User @relation("TeacherLiveSessions", fields: [teacherId], references: [id], onDelete: Cascade)
   student User @relation("StudentLiveSessions", fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id                String @id @default("global")
+  subscriptionPrice Int    @default(300)
+  analysisPrice     Int    @default(70)
+}
+
+model GameAnalysisRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  pgn         String
+  comment     String?
+  status      String   @default("PENDING") // PENDING, COMPLETED
+  answerPgn   String?
+  answerVideo String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
