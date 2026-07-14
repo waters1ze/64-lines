@@ -127,24 +127,103 @@ function parseHwPgn(pgn: string): { startFen: string; solution: string[] }[] {
 }
 
 function parsePgnToTree(pgn: string): GameTree {
+  if (!pgn?.trim()) return { children: [], comment: '' }
   if (pgn.startsWith('{') && pgn.endsWith('}')) {
     try { return JSON.parse(pgn) } catch {}
   }
-  const raw = pgn.replace(/\[.*?\]/gs, '').replace(/\{[^}]*\}/gs, '')
-  const tokens = (raw.match(/\d+\.{1,3}|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](?:=[NBRQ])?[+#]?|O-O-O|O-O|\(|\)|1-0|0-1|1\/2-1\/2|\*/g) ?? [])
-    .filter(t => !t.match(/^\d+\./) && !['1-0','0-1','1/2-1/2','*'].includes(t))
-  const pos = { i: 0 }
-  function parse(): TreeNode[] {
-    const nodes: TreeNode[] = []
-    while (pos.i < tokens.length) {
-      const t = tokens[pos.i]
-      if (t === ')') { pos.i++; break }
-      if (t === '(') { pos.i++; const alt = parse(); if (nodes.length) nodes[nodes.length - 1].children.push(...alt); continue }
-      nodes.push({ san: t, comment: '', children: [] }); pos.i++
-    }
-    return nodes
+  
+  const { parse } = require('@mliebelt/pgn-parser')
+  let parsedGame: any
+  try {
+    parsedGame = parse(pgn, { startRule: 'game' })
+  } catch (e) {
+    return { children: [], comment: '' }
   }
-  return { children: parse(), comment: '' }
+
+  if (!parsedGame) return { children: [], comment: '' }
+
+  function processMoves(moves: any[], targetChildrenArray: TreeNode[]) {
+    if (!moves || moves.length === 0) return
+    let currentParentChildren = targetChildrenArray
+    
+    for (const m of moves) {
+      const node: TreeNode = {
+        san: m.notation.notation,
+        comment: m.commentDiag?.comment || '',
+        children: []
+      }
+      currentParentChildren.push(node)
+      
+      if (m.variations && m.variations.length > 0) {
+        for (const variation of m.variations) {
+          processMoves(variation, currentParentChildren)
+        }
+      }
+      currentParentChildren = node.children
+    }
+  }
+
+  const rootChildren: TreeNode[] = []
+  processMoves(parsedGame.moves || [], rootChildren)
+  return { children: rootChildren, comment: '' }
+}
+
+function TreeNodesRenderer({
+  nodes, currentPath, activePath, onSelect, onContextMenu, onComment, isMainLine = true
+}: {
+  nodes: TreeNode[], currentPath: string[], activePath: string[],
+  onSelect: (path: string[]) => void, onContextMenu: (e: React.MouseEvent, path: string[]) => void, onComment: (path: string[], node: TreeNode) => void, isMainLine?: boolean
+}) {
+  if (!nodes || nodes.length === 0) return null;
+  const mainNode = nodes[0];
+  const variations = nodes.slice(1);
+  
+  const renderNode = (node: TreeNode, isVariation: boolean, isMainLineFlag: boolean) => {
+    const nodePath = [...currentPath, node.san]
+    const isActive = activePath[nodePath.length - 1] === node.san && activePath.slice(0, nodePath.length - 1).join() === currentPath.join()
+    const moveNumber = Math.floor(currentPath.length / 2) + 1
+    const isWhite = currentPath.length % 2 === 0
+    
+    return (
+      <React.Fragment key={node.san}>
+        {isVariation ? <span className="text-muted-foreground/60 select-none"> (</span> : (currentPath.length > 0 ? ' ' : '')}
+        
+        {isWhite && <span className="text-muted-foreground select-none">{moveNumber}. </span>}
+        {!isWhite && (!isMainLineFlag || isVariation) && <span className="text-muted-foreground select-none">{moveNumber}... </span>}
+        
+        <button
+          className={`rounded px-1 text-sm transition-colors ${isActive ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-muted'}`}
+          onClick={() => onSelect(nodePath)}
+          onContextMenu={e => { e.preventDefault(); onContextMenu(e, nodePath) }}
+        >
+          {node.san}
+        </button>
+        
+        <button className="text-[10px] opacity-30 hover:opacity-100" title="Комментарий"
+          onClick={(e) => { e.stopPropagation(); onComment(nodePath, node) }}>
+          💬
+        </button>
+
+        {node.comment && <span className="ml-1 mr-1 text-xs italic text-muted-foreground">{`{ ${node.comment} }`}</span>}
+        
+        {isVariation && node.children.length > 0 && (
+          <TreeNodesRenderer nodes={node.children} currentPath={nodePath} activePath={activePath} onSelect={onSelect} onContextMenu={onContextMenu} onComment={onComment} isMainLine={false} />
+        )}
+        
+        {isVariation && <span className="text-muted-foreground/60 select-none">) </span>}
+      </React.Fragment>
+    )
+  }
+
+  return (
+    <>
+      {renderNode(mainNode, false, isMainLine)}
+      {variations.map(variation => renderNode(variation, true, false))}
+      {mainNode.children.length > 0 && (
+        <TreeNodesRenderer nodes={mainNode.children} currentPath={[...currentPath, mainNode.san]} activePath={activePath} onSelect={onSelect} onContextMenu={onContextMenu} onComment={onComment} isMainLine={isMainLine} />
+      )}
+    </>
+  )
 }
 
 // ─── Common UI ────────────────────────────────────────────────────────────────
@@ -1770,8 +1849,8 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
   const [selected,    setSelected]    = useState<string | null>(null)
   const [dragFrom,    setDragFrom]    = useState<string | null>(null)
   const [dragOver,    setDragOver]    = useState<string | null>(null)
-  const [ctxMenu,     setCtxMenu]     = useState<{ x: number; y: number; idx: number } | null>(null)
-  const [editComment, setEditComment] = useState<number | null>(null)
+  const [ctxMenu,     setCtxMenu]     = useState<{ x: number; y: number; nodePath: string[] } | null>(null)
+  const [editComment, setEditComment] = useState<string[] | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
 
   async function saveCurrent() {
@@ -1867,22 +1946,29 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
 
   function goToStep(idx: number) { setPath(path.slice(0, idx)); setSelected(null) }
 
-  function deleteFromIdx(idx: number) {
-    const parentPath = path.slice(0, idx)
-    const sanToRemove = path[idx]
+  function deleteFromNodePath(nodePath: string[]) {
+    const parentPath = nodePath.slice(0, -1)
+    const sanToRemove = nodePath[nodePath.length - 1]
     const newTree = cloneTree(tree)
     const { nodes } = walkTo(newTree, parentPath)
     const i = nodes.findIndex(n => n.san === sanToRemove)
     if (i !== -1) nodes.splice(i, 1)
-    setTree(newTree); setPath(parentPath); setCtxMenu(null)
+    setTree(newTree)
+    if (path.length >= nodePath.length && path.slice(0, nodePath.length).join() === nodePath.join()) {
+      setPath(parentPath)
+    }
+    setCtxMenu(null)
   }
 
-  function saveComment(idx: number, text: string) {
-    const nodePath = path.slice(0, idx + 1)
+  function saveComment(nodePath: string[], text: string) {
+    const parentPath = nodePath.slice(0, -1)
+    const san = nodePath[nodePath.length - 1]
     const newTree = cloneTree(tree)
-    const { node } = walkTo(newTree, nodePath)
-    if (node) node.comment = text
-    setTree(newTree); setEditComment(null)
+    const { nodes } = walkTo(newTree, parentPath)
+    const nd = nodes.find(n => n.san === san)
+    if (nd) nd.comment = text
+    setTree(newTree)
+    setEditComment(null)
   }
 
   function load(text: string) {
@@ -1918,7 +2004,7 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
           <div className="fixed z-50 rounded-lg border bg-background shadow-lg py-1 min-w-[190px]"
             style={{ left: ctxMenu.x, top: ctxMenu.y }}>
             <button className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-destructive"
-              onClick={() => deleteFromIdx(ctxMenu.idx)}>
+              onClick={() => deleteFromNodePath(ctxMenu.nodePath)}>
               <Trash2 className="size-4" />Удалить ветку с этого хода
             </button>
           </div>
@@ -1927,7 +2013,7 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
 
       {/* Comment editor */}
       {editComment !== null && (
-        <Modal title={`Комментарий к ходу ${path[editComment]}`} close={() => setEditComment(null)}>
+        <Modal title={`Комментарий к ходу ${editComment[editComment.length - 1]}`} close={() => setEditComment(null)}>
           <textarea className="textarea min-h-28" autoFocus value={commentDraft} onChange={e => setCommentDraft(e.target.value)}
             placeholder="Например: После этого хода белые захватывают центр..." />
           <div className="flex gap-2">
@@ -2031,41 +2117,17 @@ export function PgnBoard({ openings = [], setOpenings, isTeacher, notify }: { op
               <span className="text-[10px] text-muted-foreground">ПКМ — удалить · 💬 — комментарий</span>
             </div>
             <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 leading-7">
-              {path.length === 0 && tree.children.length === 0
+              {tree.children.length === 0
                 ? <span className="text-xs text-muted-foreground">Загрузите PGN или двигайте фигуры</span>
-                : path.map((san, i) => {
-                    const nd = nodeAt(i)
-                    const siblings = siblingsAt(i).filter(s => s.san !== san)
-                    return (
-                      <span key={i} className="flex flex-col">
-                        <span className="inline-flex items-center gap-0.5">
-                          {i % 2 === 0 && <span className="text-xs text-muted-foreground">{Math.floor(i / 2) + 1}.</span>}
-                          <button
-                            className={`rounded px-1 text-sm transition-colors ${i === path.length - 1 ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                            onClick={() => goToStep(i + 1)}
-                            onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, idx: i }) }}>
-                            {san}
-                          </button>
-                          <button className="text-xs opacity-50 hover:opacity-100" title="Комментарий"
-                            onClick={() => { setEditComment(i); setCommentDraft(nd?.comment ?? '') }}>
-                            💬
-                          </button>
-                        </span>
-                        {nd?.comment && <span className="ml-2 text-xs italic text-muted-foreground">{`{ ${nd.comment} }`}</span>}
-                        {siblings.length > 0 && (
-                          <span className="ml-4 flex flex-wrap gap-1">
-                            {siblings.map(s => (
-                              <button key={s.san}
-                                className="rounded border border-dashed px-1 text-xs text-muted-foreground hover:bg-muted"
-                                onClick={() => { setPath([...path.slice(0, i), s.san]); setSelected(null) }}>
-                                ({i % 2 === 0 ? `${Math.floor(i / 2) + 1}.` : ''}{s.san})
-                              </button>
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                    )
-                  })}
+                : <TreeNodesRenderer 
+                    nodes={tree.children} 
+                    currentPath={[]} 
+                    activePath={path} 
+                    onSelect={setPath} 
+                    onContextMenu={(e, nodePath) => setCtxMenu({ x: e.clientX, y: e.clientY, nodePath })}
+                    onComment={(nodePath, node) => { setEditComment(nodePath); setCommentDraft(node?.comment ?? '') }} 
+                  />
+              }
             </div>
           </div>
 
