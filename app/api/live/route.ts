@@ -24,6 +24,9 @@ export async function GET(req: Request) {
     include: {
       teacher: { select: { id: true, name: true } },
       student: { select: { id: true, name: true } }
+    }
+  })
+
   return NextResponse.json(
     { session: activeSession },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } }
