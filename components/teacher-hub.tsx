@@ -266,7 +266,6 @@ export function TeacherHub({
   }
 
   const [role] = useState(initialRole)
-  const [pollCount, setPollCount] = useState(0)
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -324,18 +323,9 @@ export function TeacherHub({
     refreshPurchases()
     
     const fetchLive = () => {
-      fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store', credentials: 'include' }).then(async r => {
-        if (!r.ok) {
-          const text = await r.text().catch(()=>'')
-          setToast(`Error: ${r.status} ${text}`)
-        }
-        return r.json()
-      }).then(data => {
+      fetch(`/api/live?t=${Date.now()}`, { cache: 'no-store', credentials: 'include' }).then(r => r.json()).then(data => {
         setLiveSession(data.session)
-        setPollCount(c => c + 1)
-        if (data.error) setToast(`API Error: ${data.error}`)
-        if (data.debug) setToast(`Debug: ${data.debug.userId} / ${data.debug.role}`)
-      }).catch((e) => setToast('fetchLive catch error: ' + e.message))
+      }).catch((e) => console.error('fetchLive error:', e))
     }
     fetchLive()
     const interval = setInterval(fetchLive, 3000)
@@ -608,9 +598,6 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs font-mono text-muted-foreground mr-2">
-              Polls: {pollCount}
-            </span>
             <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
             {isGuest && (
               <Link href="/login" className="button ml-2 py-1 px-3 text-xs">

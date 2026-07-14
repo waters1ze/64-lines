@@ -24,23 +24,8 @@ export async function GET(req: Request) {
     include: {
       teacher: { select: { id: true, name: true } },
       student: { select: { id: true, name: true } }
-    }
-  })
-
-  // Hack: temporarily log this so we can see what's happening in prod
-  await db.message.create({
-    data: {
-      senderId: userId,
-      receiverId: userId,
-      content: `Poll /api/live. userId: ${userId}, role: ${session?.user?.role}, activeSession: ${activeSession ? activeSession.id : 'none'}`
-    }
-  }).catch(() => {})
-
   return NextResponse.json(
-    { 
-      session: activeSession,
-      debug: { userId, role: session?.user?.role }
-    },
+    { session: activeSession },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } }
   )
 }
