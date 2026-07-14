@@ -8,6 +8,7 @@ import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
 export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onPremiumClick: () => void }) {
   const [puzzle, setPuzzle] = useState<any>(null)
   const [game, setGame] = useState(new Chess())
+  const [fen, setFen] = useState('start')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [solved, setSolved] = useState(false)
@@ -45,6 +46,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         } catch(e) {}
       }
       setGame(newGame)
+      setFen(newGame.fen())
     } catch (e) {
       setError('Не удалось загрузить задачу')
     }
@@ -92,6 +94,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
       if (expectedMoveStr === userMoveStr || expectedMoveStr.startsWith(move.from + move.to)) {
         // Correct move
         setGame(gameCopy);
+        setFen(gameCopy.fen());
         const nextIndex = moveIndex + 1;
         
         if (nextIndex >= expectedMoves.length) {
@@ -110,6 +113,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
               promotion: oppMoveStr.length > 4 ? oppMoveStr[4] : undefined 
             })
             setGame(oppGame)
+            setFen(oppGame.fen())
           }, 400)
         }
         return true;
@@ -153,9 +157,9 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         ) : (
           <div className="w-full h-full relative">
             <Chessboard 
-              position={game.fen()} 
+              position={fen} 
               onPieceDrop={onDrop}
-              boardOrientation={game.turn() === 'w' ? 'white' : 'black'}
+              boardOrientation={fen.split(' ')[1] === 'w' ? 'white' : 'black'}
               customDarkSquareStyle={{ backgroundColor: '#779556' }}
               customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
               animationDuration={300}
@@ -211,7 +215,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
           )}
           {!solved && !wrong && (
             <span className="text-muted-foreground font-medium">
-              Ваш ход ({game.turn() === 'w' ? 'Белые' : 'Черные'})
+              Ваш ход ({fen.split(' ')[1] === 'w' ? 'Белые' : 'Черные'})
             </span>
           )}
         </div>
