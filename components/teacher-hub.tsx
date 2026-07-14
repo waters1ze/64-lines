@@ -2875,8 +2875,9 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
                 <div className="mt-3 flex gap-2">
                   {isTeacher ? (
                     <>
-                      <button className="outline-button flex-1" onClick={() => openEdit(c)}><Pencil className="size-3" />Изменить</button>
-                      <button className="icon-button border rounded-md" onClick={() => onDelete(c.id)}><Trash2 /></button>
+                      <button className="outline-button" onClick={() => openEdit(c)} title="Изменить"><Pencil className="size-4" /></button>
+                      <button className="button flex-1" onClick={() => onOpen?.(c.id)}>Просмотр<ChevronRight className="size-4" /></button>
+                      <button className="icon-button border rounded-md text-destructive hover:bg-destructive/10 shrink-0" onClick={() => onDelete(c.id)} title="Удалить"><Trash2 className="size-4" /></button>
                     </>
                   ) : (
                     <>
