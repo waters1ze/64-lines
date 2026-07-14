@@ -28,9 +28,14 @@ export default async function Page() {
       userName = dbUser.name || session.user.name || 'Гость'
       dbUserRole = dbUser.role
       
-      // Override session role with database role to prevent stale JWT session issues
+      // Override session with database data to prevent stale JWT session issues
+      session.user.id = dbUser.id
+      
       isTeacher = dbUser.role === 'TEACHER' || dbUser.role === 'ADMIN'
       isStudent = dbUser.role === 'STUDENT'
+    } else {
+      // If user not in DB anymore, force logout
+      return redirect('/api/auth/signout')
     }
   }
 

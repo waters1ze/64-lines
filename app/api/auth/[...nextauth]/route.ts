@@ -44,13 +44,14 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
-      } else if (token.id) {
-        // Update role from DB to avoid stale sessions when admin changes roles
+      } else if (token.email) {
+        // Always verify with DB to prevent stale JWT sessions across deletions/re-registrations
         const dbUser = await db.user.findUnique({
-          where: { id: token.id as string },
-          select: { role: true }
+          where: { email: token.email as string },
+          select: { id: true, role: true }
         })
         if (dbUser) {
+          token.id = dbUser.id
           token.role = dbUser.role
         }
       }
