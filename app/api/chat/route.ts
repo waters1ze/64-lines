@@ -124,3 +124,28 @@ export async function POST(req: Request) {
 
   return NextResponse.json(message)
 }
+
+export async function DELETE(req: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const url = new URL(req.url)
+  const withUserId = url.searchParams.get('with')
+  
+  if (!withUserId) {
+    return NextResponse.json({ error: 'Missing with parameter' }, { status: 400 })
+  }
+
+  const userId = session.user.id
+
+  await db.message.deleteMany({
+    where: {
+      OR: [
+        { senderId: userId, receiverId: withUserId },
+        { senderId: withUserId, receiverId: userId }
+      ]
+    }
+  })
+
+  return NextResponse.json({ success: true })
+}

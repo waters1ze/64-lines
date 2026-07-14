@@ -47,6 +47,19 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
     }
   }, [messages])
 
+  const deleteChat = async () => {
+    if (!activeContactId) return
+    if (confirm('Вы уверены, что хотите удалить всю переписку с этим пользователем?')) {
+      try {
+        await fetch(`/api/chat?with=${activeContactId}`, { method: 'DELETE' })
+        setMessages([])
+        fetchData()
+      } catch (e) {
+        console.error('Failed to delete chat:', e)
+      }
+    }
+  }
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !activeContactId) return
@@ -115,9 +128,17 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
                 </div>
                 <h3 className="font-semibold">{activeContact?.name}</h3>
               </div>
-              {isTeacher && activeContact?.role !== 'TEACHER' && onStartCall && (
-                <button className="button" onClick={() => onStartCall(activeContact.id)}>Начать урок</button>
-              )}
+              <div className="flex gap-2 items-center">
+                <button 
+                  className="button bg-destructive/10 text-destructive hover:bg-destructive/20" 
+                  onClick={deleteChat}
+                >
+                  Удалить чат
+                </button>
+                {isTeacher && activeContact?.role !== 'TEACHER' && onStartCall && (
+                  <button className="button" onClick={() => onStartCall(activeContact.id)}>Начать урок</button>
+                )}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
               {messages.length === 0 && (
