@@ -7,7 +7,7 @@ import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
 
 export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onPremiumClick: () => void }) {
   const [puzzle, setPuzzle] = useState<any>(null)
-  const [game, setGame] = useState(new Chess())
+  const [game, setGame] = useState<Chess | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [solved, setSolved] = useState(false)
@@ -66,7 +66,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
   }
 
   function onDrop(sourceSquare: string, targetSquare: string, piece: string) {
-    if (solved || wrong || loading) return false;
+    if (solved || wrong || loading || !game) return false;
     
     const move = {
       from: sourceSquare,
@@ -129,7 +129,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         <Crown className="h-16 w-16 text-yellow-500 mb-2" />
         <h2 className="text-2xl font-bold">Дневной лимит задач исчерпан</h2>
         <p className="text-muted-foreground max-w-md">
-          Бесплатным пользователям доступно 10 задач в день. 
+          Бесплатным пользователям доступно 5 задач в день. 
           Оформите Premium-подписку, чтобы решать неограниченное количество задач, получать доступ к приватным видео и выделяться в таблице лидеров!
         </p>
         <button 
@@ -146,7 +146,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
   return (
     <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl mx-auto">
       <div className="w-full md:w-[600px] aspect-square rounded-xl overflow-hidden shadow-lg border border-border bg-card">
-        {loading && !puzzle ? (
+        {!puzzle || !game ? (
           <div className="w-full h-full flex items-center justify-center bg-muted/20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
@@ -209,7 +209,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
               <span className="font-bold">Неверный ход. -10 рейтинга</span>
             </div>
           )}
-          {!solved && !wrong && (
+          {!solved && !wrong && game && (
             <span className="text-muted-foreground font-medium">
               Ваш ход ({game.fen().split(' ')[1] === 'w' ? 'Белые' : 'Черные'})
             </span>

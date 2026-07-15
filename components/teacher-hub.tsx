@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
 import {
-  ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, CircleDollarSign,
+  ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, ChevronLeft, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
@@ -521,6 +521,7 @@ export function TeacherHub({
     ['live',        'Уроки',              Video],
     ['findTeacher', 'Найти учителя',     UserPlus],
     ['modules',     'Мои курсы',          BookOpen],
+    ['puzzles',     'Задачи',             Trophy],
     ['shop',        'Магазин модулей',    Store],
     ['store',       'Витрина дебютов',    Store],
     ['leaderboard', 'Рейтинг',            Trophy],
@@ -2522,6 +2523,21 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
   onOpen: (id: string | number) => void
 }) {
   const [search, setSearch] = useState('')
+  const [analyses, setAnalyses] = useState<any[]>([])
+  const [activeAnalysis, setActiveAnalysis] = useState<any>(null)
+
+  useEffect(() => {
+    fetch('/api/analysis')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // For students, we only want to show completed analyses in the library
+          setAnalyses(data.filter(a => a.status === 'COMPLETED'))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const approvedPurchases = purchases.filter(p => p.status === 'APPROVED' || p.status === 'PAID')
   const purchasedCourseIds = approvedPurchases.map(p => p.courseId).filter(Boolean)
   const purchasedModuleIds = approvedPurchases.map(p => p.moduleId).filter(Boolean)
@@ -2534,7 +2550,49 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
     m.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const isEmpty = ownedCourses.length === 0 && accessibleModules.length === 0
+  const isEmpty = ownedCourses.length === 0 && accessibleModules.length === 0 && analyses.length === 0
+
+  if (activeAnalysis) {
+    return (
+      <>
+        <div className="flex items-center gap-4 mb-6">
+          <button className="icon-button" onClick={() => setActiveAnalysis(null)}>
+            <ChevronLeft className="size-5" />
+          </button>
+          <h2 className="text-xl font-bold">{activeAnalysis.title || 'Разбор партии'}</h2>
+        </div>
+        <div className="flex flex-col md:flex-row gap-6">
+          {activeAnalysis.answerVideo && (
+            <div className="w-full md:w-1/3 aspect-[9/16] bg-black rounded-xl overflow-hidden shadow-lg border">
+              <iframe 
+                src={activeAnalysis.answerVideo.replace('youtube.com/shorts/', 'youtube.com/embed/').replace('youtu.be/', 'youtube.com/embed/')} 
+                className="w-full h-full"
+                allowFullScreen
+              />
+            </div>
+          )}
+          <div className="flex-1 flex flex-col gap-4">
+            <div className="bg-card border rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold mb-2">Комментарий тренера</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground">{activeAnalysis.teacherComment || 'Нет комментариев.'}</p>
+            </div>
+            
+            {activeAnalysis.answerPgn && (
+              <div className="bg-card border rounded-xl p-6 shadow-sm flex flex-col items-center">
+                <h3 className="text-lg font-semibold mb-4 self-start">PGN с разбором</h3>
+                <div className="w-full max-w-sm aspect-square mb-4">
+                  <Chessboard position="start" />
+                </div>
+                <div className="w-full bg-muted/30 p-3 rounded-lg border font-mono text-xs whitespace-pre-wrap overflow-y-auto max-h-48">
+                  {activeAnalysis.answerPgn}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -2542,29 +2600,53 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
       {isEmpty && (
         <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
           <BookOpen className="size-12 text-muted-foreground" />
-          <p className="text-muted-foreground">У вас пока нет купленных курсов.</p>
-          <p className="text-sm text-muted-foreground">Перейдите в <b>Магазин</b>, чтобы приобрести курс.</p>
+          <p className="text-muted-foreground">У вас пока нет купленных курсов и разборов.</p>
+          <p className="text-sm text-muted-foreground">Перейдите в <b>Магазин</b>, чтобы приобрести курс или закажите разбор в Настройках.</p>
         </div>
       )}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Owned debut courses */}
-        {ownedCourses.map(c => (
-          <div key={`c-${c.id}`} className="rounded-lg border flex flex-col overflow-hidden">
-            {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full aspect-video object-cover" />}
-            <div className="p-5 flex flex-col flex-1">
-              <div className="flex flex-wrap gap-1 mb-2">
-                <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
-                <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-3 mr-1" />Куплен</span>
+
+      {analyses.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><FileSearch className="size-5" /> Мои разборы партий</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {analyses.map(a => (
+              <div key={a.id} className="rounded-lg border bg-card hover:shadow-md transition-shadow p-5 flex flex-col cursor-pointer" onClick={() => setActiveAnalysis(a)}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="badge bg-green-50 text-green-600 text-xs">Готово</span>
+                  <span className="text-xs text-muted-foreground">{new Date(a.updatedAt).toLocaleDateString('ru-RU')}</span>
+                </div>
+                <h4 className="font-bold text-lg mb-1">{a.title || 'Разбор партии'}</h4>
+                <p className="text-sm text-muted-foreground line-clamp-2 flex-1">{a.teacherComment || 'Видеоразбор от тренера'}</p>
+                <div className="mt-4 pt-4 border-t flex items-center text-primary text-sm font-medium">
+                  Смотреть разбор <ChevronRight className="size-4 ml-1" />
+                </div>
               </div>
-              <h3 className="font-semibold">{c.name}</h3>
-              {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
-              <div className="mt-4">
-                <button className="button w-full" onClick={() => onOpen(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(ownedCourses.length > 0 || accessibleModules.length > 0) && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Owned debut courses */}
+          {ownedCourses.map(c => (
+            <div key={`c-${c.id}`} className="rounded-lg border flex flex-col overflow-hidden">
+              {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full aspect-video object-cover" />}
+              <div className="p-5 flex flex-col flex-1">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
+                  <span className="badge border border-green-200 bg-transparent text-green-700 dark:border-green-800 dark:text-green-400 font-medium"><CheckCircle2 className="size-3 mr-1" />Куплен</span>
+                </div>
+                <h3 className="font-semibold">{c.name}</h3>
+                {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
+                <div className="mt-4">
+                  <button className="button w-full" onClick={() => onOpen(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-4 mt-8">
         {accessibleModules.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
@@ -3454,6 +3536,8 @@ function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
   
   const [answerPgn, setAnswerPgn] = useState('')
   const [answerVideo, setAnswerVideo] = useState('')
+  const [title, setTitle] = useState('')
+  const [teacherComment, setTeacherComment] = useState('')
 
   useEffect(() => {
     fetch('/api/analysis')
@@ -3468,11 +3552,11 @@ function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
       const res = await fetch('/api/analysis', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, answerPgn, answerVideo, status: 'COMPLETED' })
+        body: JSON.stringify({ id, title, answerPgn, answerVideo, teacherComment, status: 'COMPLETED' })
       })
       if (res.ok) {
         notify('Ответ успешно отправлен ученику!')
-        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'COMPLETED', answerPgn, answerVideo } : r))
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'COMPLETED', title, answerPgn, answerVideo, teacherComment } : r))
         setActiveReqId(null)
       } else notify('Ошибка сохранения ответа')
     } catch { notify('Ошибка сети') }
@@ -3513,6 +3597,7 @@ function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
             {req.status === 'COMPLETED' ? (
               <div className="mt-4 border-t pt-4">
                 <p className="text-sm font-semibold text-green-600 mb-2">Ответ тренера отправлен:</p>
+                {req.title && <p className="text-sm font-bold mb-2">Тема: {req.title}</p>}
                 {req.answerVideo && (
                   <a href={req.answerVideo} target="_blank" rel="noreferrer" className="text-sm text-blue-500 underline mb-2 block">Смотреть видеоразбор</a>
                 )}
@@ -3521,12 +3606,23 @@ function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
                     {req.answerPgn}
                   </div>
                 )}
+                {req.teacherComment && (
+                  <div className="mt-4 p-3 bg-primary/10 rounded-lg text-sm">
+                    <strong>Комментарий тренера:</strong> {req.teacherComment}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-4 border-t pt-4">
                 {activeReqId === req.id ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm font-semibold">Ответить ученику:</p>
+                    <input 
+                      className="input font-bold" 
+                      placeholder="Название разбора (например: Защита Каро-Канн, ошибки в миттельшпиле)"
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                    />
                     <textarea 
                       className="input min-h-[100px] font-mono text-xs" 
                       placeholder="Вставьте PGN с вашими комментариями и вариантами..."
@@ -3538,6 +3634,12 @@ function AnalysisRequests({ notify }: { notify: (s: string) => void }) {
                       placeholder="Ссылка на видео (YouTube / Cloud / и т.д.) (необязательно)"
                       value={answerVideo}
                       onChange={e => setAnswerVideo(e.target.value)}
+                    />
+                    <textarea 
+                      className="input min-h-[80px]" 
+                      placeholder="Пожелания и текстовый комментарий для ученика"
+                      value={teacherComment}
+                      onChange={e => setTeacherComment(e.target.value)}
                     />
                     <div className="flex gap-3">
                       <button className="button" onClick={() => handleSubmitAnswer(req.id)}>Отправить ответ</button>

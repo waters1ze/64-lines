@@ -22,7 +22,7 @@ export async function GET() {
     }
   }
 
-  if (!user.isPremium && solvedToday >= 10) {
+  if (!user.isPremium && solvedToday >= 5) {
     return NextResponse.json({ error: 'LIMIT_REACHED' }, { status: 403 })
   }
 

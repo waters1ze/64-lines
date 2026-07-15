@@ -6,16 +6,26 @@ import { db } from '@/lib/db'
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user.role !== 'TEACHER' && session.user.role !== 'ADMIN')) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const requests = await db.gameAnalysisRequest.findMany({
-      include: { user: { select: { id: true, name: true, email: true } } },
-      orderBy: { createdAt: 'desc' }
-    })
-    
-    return NextResponse.json(requests)
+    if (session.user.role === 'TEACHER' || session.user.role === 'ADMIN') {
+      const requests = await db.gameAnalysisRequest.findMany({
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'desc' }
+      })
+      return NextResponse.json(requests)
+    } else {
+      const user = await db.user.findUnique({ where: { email: session.user.email } })
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+      const requests = await db.gameAnalysisRequest.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' }
+      })
+      return NextResponse.json(requests)
+    }
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -29,18 +39,34 @@ export async function PUT(req: Request) {
     }
     
     const body = await req.json()
-    const { id, answerPgn, answerVideo, status } = body
+    const { id, title, answerPgn, answerVideo, teacherComment, status } = body
     
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
     
+    const reqData = await db.gameAnalysisRequest.findUnique({ where: { id: String(id) } })
+    if (!reqData) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+
     const updated = await db.gameAnalysisRequest.update({
       where: { id: String(id) },
       data: {
+        ...(title !== undefined && { title }),
         ...(answerPgn !== undefined && { answerPgn }),
         ...(answerVideo !== undefined && { answerVideo }),
+        ...(teacherComment !== undefined && { teacherComment }),
         ...(status !== undefined && { status })
       }
     })
+    
+    if (status === 'COMPLETED' && reqData.status !== 'COMPLETED') {
+      await db.notification.create({
+        data: {
+          userId: reqData.userId,
+          title: 'Разбор партии готов!',
+          message: `Тренер разобрал вашу партию: ${title || 'Без названия'}. Вы можете посмотреть разбор в разделе "Мои курсы".`,
+          link: '#modules'
+        }
+      })
+    }
     
     return NextResponse.json(updated)
   } catch (e: any) {
