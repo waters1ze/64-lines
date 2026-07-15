@@ -246,42 +246,44 @@ export function Puzzles({
 
   return (
     <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl mx-auto">
-      <div className="w-full md:w-[600px] aspect-square rounded-xl overflow-hidden shadow-lg border border-border bg-card">
-        {!isClient || !puzzle || !game ? (
-          <div className="w-full h-full flex items-center justify-center bg-muted/20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="w-full h-full relative">
+      <div className="flex flex-col">
+        <div className="w-full md:w-[600px] aspect-square rounded-xl overflow-hidden shadow-lg border border-border bg-card">
+          {!isClient || !puzzle || !game ? (
+            <div className="w-full h-full flex items-center justify-center bg-muted/20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="w-full h-full relative">
 
-            {showBoard ? (
-                <Chessboard 
-                  key={`puzzles-board-key-${puzzle.id}`}
-                  id={`puzzles-board-${puzzle.id}`}
-                  position={game.fen()}
-                  onPieceDrop={onDrop}
-                  boardOrientation={playerColor}
-                  customDarkSquareStyle={{ backgroundColor: '#779556' }}
-                  customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-                  animationDuration={300}
-                  customSquareStyles={failedSquares ? {
-                    [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
-                    [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
-                  } : {}}
-                />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted/20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            )}
-            {error && error !== 'LIMIT_REACHED' && (
-              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <p className="text-red-500 font-semibold">{error}</p>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="p-4 bg-muted text-xs font-mono overflow-auto break-all">
+              {showBoard ? (
+                  <Chessboard 
+                    key={`puzzles-board-key-${puzzle.id}`}
+                    id={`puzzles-board-${puzzle.id}`}
+                    position={game.fen().split(' ')[0]}
+                    onPieceDrop={onDrop}
+                    boardOrientation={playerColor}
+                    customDarkSquareStyle={{ backgroundColor: '#779556' }}
+                    customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
+                    animationDuration={300}
+                    customSquareStyles={failedSquares ? {
+                      [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                      [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+                    } : {}}
+                  />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              )}
+              {error && error !== 'LIMIT_REACHED' && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                  <p className="text-red-500 font-semibold">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="w-full md:w-[600px] p-4 bg-muted text-xs font-mono overflow-auto break-all mt-4 rounded-xl">
           <p>Debug Info:</p>
           <p>Puzzle FEN: {puzzle?.fen}</p>
           <p>Game FEN: {game?.fen()}</p>
