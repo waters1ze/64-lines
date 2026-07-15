@@ -24,6 +24,10 @@ export default async function Page() {
   let userRating = 1200
   let userName = 'Гость'
   let isPremium = false
+  let puzzlesSolvedTotal = 0
+  let puzzlesAttempted = 0
+  let activityStreak = 0
+  
   if (session?.user?.email) {
     const dbUser = await db.user.findUnique({ where: { email: session.user.email } })
     if (dbUser) {
@@ -31,6 +35,10 @@ export default async function Page() {
       userName = dbUser.name || session.user.name || 'Гость'
       dbUserRole = dbUser.role
       isPremium = dbUser.isPremium
+      puzzlesSolvedTotal = dbUser.puzzlesSolvedTotal
+      puzzlesAttempted = dbUser.puzzlesAttempted
+      activityStreak = dbUser.activityStreak
+      
       if (isPremium && dbUser.premiumUntil && dbUser.premiumUntil < new Date()) {
         await db.user.update({ where: { id: dbUser.id }, data: { isPremium: false, premiumUntil: null } })
         isPremium = false
@@ -109,6 +117,9 @@ export default async function Page() {
         userName={userName} 
         userRating={userRating}
         isPremium={isPremium}
+        puzzlesSolvedTotal={puzzlesSolvedTotal}
+        puzzlesAttempted={puzzlesAttempted}
+        activityStreak={activityStreak}
         initialStudents={students}
         initialHomeworks={homeworks}
         initialCourses={courses}

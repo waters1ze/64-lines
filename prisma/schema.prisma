@@ -33,6 +33,10 @@ model User {
   studentInvites      TeacherStudentInvite[] @relation("StudentInvites")
   puzzlesSolvedToday  Int            @default(0)
   lastPuzzleDate      DateTime?
+  puzzlesSolvedTotal  Int            @default(0)
+  puzzlesAttempted    Int            @default(0)
+  activityStreak      Int            @default(0)
+  lastActivityDate    DateTime?
   notifications       Notification[]
 }
 

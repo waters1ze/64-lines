@@ -320,17 +320,23 @@ export function TeacherHub({
   initialOpenings,
   initialPurchases = [],
   isPremium = false,
+  puzzlesSolvedTotal,
+  puzzlesAttempted,
+  activityStreak,
 }: { 
   initialRole?: string, 
-  userName?: string, 
-  userRating?: number,
-  initialStudents?: any[],
+  userName: string
+  userRating: number
+  isPremium: boolean
+  puzzlesSolvedTotal?: number
+  puzzlesAttempted?: number
+  activityStreak?: number
+  initialStudents: any[],
   initialHomeworks?: any[],
   initialCourses?: any[],
   initialVideos?: any[],
   initialOpenings?: any[],
   initialPurchases?: any[],
-  isPremium?: boolean,
 }) {
   const { data: session } = useSession()
   const [ratingState, setRatingState] = useState(userRating)
@@ -832,7 +838,16 @@ export function TeacherHub({
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1440px] flex-col gap-6 p-4 md:p-7">
             {section === 'overview' && (isStudent
-              ? <StudentOverview userName={userName} userRating={userRating} homeworks={homeworks} onOpenHw={openHwPuzzle} notify={notify} />
+              ? <StudentOverview 
+                  userName={userName} 
+                  userRating={ratingState} 
+                  homeworks={homeworks} 
+                  onOpenHw={openHwPuzzle} 
+                  notify={notify}
+                  puzzlesSolvedTotal={puzzlesSolvedTotal}
+                  puzzlesAttempted={puzzlesAttempted}
+                  activityStreak={activityStreak}
+                />
               : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
             )}
             {section === 'findTeacher' && isStudent && <StudentTeacherPanel notify={notify} />}
@@ -1260,24 +1275,32 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
   )
 }
 
-function StudentOverview({ userName, userRating, homeworks, onOpenHw, notify }: { userName: string; userRating: number; homeworks: HW[]; onOpenHw: (id: string | number) => void; notify: (s: string) => void }) {
-  const solved = homeworks.filter(h => h.solved).length
-  const totalAttempts = homeworks.filter(h => h.solved).reduce((a, h) => a + h.attempts, 0)
+function StudentOverview({ 
+  userName, 
+  userRating, 
+  homeworks, 
+  onOpenHw, 
+  notify,
+  puzzlesSolvedTotal = 0,
+  puzzlesAttempted = 0,
+  activityStreak = 0,
+}: { 
+  userName: string; 
+  userRating: number; 
+  homeworks: HW[]; 
+  onOpenHw: (id: string | number) => void; 
+  notify: (s: string) => void;
+  puzzlesSolvedTotal?: number;
+  puzzlesAttempted?: number;
+  activityStreak?: number;
+}) {
+  const solvedHw = homeworks.filter(h => h.solved).length
+  const totalSolved = solvedHw + puzzlesSolvedTotal
   
-  // Рассчитываем процент точности: если решено с первой попытки - 100%, со второй - 50%, и т.д.
-  // Это примерная метрика для "Точности"
   let accuracy = 0
-  if (solved > 0) {
-    const totalPossibleAccuracy = solved * 100
-    const currentAccuracy = homeworks.filter(h => h.solved).reduce((acc, h) => {
-      return acc + (100 / h.attempts)
-    }, 0)
-    accuracy = Math.round((currentAccuracy / totalPossibleAccuracy) * 100)
+  if (puzzlesAttempted > 0) {
+    accuracy = Math.round((puzzlesSolvedTotal / puzzlesAttempted) * 100)
   }
-
-  // Расчет "серии занятий" (просто пример на основе решенных задач, т.к. нет отдельной таблицы активности)
-  // Для более точного нужно сохранять дату каждого решения.
-  const streak = solved > 0 ? 1 : 0
 
   return (
     <>
@@ -1285,9 +1308,9 @@ function StudentOverview({ userName, userRating, homeworks, onOpenHw, notify }: 
       <OverviewInvitesWidget role="STUDENT" notify={notify} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Рейтинг"       value={String(userRating)} note="Текущий Эло" />
-        <Metric label="Выполнено"     value={`${solved}/${homeworks.length}`} note="заданий" />
-        <Metric label="Серия занятий" value={`${streak} дней`} note="Активность" />
-        <Metric label="Точность"      value={`${accuracy}%`} note={`${solved} задач`} />
+        <Metric label="Выполнено"     value={`${totalSolved}`} note="заданий и задач" />
+        <Metric label="Серия занятий" value={`${activityStreak} дней`} note="Активность" />
+        <Metric label="Точность"      value={`${accuracy}%`} note={`${puzzlesSolvedTotal} задач`} />
       </section>
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
       <section className="grid gap-3 lg:grid-cols-3">
@@ -3854,7 +3877,7 @@ function Leaderboard() {
                   {u.isPremium && <Crown className="size-4 text-yellow-500" title="Premium Пользователь" />}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {u._count?.homeworks ?? 0} {(u._count?.homeworks ?? 0) === 1 ? 'задание' : 'заданий'} решено
+                  {(u._count?.homeworks ?? 0) + (u.puzzlesSolvedTotal ?? 0)} заданий и задач решено
                 </p>
               </div>
               <div className="text-right shrink-0">

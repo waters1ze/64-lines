@@ -14,6 +14,7 @@ export async function GET() {
         name: true,
         rating: true,
         isPremium: true,
+        puzzlesSolvedTotal: true,
         _count: { select: { homeworks: true } }
       },
       orderBy: { rating: 'desc' },

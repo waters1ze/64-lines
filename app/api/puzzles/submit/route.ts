@@ -33,15 +33,49 @@ export async function POST(req: Request) {
   let ratingChange = isCorrect ? 10 : -10
   const newRating = Math.max(100, (user.rating || 1200) + ratingChange)
 
+  // Calculate new stats
+  const puzzlesSolvedTotal = (user.puzzlesSolvedTotal || 0) + (isCorrect ? 1 : 0)
+  const puzzlesAttempted = (user.puzzlesAttempted || 0) + 1
+
+  // Calculate streak
+  let activityStreak = user.activityStreak || 0
+  const lastActivity = user.lastActivityDate ? new Date(user.lastActivityDate) : null
+  
+  // To avoid timezone issues, format dates to YYYY-MM-DD
+  const todayStr = now.toISOString().split('T')[0]
+  const lastStr = lastActivity ? lastActivity.toISOString().split('T')[0] : null
+  
+  if (lastStr) {
+    const today = new Date(todayStr)
+    const last = new Date(lastStr)
+    const diffDays = Math.round((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 1) {
+      activityStreak += 1
+    } else if (diffDays > 1) {
+      activityStreak = 1
+    }
+  } else {
+    activityStreak = 1
+  }
+
   // Update user
   const updated = await db.user.update({
     where: { id: user.id },
     data: {
       rating: newRating,
       puzzlesSolvedToday: solvedToday + 1,
-      lastPuzzleDate: now
+      lastPuzzleDate: now,
+      puzzlesSolvedTotal,
+      puzzlesAttempted,
+      activityStreak,
+      lastActivityDate: now
     }
   })
 
-  return NextResponse.json({ rating: updated.rating, ratingChange, puzzlesSolvedToday: updated.puzzlesSolvedToday })
+  return NextResponse.json({ 
+    rating: updated.rating, 
+    ratingChange, 
+    puzzlesSolvedToday: updated.puzzlesSolvedToday 
+  })
 }

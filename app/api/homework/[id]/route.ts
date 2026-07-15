@@ -31,9 +31,34 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       else if (currentAttempts === 2) ratingDelta = 10
       else ratingDelta = 5
 
+      // Calculate streak
+      const now = new Date()
+      let activityStreak = user.activityStreak || 0
+      const lastActivity = user.lastActivityDate ? new Date(user.lastActivityDate) : null
+      const todayStr = now.toISOString().split('T')[0]
+      const lastStr = lastActivity ? lastActivity.toISOString().split('T')[0] : null
+      
+      if (lastStr) {
+        const today = new Date(todayStr)
+        const last = new Date(lastStr)
+        const diffDays = Math.round((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (diffDays === 1) {
+          activityStreak += 1
+        } else if (diffDays > 1) {
+          activityStreak = 1
+        }
+      } else {
+        activityStreak = 1
+      }
+
       await db.user.update({
         where: { id: user.id },
-        data: { rating: { increment: ratingDelta } }
+        data: { 
+          rating: { increment: ratingDelta },
+          activityStreak,
+          lastActivityDate: now
+        }
       })
     }
 
