@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { isCorrect, puzzleRating, puzzleId } = await req.json()
+  const { isCorrect, puzzleRating, puzzleId, themes } = await req.json()
 
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -79,24 +79,45 @@ export async function POST(req: Request) {
     }
   })
 
-  // Save solved puzzle to prevent repeating using upsert
+  // Save solved puzzle or missed puzzle
   if (puzzleId) {
-    try {
-      await db.solvedPuzzle.upsert({
-        where: {
-          userId_puzzleId: {
+    if (isCorrect) {
+      try {
+        await db.solvedPuzzle.upsert({
+          where: {
+            userId_puzzleId: {
+              userId: user.id,
+              puzzleId: puzzleId
+            }
+          },
+          update: {},
+          create: {
             userId: user.id,
             puzzleId: puzzleId
           }
-        },
-        update: {},
-        create: {
-          userId: user.id,
-          puzzleId: puzzleId
+        })
+        const missed = await db.missedPuzzle.findUnique({
+          where: { userId_puzzleId: { userId: user.id, puzzleId: puzzleId } }
+        })
+        if (missed) {
+          await db.missedPuzzle.update({
+            where: { id: missed.id },
+            data: { resolved: true }
+          })
         }
-      })
-    } catch (e) {
-      console.error('Error recording solved puzzle:', e)
+      } catch (e) {
+        console.error('Error recording solved puzzle:', e)
+      }
+    } else {
+      try {
+        await db.missedPuzzle.upsert({
+          where: { userId_puzzleId: { userId: user.id, puzzleId: puzzleId } },
+          update: { resolved: false, missedAt: new Date(), themes: themes || '' },
+          create: { userId: user.id, puzzleId: puzzleId, themes: themes || '' }
+        })
+      } catch (e) {
+        console.error('Error recording missed puzzle:', e)
+      }
     }
   }
 

@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'rea
 import {
   ArrowLeft, ArrowRight, Bell, BookOpen, Check, ChevronRight, ChevronLeft, CircleDollarSign,
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
-  LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
+  LockKeyhole, Menu, Pencil, Play, Plus, RotateCcw, Trophy,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
   CheckCircle2, Unlock, Search, Phone, FileSearch, Crown, Award, Zap
 } from 'lucide-react'
@@ -13,6 +13,8 @@ import dynamic from 'next/dynamic'
 import { ActivityCalendar } from './ActivityCalendar'
 import { AchievementsTab } from './AchievementsTab'
 import { PuzzleRush } from './PuzzleRush'
+import { EngineAnalysis } from './EngineAnalysis'
+import { OpeningTrainer } from './OpeningTrainer'
 import '@uiw/react-md-editor/markdown-editor.css'
 import '@uiw/react-markdown-preview/markdown.css'
 
@@ -25,6 +27,7 @@ import LiveLessonBoard from './LiveLessonBoard'
 import { AvailableStudents, StudentTeacherPanel, OverviewInvitesWidget } from './InviteComponents'
 import { ResizableBoardContainer } from './ResizableBoard'
 import { Puzzles } from './Puzzles'
+import { FriendsTab } from './FriendsTab'
 import { AdminPuzzles } from './admin-puzzles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,8 +36,8 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles' | 'add_puzzle'
-  | 'achievements' | 'puzzleRush'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles' | 'missedPuzzles' | 'add_puzzle' | 'friends'
+  | 'achievements' | 'puzzleRush' | 'openingTrainer'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -552,12 +555,14 @@ export function TeacherHub({
     ['puzzles',        'Задачи',             Trophy],
     ['add_puzzle',     'Добавить задачу',    Upload],
     ['openings',       'Мои дебюты',         Library],
+    ['openingTrainer', 'Тренажёр дебютов',   Play],
     ['modules',        'Мои курсы',          BookOpen],
     ['shop',           'Магазин модулей',    Store],
     ['store',          'Витрина дебютов',    Store],
     ['analysis',       'Разборы партий',     FileSearch],
     ['leaderboard',    'Рейтинг',            Trophy],
     ['users',          'Найти учеников',     Search],
+    ['friends',        'Друзья',             Users],
     ['settings',       'Настройки',          Settings],
   ] as const
 
@@ -571,12 +576,14 @@ export function TeacherHub({
     ['puzzles',        'Задачи',             Trophy],
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
+    ['openingTrainer', 'Тренажёр дебютов',   Play],
     ['modules',        'Учебные модули',     BookOpen],
     ['analysis',       'Разборы партий',     FileSearch],
     ['leaderboard',    'Рейтинг',            Trophy],
     ['sales',          'Продажи',            CircleDollarSign],
     ['store',          'Витрина дебютов',    Store],
     ['users',          'Пользователи',       ShieldCheck],
+    ['friends',        'Друзья',             Users],
     ['settings',       'Настройки',          Settings],
   ] as const
 
@@ -585,9 +592,12 @@ export function TeacherHub({
     ['chat',         'Сообщения',          MessageSquare],
     ['live',         'Уроки',              Video],
     ['findTeacher',  'Найти учителя',      UserPlus],
+    ['friends',      'Друзья',             Users],
     ['modules',      'Мои курсы',          BookOpen],
     ['puzzles',      'Задачи',             Trophy],
+    ['missedPuzzles','Мои ошибки',         RotateCcw],
     ['achievements', 'Достижения',         Award],
+    ['openingTrainer','Тренажёр дебютов',  Play],
     ['shop',         'Магазин модулей',    Store],
     ['store',        'Витрина дебютов',    Store],
     ['leaderboard',  'Рейтинг',            Trophy],
@@ -907,7 +917,20 @@ export function TeacherHub({
                   puzzlesAttempted={puzzlesAttempted}
                   activityStreak={activityStreak}
                 />
-              : <TeacherOverview userName={userName} go={go} homeworks={homeworks} students={students} videosCount={videos.length} onOpenHw={openHwPuzzle} onSelectStudent={openStudentProfile} notify={notify} />
+              : <TeacherOverview
+                  userName={userName}
+                  go={go}
+                  homeworks={homeworks}
+                  students={students}
+                  videosCount={videos.length}
+                  onOpenHw={openHwPuzzle}
+                  onSelectStudent={openStudentProfile}
+                  notify={notify}
+                  userRating={ratingState}
+                  puzzlesSolvedTotal={puzzlesSolvedTotal ?? 0}
+                  puzzlesAttempted={puzzlesAttempted ?? 0}
+                  activityStreak={activityStreak ?? 0}
+                />
             )}
             {section === 'findTeacher' && isStudent && <StudentTeacherPanel notify={notify} />}
             {section === 'students' && <Students students={students} homeworks={homeworks} onSelect={openStudentProfile} onAddStudent={addStudent} notify={notify} />}
@@ -969,10 +992,16 @@ export function TeacherHub({
                 </div>
               </>
             )}
+            {section === 'missedPuzzles' && (
+              <div className="mt-6">
+                <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} apiEndpoint="/api/puzzles/missed" title="Мои ошибки" />
+              </div>
+            )}
             {section === 'add_puzzle'  && (
               <AdminPuzzles onBack={() => setSection('puzzles')} />
             )}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
+            {section === 'openingTrainer' && <OpeningTrainer />}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
             {section === 'live' && (
               liveSession ? (
@@ -1029,6 +1058,9 @@ export function TeacherHub({
                 : <ModulesView modules={modules} setModules={setModules} onPurchase={purchaseCourse} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} onOpenCourse={openCourseViewer} />
             )}
             {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} onOpenCourse={openCourseViewer} onOpenModule={() => notify('Открытие модуля (в разработке)')} />}
+            {section === 'friends' && (
+              <FriendsTab notify={notify} userId={session?.user?.id as string} />
+            )}
             {section === 'leaderboard' && <Leaderboard />}
             {section === 'users'       && isAdmin && <UsersManager notify={notify} />}
             {section === 'users'       && isTeacher && !isAdmin && <AvailableStudents notify={notify} />}
@@ -1293,7 +1325,111 @@ export function TeacherHub({
 
 // ─── Overview sections ────────────────────────────────────────────────────────
 
-function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify }: { userName: string; go: (s: Section) => void; homeworks: HW[]; students: Student[]; videosCount: number; onOpenHw: (id: string | number) => void; onSelectStudent: (id: string | number) => void; notify: (s: string) => void }) {
+/**
+ * PersonalStatsSection — the four metric cards, activity calendar, and quick-launch
+ * buttons shared by both StudentOverview and TeacherOverview. Accepts only raw numbers
+ * so neither overview needs to know how to compute them.
+ */
+function PersonalStatsSection({
+  userRating = 1200,
+  puzzlesSolvedTotal = 0,
+  puzzlesAttempted = 0,
+  activityStreak = 0,
+  onGoSection,
+}: {
+  userRating?: number
+  puzzlesSolvedTotal?: number
+  puzzlesAttempted?: number
+  activityStreak?: number
+  onGoSection?: (s: string) => void
+}) {
+  const accuracy = puzzlesAttempted > 0
+    ? Math.round((puzzlesSolvedTotal / puzzlesAttempted) * 100)
+    : 0
+
+  return (
+    <>
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric
+          label="\u0420\u0435\u0439\u0442\u0438\u043d\u0433"
+          value={String(userRating)}
+          note="\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u042d\u043b\u043e"
+          icon={<Trophy className="w-5 h-5" />}
+          accentClass="text-yellow-500"
+        />
+        <Metric
+          label="\u0420\u0435\u0448\u0435\u043d\u043e"
+          value={String(puzzlesSolvedTotal)}
+          note="\u0437\u0430\u0434\u0430\u0447"
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          accentClass="text-emerald-500"
+        />
+        <Metric
+          label="\u0421\u0435\u0440\u0438\u044f \u0437\u0430\u043d\u044f\u0442\u0438\u0439"
+          value={pluralDays(activityStreak)}
+          note="\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c"
+          icon={<Award className="w-5 h-5" />}
+          accentClass="text-orange-500"
+        />
+        <Metric
+          label="\u0422\u043e\u0447\u043d\u043e\u0441\u0442\u044c"
+          value={`${accuracy}%`}
+          note={`${puzzlesSolvedTotal} \u0437\u0430\u0434\u0430\u0447`}
+          icon={<Zap className="w-5 h-5" />}
+          accentClass="text-blue-500"
+        />
+      </section>
+      <div className="my-2">
+        <ActivityCalendar />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          onClick={() => onGoSection?.('puzzles')}
+          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+            <Trophy className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-foreground">\u0417\u0430\u0434\u0430\u0447\u0438 (Puzzles)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">\u0415\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u0430\u044f \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0430 \u0442\u0430\u043a\u0442\u0438\u043a\u0438 \u0438 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</p>
+          </div>
+        </button>
+        <button
+          onClick={() => onGoSection?.('achievements')}
+          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Award className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-foreground">\u041c\u043e\u0438 \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u044f</p>
+            <p className="text-xs text-muted-foreground mt-0.5">\u0421\u043b\u0435\u0434\u0438 \u0437\u0430 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441\u043e\u043c \u0438 \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u0439 \u0431\u0435\u0439\u0434\u0436\u0438</p>
+          </div>
+        </button>
+      </div>
+    </>
+  )
+}
+
+
+function TeacherOverview({
+  userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify,
+  userRating = 1200, puzzlesSolvedTotal = 0, puzzlesAttempted = 0, activityStreak = 0
+}: {
+  userName: string
+  go: (s: Section) => void
+  homeworks: HW[]
+  students: Student[]
+  videosCount: number
+  onOpenHw: (id: string | number) => void
+  onSelectStudent: (id: string | number) => void
+  notify: (s: string) => void
+  userRating?: number
+  puzzlesSolvedTotal?: number
+  puzzlesAttempted?: number
+  activityStreak?: number
+}) {
   const recent = homeworks.slice(0, 3)
 
   const handleInvite = async () => {
@@ -1315,6 +1451,16 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
     <>
       <Head over="Рабочее пространство" title={`Добрый день, ${userName}`} text="Ученики, задания и авторские материалы 64 Lines."
         action={<button className="button" onClick={() => go('homework')}><Plus />Создать задание</button>} />
+
+      {/* ── Personal stats (identical logic to StudentOverview but no HW block) ── */}
+      <PersonalStatsSection
+        userRating={userRating}
+        puzzlesSolvedTotal={puzzlesSolvedTotal}
+        puzzlesAttempted={puzzlesAttempted}
+        activityStreak={activityStreak}
+        onGoSection={go}
+      />
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Активные ученики" value={String(students.length)}  note="всего" />
         <Metric label="Активных заданий" value={String(homeworks.filter(h => !h.solved).length)} note="не завершено" />
@@ -1418,67 +1564,14 @@ function StudentOverview({
     <>
       <Head over="Личный кабинет" title={`${greeting}, ${userName} — продолжим тренировку?`} text="Статистика и задания тренера." />
       <OverviewInvitesWidget role="STUDENT" notify={notify} />
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric
-          label="Рейтинг"
-          value={String(userRating)}
-          note={userRank > 0 ? `Топ ${userRank} сайта` : 'Текущий Эло'}
-          icon={<Trophy className="w-5 h-5" />}
-          accentClass="text-yellow-500"
-        />
-        <Metric
-          label="Выполнено"
-          value={String(totalSolved)}
-          note="заданий и задач"
-          icon={<CheckCircle2 className="w-5 h-5" />}
-          accentClass="text-emerald-500"
-        />
-        <Metric
-          label="Серия занятий"
-          value={pluralDays(activityStreak)}
-          note="Активность"
-          icon={<Award className="w-5 h-5" />}
-          accentClass="text-orange-500"
-        />
-        <Metric
-          label="Точность"
-          value={`${accuracy}%`}
-          note={`${puzzlesSolvedTotal} задач`}
-          icon={<Zap className="w-5 h-5" />}
-          accentClass="text-blue-500"
-        />
-      </section>
-      <div className="my-2">
-        <ActivityCalendar />
-      </div>
 
-      {/* Quick-launch widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <button
-          onClick={() => onGoSection?.('puzzles')}
-          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
-            <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500 group-hover:animate-pulse" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-foreground">Начать Puzzle Rush</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Реши как можно больше задач за 3 минуты</p>
-          </div>
-        </button>
-        <button
-          onClick={() => onGoSection?.('achievements')}
-          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Award className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-foreground">Мои достижения</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Следи за прогрессом и открывай бейджи</p>
-          </div>
-        </button>
-      </div>
+      <PersonalStatsSection
+        userRating={userRating}
+        puzzlesSolvedTotal={puzzlesSolvedTotal}
+        puzzlesAttempted={puzzlesAttempted}
+        activityStreak={activityStreak}
+        onGoSection={onGoSection}
+      />
 
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
       {activeHw.length === 0 ? (
@@ -1605,6 +1698,33 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const [weakThemes, setWeakThemes] = useState<{ themesJson: string, recommendation: string } | null>(null)
+  const [generatingWeakThemes, setGeneratingWeakThemes] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/teacher/students/${student.id}/weak-themes`)
+      .then(r => r.json())
+      .then(d => { if (d.report) setWeakThemes(d.report) })
+      .catch(() => {})
+  }, [student.id])
+
+  const generateWeakThemes = async () => {
+    setGeneratingWeakThemes(true)
+    try {
+      const res = await fetch(`/api/teacher/students/${student.id}/weak-themes`, { method: 'POST' })
+      const data = await res.json()
+      if (data.report) {
+        setWeakThemes(data.report)
+        notify('Отчет успешно сгенерирован!')
+      } else {
+        notify(data.error || 'Ошибка при генерации')
+      }
+    } catch {
+      notify('Ошибка сети')
+    }
+    setGeneratingWeakThemes(false)
+  }
+
   // Reset editor when opened
   useEffect(() => {
     if (showAdd) {
@@ -1683,6 +1803,23 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
         {homeworks.length === 0
           ? <p className="mt-2 text-sm text-muted-foreground">Заданий пока нет. Нажмите «Добавить ДЗ».</p>
           : <div className="mt-3 grid gap-3 lg:grid-cols-3">{homeworks.map(hw => <HwCard key={hw.id} hw={hw} onOpen={() => onOpenHw(hw.id)} />)}</div>}
+      </div>
+
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2"><Zap className="size-5 text-amber-500" /> AI-анализ слабых тем</h2>
+          <button className="outline-button text-xs py-1.5" onClick={generateWeakThemes} disabled={generatingWeakThemes}>
+            {generatingWeakThemes ? 'Генерация...' : 'Обновить анализ'}
+          </button>
+        </div>
+        {weakThemes ? (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-5">
+            <p className="text-sm font-semibold mb-2">Рекомендация:</p>
+            <p className="text-sm">{weakThemes.recommendation}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-2">Анализ пока не проводился. Нажмите "Обновить анализ", чтобы AI проанализировал ошибки ученика.</p>
+        )}
       </div>
 
       {showAdd && (
@@ -4094,6 +4231,8 @@ function SettingsPanel({ notify, initialName, isStudent, isAdmin, globalSettings
                 onChange={e => setAnalysisComment(e.target.value)}
               />
               
+              {analysisPgn && <EngineAnalysis pgn={analysisPgn} />}
+
               <button 
                 className="button w-fit" 
                 onClick={() => {

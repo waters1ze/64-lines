@@ -6,6 +6,8 @@ import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
 const Chessboard = dynamic(() => import('react-chessboard').then(m => m.Chessboard), { ssr: false })
 import { ArrowLeft, Save, Loader2, Upload } from 'lucide-react'
+import { ResponsiveBoard } from '@/components/ResponsiveBoard'
+import { EngineToggle } from '@/components/EngineToggle'
 
 export function AdminPuzzles({ onBack }: { onBack: () => void }) {
   const [pgn, setPgn] = useState('')
@@ -140,9 +142,10 @@ export function AdminPuzzles({ onBack }: { onBack: () => void }) {
             {previewFen ? (
               <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-4">
                 <h3 className="font-semibold text-lg">Предпросмотр начальной позиции</h3>
-                <div className="aspect-square w-full">
+              <ResponsiveBoard>
                   <Chessboard options={{ position: previewFen, boardOrientation: previewFen.split(' ')[1] === 'w' ? 'white' : 'black' }} />
-                </div>
+                </ResponsiveBoard>
+                <EngineToggle fen={previewFen || null} className="mt-2" />
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-1">Распознанные ходы (решение):</h4>
                   <div className="flex flex-wrap gap-1">

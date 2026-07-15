@@ -8,53 +8,60 @@ datasource db {
 }
 
 model User {
-  id                String         @id @default(cuid())
-  name              String?
-  email             String         @unique
-  passwordHash      String
-  role              Role           @default(STUDENT)
-  rating            Int            @default(1500)
-  isPremium         Boolean        @default(false)
-  premiumUntil      DateTime?
-  teacherId         String?
-  emailVerified     DateTime?
-  verificationToken String?
-  homeworks         Homework[]
-  moduleAccesses    ModuleAccess[]
-  purchases         Purchase[]
-  analysisRequests  GameAnalysisRequest[]
-  teacher           User?          @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
-  students          User[]         @relation("TeacherStudents")
-  sentMessages      Message[]      @relation("SentMessages")
-  receivedMessages  Message[]      @relation("ReceivedMessages")
-  teacherLiveSessions LiveSession[] @relation("TeacherLiveSessions")
-  studentLiveSessions LiveSession[] @relation("StudentLiveSessions")
-  teacherInvites      TeacherStudentInvite[] @relation("TeacherInvites")
-  studentInvites      TeacherStudentInvite[] @relation("StudentInvites")
-  puzzlesSolvedToday  Int            @default(0)
-  lastPuzzleDate      DateTime?
-  puzzlesSolvedTotal  Int            @default(0)
-  puzzlesAttempted    Int            @default(0)
-  activityStreak      Int            @default(0)
-  lastActivityDate    DateTime?
-  notifications       Notification[]
-  solvedPuzzles       SolvedPuzzle[]
-  pushSubscriptions   PushSubscription[]
-  activityLogs        ActivityLog[]
-  achievements        UserAchievement[]
-  puzzleRushResults   PuzzleRushResult[]
+  id                     String                    @id @default(cuid())
+  name                   String?
+  email                  String                    @unique
+  passwordHash           String
+  role                   Role                      @default(STUDENT)
+  rating                 Int                       @default(1500)
+  isPremium              Boolean                   @default(false)
+  premiumUntil           DateTime?
+  teacherId              String?
+  emailVerified          DateTime?
+  verificationToken      String?
+  homeworks              Homework[]
+  moduleAccesses         ModuleAccess[]
+  purchases              Purchase[]
+  analysisRequests       GameAnalysisRequest[]
+  teacher                User?                     @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
+  students               User[]                    @relation("TeacherStudents")
+  sentMessages           Message[]                 @relation("SentMessages")
+  receivedMessages       Message[]                 @relation("ReceivedMessages")
+  teacherLiveSessions    LiveSession[]             @relation("TeacherLiveSessions")
+  studentLiveSessions    LiveSession[]             @relation("StudentLiveSessions")
+  teacherInvites         TeacherStudentInvite[]    @relation("TeacherInvites")
+  studentInvites         TeacherStudentInvite[]    @relation("StudentInvites")
+  puzzlesSolvedToday     Int                       @default(0)
+  lastPuzzleDate         DateTime?
+  puzzlesSolvedTotal     Int                       @default(0)
+  puzzlesAttempted       Int                       @default(0)
+  activityStreak         Int                       @default(0)
+  lastActivityDate       DateTime?
+  notifications          Notification[]
+  solvedPuzzles          SolvedPuzzle[]
+  pushSubscriptions      PushSubscription[]
+  activityLogs           ActivityLog[]
+  achievements           UserAchievement[]
+  puzzleRushResults      PuzzleRushResult[]
+  missedPuzzles          MissedPuzzle[]
+  weakThemesAsStudent    StudentWeakThemesReport[] @relation("WeakThemesStudent")
+  weakThemesAsTeacher    StudentWeakThemesReport[] @relation("WeakThemesTeacher")
+  sentFriendRequests     FriendRequest[]           @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[]           @relation("ReceivedFriendRequests")
+  createdDuels           PuzzleRushDuel[]          @relation("DuelCreator")
+  opponentDuels          PuzzleRushDuel[]          @relation("DuelOpponent")
 }
 
 model Homework {
-  id          String    @id @default(cuid())
-  title       String
-  pgn         String
-  assignedAt  DateTime  @default(now())
-  dueDate     DateTime?
-  progress    Int       @default(0)
-  solved      Boolean   @default(false)
-  attempts    Int       @default(0)
-  teacherNote String?
+  id             String    @id @default(cuid())
+  title          String
+  pgn            String
+  assignedAt     DateTime  @default(now())
+  dueDate        DateTime?
+  progress       Int       @default(0)
+  solved         Boolean   @default(false)
+  attempts       Int       @default(0)
+  teacherNote    String?
   studentId      String
   rating         Int?
   student        User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -75,20 +82,20 @@ model Course {
 }
 
 model Purchase {
-  id         String   @id @default(cuid())
-  userId     String
-  courseId   String?
-  moduleId   String?
-  type       String   @default("COURSE") // COURSE, MODULE, SUBSCRIPTION, ANALYSIS
-  amount     Int?
-  createdAt  DateTime @default(now())
-  status         String   @default("PENDING")
-  paymentMethod  String   @default("sbp")
-  comment        String?
-  senderName String?
-  course     Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  module     Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  userId        String
+  courseId      String?
+  moduleId      String?
+  type          String   @default("COURSE") // COURSE, MODULE, SUBSCRIPTION, ANALYSIS
+  amount        Int?
+  createdAt     DateTime @default(now())
+  status        String   @default("PENDING")
+  paymentMethod String   @default("sbp")
+  comment       String?
+  senderName    String?
+  course        Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module        Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Video {
@@ -96,7 +103,7 @@ model Video {
   title     String
   meta      String
   url       String
-  isPremium Boolean @default(false)
+  isPremium Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 
@@ -187,16 +194,16 @@ model Message {
 }
 
 model LiveSession {
-  id           String   @id @default(cuid())
-  teacherId    String
-  studentId    String
-  status       String   @default("ACTIVE") // ACTIVE, ENDED
+  id            String   @id @default(cuid())
+  teacherId     String
+  studentId     String
+  status        String   @default("ACTIVE") // ACTIVE, ENDED
   jitsiRoomName String
-  pgn          String?
-  currentFen   String?
-  activeMoveId String?
-  lastUpdated  DateTime @default(now())
-  createdAt    DateTime @default(now())
+  pgn           String?
+  currentFen    String?
+  activeMoveId  String?
+  lastUpdated   DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   teacher User @relation("TeacherLiveSessions", fields: [teacherId], references: [id], onDelete: Cascade)
   student User @relation("StudentLiveSessions", fields: [studentId], references: [id], onDelete: Cascade)
@@ -209,29 +216,29 @@ model Settings {
 }
 
 model GameAnalysisRequest {
-  id          String   @id @default(cuid())
-  userId      String
-  title       String?
-  pgn         String
-  comment     String?
-  status      String   @default("PENDING") // PENDING, COMPLETED
-  answerPgn   String?
-  answerVideo String?
+  id             String   @id @default(cuid())
+  userId         String
+  title          String?
+  pgn            String
+  comment        String?
+  status         String   @default("PENDING") // PENDING, COMPLETED
+  answerPgn      String?
+  answerVideo    String?
   teacherComment String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Puzzle {
-  id         String   @id
-  fen        String
-  moves      String
-  rating     Int
-  ratingDeviation Int @default(0)
-  themes     String
-  openingTags String?
+  id              String  @id
+  fen             String
+  moves           String
+  rating          Int
+  ratingDeviation Int     @default(0)
+  themes          String
+  openingTags     String?
 }
 
 model Notification {
@@ -247,11 +254,11 @@ model Notification {
 }
 
 model SolvedPuzzle {
-  id        String   @id @default(cuid())
-  userId    String
-  puzzleId  String
-  solvedAt  DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String   @id @default(cuid())
+  userId   String
+  puzzleId String
+  solvedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, puzzleId])
 }
@@ -277,11 +284,11 @@ model ActivityLog {
 }
 
 model Achievement {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  title       String
-  description String
-  icon        String
+  id               String            @id @default(cuid())
+  code             String            @unique
+  title            String
+  description      String
+  icon             String
   userAchievements UserAchievement[]
 }
 
@@ -302,4 +309,52 @@ model PuzzleRushResult {
   score    Int
   playedAt DateTime @default(now())
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MissedPuzzle {
+  id       String   @id @default(cuid())
+  userId   String
+  puzzleId String
+  themes   String
+  missedAt DateTime @default(now())
+  resolved Boolean  @default(false)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, puzzleId])
+}
+
+model StudentWeakThemesReport {
+  id             String   @id @default(cuid())
+  studentId      String
+  teacherId      String
+  themesJson     String
+  recommendation String
+  generatedAt    DateTime @default(now())
+  student        User     @relation("WeakThemesStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher        User     @relation("WeakThemesTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model FriendRequest {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  createdAt  DateTime @default(now())
+  sender     User     @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+}
+
+model PuzzleRushDuel {
+  id            String   @id @default(cuid())
+  creatorId     String?
+  opponentId    String?
+  creatorScore  Int?
+  opponentScore Int?
+  status        String   @default("PENDING") // PENDING, COMPLETED
+  createdAt     DateTime @default(now())
+
+  creator  User? @relation("DuelCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  opponent User? @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: SetNull)
 }

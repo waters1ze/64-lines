@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
 import { Timer, Trophy, Zap, AlertCircle, Play, RefreshCw, Star, Loader2 } from 'lucide-react'
+import { ResponsiveBoard } from '@/components/ResponsiveBoard'
+import { EngineToggle } from '@/components/EngineToggle'
 
-export function PuzzleRush() {
+export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: string }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [timeLeft, setTimeLeft] = useState(180) // 3 minutes
   const [score, setScore] = useState(0)
@@ -79,17 +81,25 @@ export function PuzzleRush() {
     setStatus('finished')
     if (timerRef.current) clearInterval(timerRef.current)
 
-    // Save score
-    try {
-      await fetch('/api/puzzle-rush/finish', {
+    // Submit score
+    if (score > 0) {
+      fetch('/api/puzzle-rush/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score })
+      }).then(() => {
+        fetchLeaderboard()
       })
-      // Refresh high score and leaderboard
-      fetchLeaderboard()
-    } catch (e) {
-      console.error(e)
+    }
+
+    if (duelId) {
+      fetch(`/api/puzzle-rush/duel/${duelId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score })
+      }).then(() => {
+        // Duel score submitted
+      })
     }
   }
 
@@ -309,11 +319,13 @@ export function PuzzleRush() {
               </div>
 
               {/* Chessboard Wrapper */}
-              <div className={`relative max-w-[420px] mx-auto rounded-xl overflow-hidden border-4 transition-all duration-200 ${
-                status === 'correct' ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' :
-                status === 'wrong' ? 'border-red-500 shadow-lg shadow-red-500/20 animate-shake' :
-                'border-border'
-              }`}>
+              <ResponsiveBoard
+                className={`border-4 transition-all duration-200 ${
+                  status === 'correct' ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' :
+                  status === 'wrong' ? 'border-red-500 shadow-lg shadow-red-500/20 animate-shake' :
+                  'border-border'
+                }`}
+              >
                 {loadingPuzzle && (
                   <div className="absolute inset-0 bg-background/60 backdrop-blur-xs flex items-center justify-center z-10">
                     <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -337,7 +349,9 @@ export function PuzzleRush() {
                     }}
                   />
                 )}
-              </div>
+              </ResponsiveBoard>
+              {/* Engine toggle — off by default so it never slows down the rush timer */}
+              <EngineToggle fen={game ? game.fen() : null} className="mt-2" />
             </div>
           )}
         </div>

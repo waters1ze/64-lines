@@ -6,15 +6,21 @@ import { Chessboard } from 'react-chessboard'
 import { Loader2, Crown, Trophy, CheckCircle2, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { PUZZLE_THEMES, MAX_SELECTED_THEMES } from '@/lib/puzzleThemes'
 import { NotificationBanner } from '@/components/NotificationBanner'
+import { ResponsiveBoard } from '@/components/ResponsiveBoard'
+import { EngineToggle } from '@/components/EngineToggle'
 
 export function Puzzles({ 
   isPremium, 
   onPremiumClick,
   onRatingChange,
+  apiEndpoint = '/api/puzzles',
+  title = 'Задачи'
 }: { 
   isPremium: boolean, 
   onPremiumClick: () => void,
-  onRatingChange?: (newRating: number) => void 
+  onRatingChange?: (newRating: number) => void,
+  apiEndpoint?: string,
+  title?: string
 }) {
   const [puzzle, setPuzzle] = useState<any>(null)
   const [game, setGame] = useState<Chess>(new Chess())
@@ -172,8 +178,10 @@ export function Puzzles({
     setCurrentHistoryIndex(0)
     
     try {
-      const themesParam = themes.length ? `&themes=${themes.join(',')}` : ''
-      const res = await fetch(`/api/puzzles?difficulty=${diff}${themesParam}`)
+      const themesParam = themes.length ? (apiEndpoint.includes('?') ? '&' : '?') + `themes=${themes.join(',')}` : ''
+      const diffParam = apiEndpoint.includes('?') ? `&difficulty=${diff}` : `?difficulty=${diff}`
+      
+      const res = await fetch(`${apiEndpoint}${diffParam}${themesParam}`)
       if (res.status === 403) {
         setError('LIMIT_REACHED')
         setLoading(false)
@@ -447,38 +455,39 @@ export function Puzzles({
 
   return (
     <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl mx-auto">
-      <div className="flex flex-col">
-        <div className="w-full md:w-[600px] aspect-square rounded-xl overflow-hidden shadow-lg border border-border bg-card">
+      <div className="flex flex-col gap-3">
+        <ResponsiveBoard>
           {!isClient || !puzzle || !game ? (
             <div className="w-full h-full flex items-center justify-center bg-muted/20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <div className="w-full h-full relative">
-            <Chessboard 
-              key={puzzle?.fen || 'start'}
-              options={{
-                id: `board-${puzzle?.id || 'default'}`,
-                position: game.fen(),
-                boardOrientation: playerColor,
-                onPieceDrop: onDrop,
-                animationDurationInMs: 0,
-                darkSquareStyle: { backgroundColor: '#779556' },
-                lightSquareStyle: { backgroundColor: '#ebecd0' },
-                squareStyles: failedSquares ? {
-                  [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
-                  [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
-                } : {}
-              }}
-            />
-            {error && error !== 'LIMIT_REACHED' && (
-              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <p className="text-red-500 font-semibold">{error}</p>
-              </div>
-            )}
-          </div>
+              <Chessboard
+                key={puzzle?.fen || 'start'}
+                options={{
+                  id: `board-${puzzle?.id || 'default'}`,
+                  position: game.fen(),
+                  boardOrientation: playerColor,
+                  onPieceDrop: onDrop,
+                  animationDurationInMs: 0,
+                  darkSquareStyle: { backgroundColor: '#779556' },
+                  lightSquareStyle: { backgroundColor: '#ebecd0' },
+                  squareStyles: failedSquares ? {
+                    [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                    [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+                  } : {}
+                }}
+              />
+              {error && error !== 'LIMIT_REACHED' && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                  <p className="text-red-500 font-semibold">{error}</p>
+                </div>
+              )}
+            </div>
           )}
-        </div>
+        </ResponsiveBoard>
+        <EngineToggle fen={game ? game.fen() : null} />
       </div>
       
       <div className="flex-1 flex flex-col justify-center space-y-6">
