@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
-import { Loader2, Crown, Trophy, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Crown, Trophy, CheckCircle2, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { PUZZLE_THEMES, MAX_SELECTED_THEMES } from '@/lib/puzzleThemes'
 import { NotificationBanner } from '@/components/NotificationBanner'
 
@@ -29,6 +29,8 @@ export function Puzzles({
   const [failedSquares, setFailedSquares] = useState<{from: string, to: string} | null>(null)
   const [isPlayingSolution, setIsPlayingSolution] = useState(false)
   const [ratingDiff, setRatingDiff] = useState<number | null>(null)
+  const [positionHistory, setPositionHistory] = useState<string[]>([])
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(0)
 
   const [difficulty, setDifficulty] = useState('normal')
   const [selectedThemes, setSelectedThemes] = useState<string[]>([])
@@ -43,6 +45,79 @@ export function Puzzles({
     }
     fetchPuzzle(newDiff, selectedThemes)
   }
+
+  const getSolutionFens = (initialFen: string, movesStr: string) => {
+    const fens = [initialFen]
+    const tempGame = new Chess(initialFen)
+    const moves = movesStr.split(' ')
+    for (const m of moves) {
+      try {
+        tempGame.move({
+          from: m.substring(0, 2),
+          to: m.substring(2, 4),
+          promotion: m.length > 4 ? m[4] : undefined
+        })
+        fens.push(tempGame.fen())
+      } catch (e) {
+        break
+      }
+    }
+    return fens
+  }
+
+  const goToStart = () => {
+    if (positionHistory.length > 0) {
+      setCurrentHistoryIndex(0)
+      setGame(new Chess(positionHistory[0]))
+    }
+  }
+
+  const goToEnd = () => {
+    if (positionHistory.length > 0) {
+      const lastIdx = positionHistory.length - 1
+      setCurrentHistoryIndex(lastIdx)
+      setGame(new Chess(positionHistory[lastIdx]))
+    }
+  }
+
+  const goBack = () => {
+    if (currentHistoryIndex > 0) {
+      const nextIdx = currentHistoryIndex - 1
+      setCurrentHistoryIndex(nextIdx)
+      setGame(new Chess(positionHistory[nextIdx]))
+    }
+  }
+
+  const goForward = () => {
+    if (currentHistoryIndex < positionHistory.length - 1) {
+      const nextIdx = currentHistoryIndex + 1
+      setCurrentHistoryIndex(nextIdx)
+      setGame(new Chess(positionHistory[nextIdx]))
+    }
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!solved && !wrong) return
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goBack()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        goForward()
+      } else if (e.key === 'ArrowUp' || e.key === 'Home') {
+        e.preventDefault()
+        goToStart()
+      } else if (e.key === 'ArrowDown' || e.key === 'End') {
+        e.preventDefault()
+        goToEnd()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [solved, wrong, currentHistoryIndex, positionHistory])
 
   const toggleTheme = (themeCode: string) => {
     let nextThemes = [...selectedThemes]
@@ -93,6 +168,8 @@ export function Puzzles({
     setFailedSquares(null)
     setIsPlayingSolution(false)
     setRatingDiff(null)
+    setPositionHistory([])
+    setCurrentHistoryIndex(0)
     
     try {
       const themesParam = themes.length ? `&themes=${themes.join(',')}` : ''
@@ -144,6 +221,17 @@ export function Puzzles({
           console.error('Error making first move:', move, e)
         }
       }
+      
+      // Initialize position history
+      const solutionFens = getSolutionFens(data.fen, data.moves)
+      if (solutionFens.length > 1) {
+        setPositionHistory(solutionFens.slice(0, 2))
+        setCurrentHistoryIndex(1)
+      } else {
+        setPositionHistory([data.fen])
+        setCurrentHistoryIndex(0)
+      }
+
       setPlayerColor(newGame.fen().split(' ')[1] === 'w' ? 'white' : 'black')
       setGame(newGame)
     } catch (e) {
@@ -172,7 +260,37 @@ export function Puzzles({
   }
 
   const onDrop = ({ sourceSquare, targetSquare, piece }: any) => {
-    if (solved || wrong || isPlayingSolution || !game || !puzzle) return false
+    if (isPlayingSolution || !game || !puzzle) return false
+
+    if (solved || wrong) {
+      // Free play / analysis mode after puzzle is finished
+      try {
+        const pieceStr = piece.pieceType || piece
+        const isProm = 
+          (pieceStr[1]?.toLowerCase() === 'p') && 
+          ((pieceStr[0] === 'w' && targetSquare[1] === '8') || (pieceStr[0] === 'b' && targetSquare[1] === '1'));
+
+        const testGame = new Chess(game.fen())
+        const move = testGame.move({ 
+          from: sourceSquare, 
+          to: targetSquare, 
+          promotion: isProm ? 'q' : undefined 
+        })
+        if (!move) return false
+        
+        const newFen = testGame.fen()
+        setGame(new Chess(newFen))
+        
+        // Truncate history at the current viewing index and append the new FEN
+        const nextHistory = positionHistory.slice(0, currentHistoryIndex + 1)
+        nextHistory.push(newFen)
+        setPositionHistory(nextHistory)
+        setCurrentHistoryIndex(nextHistory.length - 1)
+        return true
+      } catch(e) {
+        return false
+      }
+    }
 
     try {
       const pieceStr = piece.pieceType || piece
@@ -203,20 +321,38 @@ export function Puzzles({
       const moves = puzzle.moves.split(' ')
       if (moveIndex < moves.length && moves[moveIndex] === move.lan) {
         // Correct move
+        const playerMoveFen = testGame.fen()
+        
         if (moveIndex === moves.length - 1) {
           // Solved
+          const solutionFens = getSolutionFens(puzzle.fen, puzzle.moves)
+          setPositionHistory(solutionFens)
+          setCurrentHistoryIndex(solutionFens.length - 1)
           setSolved(true)
           submitResult(true)
         } else {
           // Next move by opponent
           setMoveIndex(m => m + 1)
+          
+          setPositionHistory(prev => [...prev, playerMoveFen])
+          setCurrentHistoryIndex(prev => prev + 1)
+
           setTimeout(() => {
             try {
               const oppMove = moves[moveIndex + 1]
               testGame.move({ from: oppMove.substring(0, 2), to: oppMove.substring(2, 4), promotion: oppMove.length > 4 ? oppMove[4] : undefined })
+              
+              const oppMoveFen = testGame.fen()
               setGame(new Chess(testGame.fen()))
               setMoveIndex(m => m + 1)
+              
+              setPositionHistory(prev => [...prev, oppMoveFen])
+              setCurrentHistoryIndex(prev => prev + 1)
+
               if (moveIndex + 1 === moves.length - 1) {
+                const solutionFens = getSolutionFens(puzzle.fen, puzzle.moves)
+                setPositionHistory(solutionFens)
+                setCurrentHistoryIndex(solutionFens.length - 1)
                 setSolved(true)
                 submitResult(true)
               }
@@ -231,6 +367,11 @@ export function Puzzles({
         setTimeout(() => setFailedSquares(null), 1000)
         setWrong(true)
         submitResult(false)
+        
+        // Pre-populate history with the correct solution
+        const solutionFens = getSolutionFens(puzzle.fen, puzzle.moves)
+        setPositionHistory(solutionFens)
+        setCurrentHistoryIndex(moveIndex)
         return false
       }
     } catch (e) {
@@ -272,26 +413,20 @@ export function Puzzles({
     setIsPlayingSolution(true)
     setFailedSquares(null)
     
-    const newGame = new Chess(puzzle.fen)
-    const moves = puzzle.moves.split(' ')
-    if (moves.length > 0) {
-      const opp = moves[0]
-      try { newGame.move({ from: opp.substring(0, 2), to: opp.substring(2, 4), promotion: opp.length > 4 ? opp[4] : undefined }) } catch(e) {}
+    if (positionHistory.length > 1) {
+      setCurrentHistoryIndex(1)
+      setGame(new Chess(positionHistory[1]))
     }
-    setGame(new Chess(newGame.fen()))
     
-    let i = 1
+    let i = 2
     const interval = setInterval(() => {
-      if (i >= moves.length) {
+      if (i >= positionHistory.length) {
         clearInterval(interval)
         setIsPlayingSolution(false)
         return
       }
-      const m = moves[i]
-      try { 
-        newGame.move({ from: m.substring(0, 2), to: m.substring(2, 4), promotion: m.length > 4 ? m[4] : undefined }) 
-        setGame(new Chess(newGame.fen()))
-      } catch(e) {}
+      setCurrentHistoryIndex(i)
+      setGame(new Chess(positionHistory[i]))
       i++
     }, 1000)
   }
@@ -468,6 +603,45 @@ export function Puzzles({
             </span>
           )}
         </div>
+
+        {/* Navigation Controls */}
+        {(solved || wrong) && positionHistory.length > 0 && (
+          <div className="flex justify-center items-center gap-1.5 p-2 bg-muted/20 rounded-xl border border-muted select-none">
+            <button 
+              onClick={goToStart} 
+              title="В начало"
+              className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronsLeft className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={goBack} 
+              title="Назад"
+              disabled={currentHistoryIndex === 0}
+              className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-xs font-semibold px-3 text-muted-foreground min-w-[70px] text-center">
+              Ход {currentHistoryIndex} / {positionHistory.length - 1}
+            </span>
+            <button 
+              onClick={goForward} 
+              title="Вперед"
+              disabled={currentHistoryIndex === positionHistory.length - 1}
+              className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={goToEnd} 
+              title="В конец"
+              className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronsRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
 
         <button
           onClick={fetchPuzzle}
