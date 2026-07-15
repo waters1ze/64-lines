@@ -333,6 +333,7 @@ export function TeacherHub({
   isPremium?: boolean,
 }) {
   const { data: session } = useSession()
+  const [ratingState, setRatingState] = useState(userRating)
   
   const isAdmin = initialRole === 'ADMIN'
   const isTeacher = initialRole === 'Учитель' || isAdmin
