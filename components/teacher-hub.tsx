@@ -746,6 +746,10 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-500 px-2 py-1 rounded-md text-sm font-bold border border-amber-200 dark:border-amber-800/50 shadow-sm mr-2" title="Ваш рейтинг (Эло)">
+              <Trophy className="size-4" />
+              {ratingState}
+            </div>
             {isPremium && (
               <span className="flex items-center gap-1 text-xs font-semibold text-yellow-600 bg-yellow-500/20 px-2 py-1 rounded-md border border-yellow-500/50">
                 <Crown className="size-3" /> Premium
@@ -856,7 +860,7 @@ export function TeacherHub({
               <>
                 <Head over="Тренировка" title="Тактические задачи" text="Решайте шахматные задачи для повышения своего рейтинга" />
                 <div className="mt-8">
-                  <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} />
+                  <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} />
                 </div>
               </>
             )}

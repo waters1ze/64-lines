@@ -5,6 +5,8 @@ import { redirect } from "next/navigation"
 import { db } from '@/lib/db'
 import { Suspense } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Page() {
   const session = await getServerSession(authOptions)
 

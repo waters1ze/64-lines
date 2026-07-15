@@ -5,7 +5,15 @@ import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
 import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
 
-export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onPremiumClick: () => void }) {
+export function Puzzles({ 
+  isPremium, 
+  onPremiumClick,
+  onRatingChange,
+}: { 
+  isPremium: boolean, 
+  onPremiumClick: () => void,
+  onRatingChange?: (newRating: number) => void 
+}) {
   const [puzzle, setPuzzle] = useState<any>(null)
   const [game, setGame] = useState<Chess | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,11 +82,15 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
 
   const submitResult = async (isCorrect: boolean) => {
     try {
-      await fetch('/api/puzzles/submit', {
+      const res = await fetch('/api/puzzles/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isCorrect })
       })
+      const data = await res.json()
+      if (data.rating && onRatingChange) {
+        onRatingChange(data.rating)
+      }
     } catch (e) {}
   }
 
