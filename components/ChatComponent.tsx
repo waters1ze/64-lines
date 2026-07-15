@@ -153,7 +153,7 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
                   Удалить чат
                 </button>
                 {isTeacher && activeContact?.role !== 'TEACHER' && onStartCall && (
-                  <button className="button" onClick={() => onStartCall(activeContact.id)}>Начать урок</button>
+                  <button className="button" onClick={() => onStartCall(activeContact!.id)}>Начать урок</button>
                 )}
               </div>
             </div>

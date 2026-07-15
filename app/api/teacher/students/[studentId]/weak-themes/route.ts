@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { getWeakThemesRecommendation } from '@/lib/groq'
 
-export async function GET(req: Request, { params }: { params: { studentId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ studentId: string }> }) {
+  const { studentId } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -12,7 +13,7 @@ export async function GET(req: Request, { params }: { params: { studentId: strin
   if (!teacher) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const invite = await db.teacherStudentInvite.findFirst({
-    where: { teacherId: teacher.id, studentId: params.studentId, status: 'ACCEPTED' }
+    where: { teacherId: teacher.id, studentId: studentId, status: 'ACCEPTED' }
   })
   if (!invite) return NextResponse.json({ error: 'Not your student' }, { status: 403 })
 

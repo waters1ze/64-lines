@@ -376,7 +376,7 @@ export function TeacherHub({
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
-  const [puzzleSubMode, setPuzzleSubMode] = useState<'normal' | 'rush'>('normal')
+  const [puzzleSubMode, setPuzzleSubMode] = useState<'normal' | 'rush' | 'missed'>('normal')
 
   const [students, setStudents] = useState<Student[]>(initialStudents || INIT_STUDENTS)
   const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
@@ -576,7 +576,6 @@ export function TeacherHub({
     ['puzzles',        'Задачи',             Trophy],
     ['courses',        'Дебютные курсы',     GraduationCap],
     ['openings',       'Мои дебюты',         Library],
-    ['openingTrainer', 'Тренажёр дебютов',   Play],
     ['modules',        'Учебные модули',     BookOpen],
     ['analysis',       'Разборы партий',     FileSearch],
     ['leaderboard',    'Рейтинг',            Trophy],
@@ -595,9 +594,7 @@ export function TeacherHub({
     ['friends',      'Друзья',             Users],
     ['modules',      'Мои курсы',          BookOpen],
     ['puzzles',      'Задачи',             Trophy],
-    ['missedPuzzles','Мои ошибки',         RotateCcw],
     ['achievements', 'Достижения',         Award],
-    ['openingTrainer','Тренажёр дебютов',  Play],
     ['shop',         'Магазин модулей',    Store],
     ['store',        'Витрина дебютов',    Store],
     ['leaderboard',  'Рейтинг',            Trophy],
@@ -981,27 +978,45 @@ export function TeacherHub({
                   >
                     Puzzle Rush (Молния)
                   </button>
+                  <button
+                    onClick={() => setPuzzleSubMode('missed')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-full transition ${
+                      puzzleSubMode === 'missed'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    Мои ошибки
+                  </button>
                 </div>
 
                 <div className="mt-6">
                   {puzzleSubMode === 'normal' ? (
                     <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} />
-                  ) : (
+                  ) : puzzleSubMode === 'rush' ? (
                     <PuzzleRush />
+                  ) : (
+                    <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} apiEndpoint="/api/puzzles/missed" title="Мои ошибки" />
                   )}
                 </div>
               </>
             )}
-            {section === 'missedPuzzles' && (
-              <div className="mt-6">
-                <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} apiEndpoint="/api/puzzles/missed" title="Мои ошибки" />
-              </div>
-            )}
             {section === 'add_puzzle'  && (
               <AdminPuzzles onBack={() => setSection('puzzles')} />
             )}
-            {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
-            {section === 'openingTrainer' && <OpeningTrainer />}
+            {section === 'openings'    && (
+              <div className="space-y-6">
+                <div className="flex gap-2 mb-4 border-b pb-4">
+                  <button onClick={() => setPuzzleSubMode('normal')} className={`px-4 py-2 text-sm font-semibold rounded-full transition ${puzzleSubMode === 'normal' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground'}`}>Управление базами</button>
+                  <button onClick={() => setPuzzleSubMode('rush')} className={`px-4 py-2 text-sm font-semibold rounded-full transition ${puzzleSubMode === 'rush' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground'}`}>Тренажёр</button>
+                </div>
+                {puzzleSubMode === 'normal' ? (
+                  <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />
+                ) : (
+                  <OpeningTrainer />
+                )}
+              </div>
+            )}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
             {section === 'live' && (
               liveSession ? (
@@ -1009,6 +1024,7 @@ export function TeacherHub({
                   sessionId={liveSession.id} 
                   jitsiRoomName={liveSession.jitsiRoomName}
                   userId={!isGuest && session?.user ? session.user.id : ''}
+                  userName={session?.user?.name || 'User'}
                   isTeacher={isTeacher}
                   onClose={() => { setLiveSession(null); go('overview') }}
                 />
@@ -1351,30 +1367,30 @@ function PersonalStatsSection({
     <>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric
-          label="\u0420\u0435\u0439\u0442\u0438\u043d\u0433"
+          label="Рейтинг"
           value={String(userRating)}
-          note="\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u042d\u043b\u043e"
+          note="Текущий Эло"
           icon={<Trophy className="w-5 h-5" />}
           accentClass="text-yellow-500"
         />
         <Metric
-          label="\u0420\u0435\u0448\u0435\u043d\u043e"
+          label="Решено"
           value={String(puzzlesSolvedTotal)}
-          note="\u0437\u0430\u0434\u0430\u0447"
+          note="задач"
           icon={<CheckCircle2 className="w-5 h-5" />}
           accentClass="text-emerald-500"
         />
         <Metric
-          label="\u0421\u0435\u0440\u0438\u044f \u0437\u0430\u043d\u044f\u0442\u0438\u0439"
+          label="Серия занятий"
           value={pluralDays(activityStreak)}
-          note="\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c"
+          note="Активность"
           icon={<Award className="w-5 h-5" />}
           accentClass="text-orange-500"
         />
         <Metric
-          label="\u0422\u043e\u0447\u043d\u043e\u0441\u0442\u044c"
+          label="Точность"
           value={`${accuracy}%`}
-          note={`${puzzlesSolvedTotal} \u0437\u0430\u0434\u0430\u0447`}
+          note={`${puzzlesSolvedTotal} задач`}
           icon={<Zap className="w-5 h-5" />}
           accentClass="text-blue-500"
         />
@@ -1391,8 +1407,8 @@ function PersonalStatsSection({
             <Trophy className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" />
           </div>
           <div>
-            <p className="font-semibold text-sm text-foreground">\u0417\u0430\u0434\u0430\u0447\u0438 (Puzzles)</p>
-            <p className="text-xs text-muted-foreground mt-0.5">\u0415\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u0430\u044f \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0430 \u0442\u0430\u043a\u0442\u0438\u043a\u0438 \u0438 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</p>
+            <p className="font-semibold text-sm text-foreground">Задачи (Puzzles)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Ежедневная тренировка тактики и расчёта</p>
           </div>
         </button>
         <button
@@ -1403,8 +1419,8 @@ function PersonalStatsSection({
             <Award className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="font-semibold text-sm text-foreground">\u041c\u043e\u0438 \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u044f</p>
-            <p className="text-xs text-muted-foreground mt-0.5">\u0421\u043b\u0435\u0434\u0438 \u0437\u0430 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441\u043e\u043c \u0438 \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u0439 \u0431\u0435\u0439\u0434\u0436\u0438</p>
+            <p className="font-semibold text-sm text-foreground">Мои достижения</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Следи за прогрессом и открывай бейджи</p>
           </div>
         </button>
       </div>

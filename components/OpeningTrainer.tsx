@@ -260,7 +260,7 @@ function TrainingMode({
   }, [])
 
   // ── Handle user piece drop ──
-  const onDrop = useCallback(({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string }) => {
+  const onDrop = useCallback(({ sourceSquare, targetSquare }: any) => {
     if (status !== 'waiting' || stepIndex >= line.length) return false
 
     const expectedSan = line[stepIndex]
@@ -367,7 +367,7 @@ function TrainingMode({
               id: `opening-trainer-${opening.id}`,
               position: currentFen,
               boardOrientation: userSide,
-              onPieceDrop: (src, tgt) => onDrop({ sourceSquare: src, targetSquare: tgt }),
+              onPieceDrop: ({ sourceSquare, targetSquare }) => Boolean(onDrop({ sourceSquare: sourceSquare as string, targetSquare: targetSquare as string })),
               animationDurationInMs: 150,
               darkSquareStyle: { backgroundColor: '#779556' },
               lightSquareStyle: { backgroundColor: '#ebecd0' },

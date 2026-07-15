@@ -3,14 +3,15 @@ import { db } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const request = await db.friendRequest.findUnique({ where: { id: params.id } })
+  const request = await db.friendRequest.findUnique({ where: { id: id } })
   if (!request) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
 
   if (request.receiverId !== user.id && request.senderId !== user.id) {

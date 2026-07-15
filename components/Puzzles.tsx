@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
 import { Loader2, Crown, Trophy, CheckCircle2, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { PUZZLE_THEMES, MAX_SELECTED_THEMES } from '@/lib/puzzleThemes'
 import { NotificationBanner } from '@/components/NotificationBanner'
 import { ResponsiveBoard } from '@/components/ResponsiveBoard'
-import { EngineToggle } from '@/components/EngineToggle'
 
 export function Puzzles({ 
   isPremium, 
@@ -210,10 +209,8 @@ export function Puzzles({
 
       setPuzzle(data)
       let newGame = new Chess()
-      console.log('Loaded puzzle data:', data)
       try {
         newGame = new Chess(data.fen)
-        console.log('FEN loaded successfully:', newGame.fen())
       } catch (err) {
         console.error('Error loading FEN:', data.fen, err)
       }
@@ -271,7 +268,6 @@ export function Puzzles({
     if (isPlayingSolution || !game || !puzzle) return false
 
     if (solved || wrong) {
-      // Free play / analysis mode after puzzle is finished
       try {
         const pieceStr = piece.pieceType || piece
         const isProm = 
@@ -289,7 +285,6 @@ export function Puzzles({
         const newFen = testGame.fen()
         setGame(new Chess(newFen))
         
-        // Truncate history at the current viewing index and append the new FEN
         const nextHistory = positionHistory.slice(0, currentHistoryIndex + 1)
         nextHistory.push(newFen)
         setPositionHistory(nextHistory)
@@ -328,18 +323,15 @@ export function Puzzles({
 
       const moves = puzzle.moves.split(' ')
       if (moveIndex < moves.length && moves[moveIndex] === move.lan) {
-        // Correct move
         const playerMoveFen = testGame.fen()
         
         if (moveIndex === moves.length - 1) {
-          // Solved
           const solutionFens = getSolutionFens(puzzle.fen, puzzle.moves)
           setPositionHistory(solutionFens)
           setCurrentHistoryIndex(solutionFens.length - 1)
           setSolved(true)
           submitResult(true)
         } else {
-          // Next move by opponent
           setMoveIndex(m => m + 1)
           
           setPositionHistory(prev => [...prev, playerMoveFen])
@@ -369,14 +361,12 @@ export function Puzzles({
         }
         return true
       } else {
-        // Wrong move
         setGame(new Chess(game.fen()))
         setFailedSquares({ from: sourceSquare, to: targetSquare })
         setTimeout(() => setFailedSquares(null), 1000)
         setWrong(true)
         submitResult(false)
         
-        // Pre-populate history with the correct solution
         const solutionFens = getSolutionFens(puzzle.fen, puzzle.moves)
         setPositionHistory(solutionFens)
         setCurrentHistoryIndex(moveIndex)
@@ -487,7 +477,6 @@ export function Puzzles({
             </div>
           )}
         </ResponsiveBoard>
-        <EngineToggle fen={game ? game.fen() : null} />
       </div>
       
       <div className="flex-1 flex flex-col justify-center space-y-6">
@@ -653,7 +642,7 @@ export function Puzzles({
         )}
 
         <button
-          onClick={fetchPuzzle}
+          onClick={() => fetchPuzzle()}
           disabled={loading || (!solved && !wrong)}
           className={`w-full py-4 rounded-xl font-bold transition-all ${
             solved || wrong 

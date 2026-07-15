@@ -5,7 +5,6 @@ import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
 import { Timer, Trophy, Zap, AlertCircle, Play, RefreshCw, Star, Loader2 } from 'lucide-react'
 import { ResponsiveBoard } from '@/components/ResponsiveBoard'
-import { EngineToggle } from '@/components/EngineToggle'
 
 export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: string }) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -142,11 +141,11 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
     setLoadingPuzzle(false)
   }
 
-  const onDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
+  const onDrop = ({ sourceSquare, targetSquare, piece }: { sourceSquare: string, targetSquare: string, piece: string }) => {
     if (status !== 'playing' || !game || !puzzle || loadingPuzzle) return false
 
     try {
-      const pieceStr = piece.pieceType || piece
+      const pieceStr = (piece as any).pieceType || piece
       const isProm =
         pieceStr[1]?.toLowerCase() === 'p' &&
         ((pieceStr[0] === 'w' && targetSquare[1] === '8') ||
@@ -350,8 +349,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
                   />
                 )}
               </ResponsiveBoard>
-              {/* Engine toggle — off by default so it never slows down the rush timer */}
-              <EngineToggle fen={game ? game.fen() : null} className="mt-2" />
             </div>
           )}
         </div>

@@ -64,7 +64,7 @@ export function useStockfishEval(
         // Lazy-load stockfish only once; reuse if already instantiated
         if (!engineRef.current) {
           if (cancelled) return
-          engineRef.current = new Worker('/stockfish/stockfish-18-lite.js')
+          engineRef.current = new Worker('/stockfish/stockfish-18-lite-single.js')
         }
 
         const engine = engineRef.current
