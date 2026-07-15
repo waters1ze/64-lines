@@ -27,69 +27,41 @@ export async function GET() {
   }
 
   const targetRating = user.rating || 1200
-  let puzzle = null;
+  let puzzle = null
 
-  // Try RapidAPI first
-  try {
-    const res = await fetch(`https://chess-puzzles.p.rapidapi.com/?rating=${targetRating}&count=1`, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': 'chess-puzzles.p.rapidapi.com',
-        'x-rapidapi-key': '11089b4e0bmsh26773ff32f030c1p17ad8djsn39bdeef95907'
-      },
-      signal: AbortSignal.timeout(3000) // 3s timeout
-    })
-    if (res.ok) {
-      const data = await res.json()
-      if (data && data.puzzles && data.puzzles.length > 0) {
-        puzzle = {
-          id: data.puzzles[0].puzzleid,
-          fen: data.puzzles[0].fen,
-          moves: data.puzzles[0].moves.join(' '), // Assuming moves is array, if not it will fail back to DB
-          rating: data.puzzles[0].rating,
-          themes: data.puzzles[0].themes.join(' ')
-        }
+  // Get from our own DB
+  let puzzles = await db.puzzle.findMany({
+    where: {
+      rating: {
+        gte: targetRating - 100,
+        lte: targetRating + 100,
       }
     }
-  } catch (e) {
-    console.error('RapidAPI failed, falling back to DB', e)
-  }
+  })
 
-  if (!puzzle) {
-    // Fallback to our own DB
-    let puzzles = await db.puzzle.findMany({
+  if (puzzles.length === 0) {
+    puzzles = await db.puzzle.findMany({
       where: {
         rating: {
-          gte: targetRating - 100,
-          lte: targetRating + 100,
+          gte: targetRating - 200,
+          lte: targetRating + 200,
         }
       }
     })
+  }
 
-    if (puzzles.length === 0) {
-      puzzles = await db.puzzle.findMany({
-        where: {
-          rating: {
-            gte: targetRating - 200,
-            lte: targetRating + 200,
-          }
-        }
-      })
+  if (puzzles.length === 0) {
+    // Get closest above or below
+    const allPuzzles = await db.puzzle.findMany()
+    if (allPuzzles.length > 0) {
+      // Sort by absolute rating difference
+      allPuzzles.sort((a, b) => Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating))
+      puzzles = [allPuzzles[0]]
     }
+  }
 
-    if (puzzles.length === 0) {
-      // Get closest above or below
-      const allPuzzles = await db.puzzle.findMany()
-      if (allPuzzles.length > 0) {
-        // Sort by absolute rating difference
-        allPuzzles.sort((a, b) => Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating))
-        puzzles = [allPuzzles[0]]
-      }
-    }
-
-    if (puzzles.length > 0) {
-      puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
-    }
+  if (puzzles.length > 0) {
+    puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
   }
 
   if (!puzzle) {

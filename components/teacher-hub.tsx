@@ -21,6 +21,7 @@ import LiveLessonBoard from './LiveLessonBoard'
 import { AvailableStudents, StudentTeacherPanel, OverviewInvitesWidget } from './InviteComponents'
 import { ResizableBoardContainer } from './ResizableBoard'
 import { Puzzles } from './Puzzles'
+import { AdminPuzzles } from './admin-puzzles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ type Role = 'Учитель' | 'Ученик' | 'Покупатель'
 type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
-  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles'
+  | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles' | 'add_puzzle'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -486,6 +487,7 @@ export function TeacherHub({
     ['homework',       'Домашние задания',   BookOpen],
     ['videos',         'Видео с YouTube',    Video],
     ['puzzles',        'Задачи',             Trophy],
+    ['add_puzzle',     'Добавить задачу',    Upload],
     ['openings',       'Мои дебюты',         Library],
     ['modules',        'Мои курсы',          BookOpen],
     ['shop',           'Магазин модулей',    Store],
@@ -857,6 +859,9 @@ export function TeacherHub({
                   <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} />
                 </div>
               </>
+            )}
+            {section === 'add_puzzle'  && (
+              <AdminPuzzles onBack={() => setSection('puzzles')} />
             )}
             {section === 'openings'    && <PgnBoard openings={openings} setOpenings={setOpenings} isTeacher={!isStudent} notify={notify} />}
             {section === 'chat'        && <ChatComponent userId={!isGuest && session?.user ? session.user.id : ''} isTeacher={isTeacher} onStartCall={isTeacher ? startLiveSession : undefined} />}
