@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
-import dynamic from 'next/dynamic'
+import { Chessboard } from 'react-chessboard'
 import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
-
-const Chessboard = dynamic(() => import('react-chessboard').then(m => m.Chessboard), { ssr: false })
 
 export function Puzzles({ 
   isPremium, 
