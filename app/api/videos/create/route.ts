@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { broadcastNotification } from '@/lib/notifications'
 
 export async function POST(req: Request) {
   try {
@@ -19,8 +20,17 @@ export async function POST(req: Request) {
       data: { title, meta: meta || '', url, isPremium: !!isPremium }
     })
 
+    // Broadcast notification to all users (excluding the admin who published)
+    broadcastNotification({
+      title: 'Новое видео',
+      message: `Вышло новое видео: ${video.title}`,
+      link: '/?section=videos',
+      excludeUserId: session.user.id
+    }).catch(() => {})
+
     return NextResponse.json({ success: true, video })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+

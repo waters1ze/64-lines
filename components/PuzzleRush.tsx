@@ -321,17 +321,20 @@ export function PuzzleRush() {
                 )}
                 {game && (
                   <Chessboard
-                    id="rush-board"
-                    position={game.fen()}
-                    boardWidth={412}
-                    boardOrientation={playerColor}
-                    onPieceDrop={onDrop}
-                    customBoardStyle={{
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    key={puzzle?.fen || 'rush-start'}
+                    options={{
+                      id: `rush-board-${puzzle?.id || 'default'}`,
+                      position: game.fen(),
+                      boardOrientation: playerColor,
+                      onPieceDrop: onDrop,
+                      animationDurationInMs: 0,
+                      darkSquareStyle: { backgroundColor: '#b58863' },
+                      lightSquareStyle: { backgroundColor: '#f0d9b5' },
+                      squareStyles: failedSquares ? {
+                        [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                        [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+                      } : {}
                     }}
-                    customDarkSquareStyle={{ backgroundColor: '#b58863' }}
-                    customLightSquareStyle={{ backgroundColor: '#f0d9b5' }}
                   />
                 )}
               </div>

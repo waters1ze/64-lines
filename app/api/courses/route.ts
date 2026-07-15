@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { broadcastNotification } from '@/lib/notifications'
 
 export async function POST(req: Request) {
   try {
@@ -27,6 +28,14 @@ export async function POST(req: Request) {
         isPremium: Boolean(isPremium)
       }
     })
+
+    // Broadcast notification to all users (excluding the admin who published)
+    broadcastNotification({
+      title: 'Новый курс',
+      message: `Доступен новый курс: ${course.name}`,
+      link: '/?section=modules',
+      excludeUserId: user.id
+    }).catch(() => {})
 
     return NextResponse.json(course)
   } catch (error) {

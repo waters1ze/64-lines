@@ -4,41 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "d5ad201a69b5fe16",
+        "id": "9e695c33dab0daec",
         "type": "tabs",
         "children": [
           {
-            "id": "456aba7280914894",
+            "id": "a1fd87b04cf65ed8",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Добро пожаловать.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "Добро пожаловать"
-            }
-          }
-        ]
-      },
-      {
-        "id": "950d4a00bea808b9",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "a67dbee41a503b81",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Архитектура проекта.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Архитектура проекта"
+              "title": "Новая вкладка"
             }
           }
         ]
@@ -114,7 +90,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Архитектура проекта.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -124,7 +99,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Обратные ссылки для Архитектура проекта"
+              "title": "Обратные ссылки"
             }
           },
           {
@@ -133,12 +108,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Архитектура проекта.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Исходящие ссылки из Архитектура проекта"
+              "title": "Исходящие ссылки"
             }
           },
           {
@@ -176,21 +150,30 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Архитектура проекта.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Структура Архитектура проекта"
+              "title": "Структура"
+            }
+          },
+          {
+            "id": "183d25127e7d8897",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Граф"
             }
           }
-        ]
+        ],
+        "currentTab": 5
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 1384.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -203,10 +186,43 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "a67dbee41a503b81",
+  "active": "183d25127e7d8897",
   "lastOpenFiles": [
+    "03-API/API-Invites.md",
+    "02-База-данных/Схема базы данных (Prisma).md",
+    "02-База-данных/Model-Video.md",
+    "02-База-данных/Model-User.md",
+    "02-База-данных/Model-TeacherStudentInvite.md",
+    "02-База-данных/Model-SolvedPuzzle.md",
+    "02-База-данных/Model-Settings.md",
+    "02-База-данных/Model-Puzzle.md",
+    "02-База-данных/Model-Purchase.md",
+    "02-База-данных/Model-Opening.md",
+    "02-База-данных/Model-Notification.md",
+    "02-База-данных/Model-ModuleAccess.md",
+    "02-База-данных/Model-Module.md",
+    "02-База-данных/Model-Message.md",
+    "02-База-данных/Model-LiveSession.md",
+    "02-База-данных/Model-Lesson.md",
+    "02-База-данных/Model-InviteLink.md",
+    "02-База-данных/Model-Homework.md",
+    "02-База-данных/Model-GameAnalysisRequest.md",
+    "02-База-данных/Model-Course.md",
+    "02-База-данных/00-ER-диаграмма.md",
+    "02-База-данных",
     "Настройка платежей ЮMoney.md",
-    "Добро пожаловать.md",
-    "Архитектура проекта.md"
+    "AGENTS.md",
+    "README-для-AI.md",
+    "99-Глоссарий/Термины.md",
+    "99-Глоссарий",
+    "08-Скрипты-и-утилиты/Скрипты-тестирования.md",
+    "08-Скрипты-и-утилиты",
+    "07-Интеграции-и-инфраструктура",
+    "06-Бизнес-процессы",
+    "05-Страницы-и-маршруты",
+    "04-Компоненты",
+    "03-API",
+    "01-Обзор-проекта",
+    "00-Index"
   ]
 }

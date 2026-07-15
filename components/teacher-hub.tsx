@@ -254,11 +254,16 @@ function Head({ over, title, text, action }: { over: string; title: string; text
   )
 }
 
-function Metric({ label, value, note }: { label: string; value: string; note: string }) {
+function Metric({ label, value, note, icon, accentClass }: { label: string; value: string; note: string; icon?: React.ReactNode; accentClass?: string }) {
   return (
-    <article className="rounded-lg border p-5">
+    <article className="rounded-lg border p-5 relative overflow-hidden">
+      {icon && (
+        <div className={`absolute top-4 right-4 opacity-80 ${accentClass || ''}`}>
+          {icon}
+        </div>
+      )}
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className={`mt-3 text-3xl font-semibold tracking-tight ${accentClass || ''}`}>{value}</p>
       <p className="mt-2 text-xs text-muted-foreground">{note}</p>
     </article>
   )
@@ -897,6 +902,7 @@ export function TeacherHub({
                   homeworks={homeworks} 
                   onOpenHw={openHwPuzzle} 
                   notify={notify}
+                  onGoSection={go}
                   puzzlesSolvedTotal={puzzlesSolvedTotal}
                   puzzlesAttempted={puzzlesAttempted}
                   activityStreak={activityStreak}
@@ -1358,6 +1364,15 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
   )
 }
 
+function pluralDays(n: number) {
+  const abs = Math.abs(n) % 100
+  const n1 = abs % 10
+  if (abs > 10 && abs < 20) return `${n} дней`
+  if (n1 > 1 && n1 < 5) return `${n} дня`
+  if (n1 === 1) return `${n} день`
+  return `${n} дней`
+}
+
 function StudentOverview({ 
   userName, 
   userRating, 
@@ -1365,6 +1380,7 @@ function StudentOverview({
   homeworks, 
   onOpenHw, 
   notify,
+  onGoSection,
   puzzlesSolvedTotal = 0,
   puzzlesAttempted = 0,
   activityStreak = 0,
@@ -1373,7 +1389,8 @@ function StudentOverview({
   userRating: number; 
   userRank?: number;
   homeworks: HW[]; 
-  onOpenHw: (id: string | number) => void; 
+  onOpenHw: (id: string | number) => void;
+  onGoSection?: (s: string) => void;
   notify: (s: string) => void;
   puzzlesSolvedTotal?: number;
   puzzlesAttempted?: number;
@@ -1387,23 +1404,105 @@ function StudentOverview({
     accuracy = Math.round((puzzlesSolvedTotal / puzzlesAttempted) * 100)
   }
 
+  // Time-based greeting
+  const hour = new Date().getHours()
+  const greeting =
+    hour < 5  ? 'Доброй ночи' :
+    hour < 12 ? 'Доброе утро' :
+    hour < 17 ? 'Добрый день' :
+    'Добрый вечер'
+
+  const activeHw = homeworks.filter(h => !h.solved)
+
   return (
     <>
-      <Head over="Личный кабинет" title={`${userName}, продолжим тренировку`} text="Статистика и задания тренера." />
+      <Head over="Личный кабинет" title={`${greeting}, ${userName} — продолжим тренировку?`} text="Статистика и задания тренера." />
       <OverviewInvitesWidget role="STUDENT" notify={notify} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Рейтинг"       value={String(userRating)} note={userRank > 0 ? `Топ ${userRank} сайта` : "Текущий Эло"} />
-        <Metric label="Выполнено"     value={`${totalSolved}`} note="заданий и задач" />
-        <Metric label="Серия занятий" value={`${activityStreak} дней`} note="Активность" />
-        <Metric label="Точность"      value={`${accuracy}%`} note={`${puzzlesSolvedTotal} задач`} />
+        <Metric
+          label="Рейтинг"
+          value={String(userRating)}
+          note={userRank > 0 ? `Топ ${userRank} сайта` : 'Текущий Эло'}
+          icon={<Trophy className="w-5 h-5" />}
+          accentClass="text-yellow-500"
+        />
+        <Metric
+          label="Выполнено"
+          value={String(totalSolved)}
+          note="заданий и задач"
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          accentClass="text-emerald-500"
+        />
+        <Metric
+          label="Серия занятий"
+          value={pluralDays(activityStreak)}
+          note="Активность"
+          icon={<Award className="w-5 h-5" />}
+          accentClass="text-orange-500"
+        />
+        <Metric
+          label="Точность"
+          value={`${accuracy}%`}
+          note={`${puzzlesSolvedTotal} задач`}
+          icon={<Zap className="w-5 h-5" />}
+          accentClass="text-blue-500"
+        />
       </section>
       <div className="my-2">
         <ActivityCalendar />
       </div>
+
+      {/* Quick-launch widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          onClick={() => onGoSection?.('puzzles')}
+          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500 group-hover:animate-pulse" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-foreground">Начать Puzzle Rush</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Реши как можно больше задач за 3 минуты</p>
+          </div>
+        </button>
+        <button
+          onClick={() => onGoSection?.('achievements')}
+          className="flex items-center gap-4 bg-card border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Award className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-foreground">Мои достижения</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Следи за прогрессом и открывай бейджи</p>
+          </div>
+        </button>
+      </div>
+
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
-      <section className="grid gap-3 lg:grid-cols-3">
-        {homeworks.map(hw => <HwCard key={hw.id} hw={hw} isStudent onOpen={() => onOpenHw(hw.id)} />)}
-      </section>
+      {activeHw.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center bg-card border rounded-xl gap-3">
+          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+            <BookOpen className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">Пока нет активных заданий</p>
+            <p className="text-sm text-muted-foreground mt-1">Самое время порешать</p>
+          </div>
+          <button
+            onClick={() => onGoSection?.('puzzles')}
+            className="mt-1 px-5 py-2 bg-foreground text-background rounded-xl font-semibold text-sm hover:bg-foreground/90 transition flex items-center gap-2"
+          >
+            <Zap className="w-4 h-4" />
+            Puzzle Rush!
+          </button>
+        </div>
+      ) : (
+        <section className="grid gap-3 lg:grid-cols-3">
+          {activeHw.map(hw => <HwCard key={hw.id} hw={hw} isStudent onOpen={() => onOpenHw(hw.id)} />)}
+        </section>
+      )}
     </>
   )
 }
