@@ -127,6 +127,17 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
     }
   }
 
+  const [showBoard, setShowBoard] = useState(false)
+
+  useEffect(() => {
+    if (game && puzzle && game.fen() !== 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1') {
+      const timer = setTimeout(() => setShowBoard(true), 100)
+      return () => clearTimeout(timer)
+    } else {
+      setShowBoard(false)
+    }
+  }, [game, puzzle])
+
   if (error === 'LIMIT_REACHED') {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-6 max-w-md mx-auto">
@@ -158,7 +169,22 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
               <p>4. isClient: {isClient ? 'YES' : 'NO'}</p>
               <p>5. board_position_prop: {game?.fen()}</p>
             </div>
-            <Chessboard position={game.fen()} onPieceDrop={onDrop} />
+            {showBoard ? (
+              <Chessboard 
+                key={`${puzzle.id}-${refreshKey}`}
+                id={`puzzles-board-${puzzle.id}`}
+                position={game.fen()} 
+                onPieceDrop={onDrop}
+                boardOrientation={game.fen().split(' ')[1] === 'w' ? 'white' : 'black'}
+                customDarkSquareStyle={{ backgroundColor: '#779556' }}
+                customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
+                animationDuration={300}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
             {error && error !== 'LIMIT_REACHED' && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                 <p className="text-red-500 font-semibold">{error}</p>
