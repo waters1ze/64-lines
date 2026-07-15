@@ -245,7 +245,7 @@ export function Puzzles({
           ) : (
             <div className="w-full h-full relative">
             <Chessboard 
-              id={`puzzles-board`}
+              key={puzzle?.id || 'start'}
               position={game.fen()}
               onPieceDrop={onDrop}
               boardOrientation={playerColor}
