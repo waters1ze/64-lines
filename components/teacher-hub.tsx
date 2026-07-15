@@ -368,6 +368,8 @@ export function TeacherHub({
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
+  const [puzzleSubMode, setPuzzleSubMode] = useState<'normal' | 'rush'>('normal')
+
   const [students, setStudents] = useState<Student[]>(initialStudents || INIT_STUDENTS)
   const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
   const [courses, setCourses] = useState<Course[]>(initialCourses || INIT_COURSES)
@@ -580,7 +582,6 @@ export function TeacherHub({
     ['findTeacher',  'Найти учителя',      UserPlus],
     ['modules',      'Мои курсы',          BookOpen],
     ['puzzles',      'Задачи',             Trophy],
-    ['puzzleRush',   'Puzzle Rush',        Zap],
     ['achievements', 'Достижения',         Award],
     ['shop',         'Магазин модулей',    Store],
     ['store',        'Витрина дебютов',    Store],
@@ -925,12 +926,40 @@ export function TeacherHub({
             )}
             {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} isUserPremium={isPremium} onPremiumClick={purchaseSubscription} />}
             {section === 'achievements' && <AchievementsTab />}
-            {section === 'puzzleRush' && <PuzzleRush />}
             {section === 'puzzles'     && (
               <>
                 <Head over="Тренировка" title="Тактические задачи" text="Решайте шахматные задачи для повышения своего рейтинга" />
-                <div className="mt-8">
-                  <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} />
+                
+                {/* Mode Selector */}
+                <div className="flex gap-1.5 mt-6 bg-muted/40 border p-1 rounded-xl w-fit">
+                  <button
+                    onClick={() => setPuzzleSubMode('normal')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      puzzleSubMode === 'normal'
+                        ? 'bg-card text-foreground shadow-xs border border-border/40'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Обычные задачи
+                  </button>
+                  <button
+                    onClick={() => setPuzzleSubMode('rush')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      puzzleSubMode === 'rush'
+                        ? 'bg-card text-foreground shadow-xs border border-border/40'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Puzzle Rush (Молния)
+                  </button>
+                </div>
+
+                <div className="mt-6">
+                  {puzzleSubMode === 'normal' ? (
+                    <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} />
+                  ) : (
+                    <PuzzleRush />
+                  )}
                 </div>
               </>
             )}

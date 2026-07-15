@@ -54,8 +54,8 @@ export async function GET(req: Request) {
     maxDiff = 500
   }
 
-  // Fetch solved puzzles for user to exclude them
-  const solvedPuzzles = await db.solvedPuzzle.findMany({
+  // Fetch solved puzzles for user to exclude them (skip for Puzzle Rush)
+  const solvedPuzzles = mode === 'rush' ? [] : await db.solvedPuzzle.findMany({
     where: { userId: user.id },
     select: { puzzleId: true }
   })
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   // 1. Try target range
   let puzzles = await db.puzzle.findMany({
     where: {
-      id: { notIn: solvedIds },
+      id: mode === 'rush' ? undefined : { notIn: solvedIds },
       rating: {
         gte: targetRating + minDiff,
         lte: targetRating + maxDiff,
@@ -85,7 +85,7 @@ export async function GET(req: Request) {
   if (filtered.length === 0) {
     puzzles = await db.puzzle.findMany({
       where: {
-        id: { notIn: solvedIds },
+        id: mode === 'rush' ? undefined : { notIn: solvedIds },
         rating: {
           gte: targetRating - 300,
           lte: targetRating + 300,
@@ -98,7 +98,7 @@ export async function GET(req: Request) {
   // 3. Fallback to all unsolved puzzles sorted by closest rating
   if (filtered.length === 0) {
     const allUnsolved = await db.puzzle.findMany({
-      where: {
+      where: mode === 'rush' ? {} : {
         id: { notIn: solvedIds }
       }
     })
