@@ -1530,11 +1530,13 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
             </div>
             <div className="flex flex-col">
               <div className="w-full aspect-square border rounded-md overflow-hidden bg-muted/20">
-                <Chessboard 
-                  position={hwChess.fen()} 
-                  boardOrientation={boardOrientation}
-                  onPieceDrop={onPieceDrop}
-                  animationDuration={200}
+                 <Chessboard 
+                  options={{
+                    position: hwChess.fen(),
+                    boardOrientation: boardOrientation,
+                    onPieceDrop: ({ sourceSquare, targetSquare }) => onPieceDrop(sourceSquare, targetSquare),
+                    animationDurationInMs: 200
+                  }}
                 />
               </div>
               <button className="button mt-auto pt-4" onClick={handleAdd}>Назначить ученику</button>

@@ -107,11 +107,18 @@ export function Puzzles({
 
     try {
       const pieceStr = piece.pieceType || piece
+      const isProm = 
+        (pieceStr[1]?.toLowerCase() === 'p') && 
+        ((pieceStr[0] === 'w' && targetSquare[1] === '8') || (pieceStr[0] === 'b' && targetSquare[1] === '1'));
       
       const testGame = new Chess(game.fen())
       let move = null
       try {
-         move = testGame.move({ from: sourceSquare, to: targetSquare, promotion: pieceStr[1]?.toLowerCase() ?? 'q' })
+         move = testGame.move({ 
+           from: sourceSquare, 
+           to: targetSquare, 
+           promotion: isProm ? 'q' : undefined 
+         })
       } catch(e) {
          move = null
       }
@@ -245,12 +252,20 @@ export function Puzzles({
           ) : (
             <div className="w-full h-full relative">
             <Chessboard 
-              id={puzzle?.id || 'board'}
               key={puzzle?.id || 'start'}
-              position={game.fen()}
-              boardOrientation={playerColor}
-              onPieceDrop={onDrop}
-              animationDuration={0}
+              options={{
+                id: puzzle?.id || 'board',
+                position: game.fen(),
+                boardOrientation: playerColor,
+                onPieceDrop: onDrop,
+                animationDurationInMs: 0,
+                darkSquareStyle: { backgroundColor: '#779556' },
+                lightSquareStyle: { backgroundColor: '#ebecd0' },
+                squareStyles: failedSquares ? {
+                  [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                  [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+                } : {}
+              }}
             />
             {error && error !== 'LIMIT_REACHED' && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
