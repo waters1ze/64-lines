@@ -2586,7 +2586,7 @@ function MyLibrary({ modules, purchases, courses, onOpen }: {
               <div className="bg-card border rounded-xl p-6 shadow-sm flex flex-col items-center">
                 <h3 className="text-lg font-semibold mb-4 self-start">PGN с разбором</h3>
                 <div className="w-full max-w-sm aspect-square mb-4">
-                  <Chessboard position="start" />
+                  <Chessboard options={{ position: 'start' }} />
                 </div>
                 <div className="w-full bg-muted/30 p-3 rounded-lg border font-mono text-xs whitespace-pre-wrap overflow-y-auto max-h-48">
                   {activeAnalysis.answerPgn}

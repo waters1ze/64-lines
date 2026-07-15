@@ -171,14 +171,15 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
             </div>
             {showBoard ? (
               <Chessboard 
-                key={`${puzzle.id}-${refreshKey}`}
-                id={`puzzles-board-${puzzle.id}`}
-                position={game.fen().split(' ')[0]} 
-                onPieceDrop={onDrop}
-                boardOrientation={game.fen().split(' ')[1] === 'w' ? 'white' : 'black'}
-                customDarkSquareStyle={{ backgroundColor: '#779556' }}
-                customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-                animationDuration={300}
+                options={{
+                  id: `puzzles-board-${puzzle.id}`,
+                  position: game.fen(),
+                  onPieceDrop: onDrop,
+                  boardOrientation: game.fen().split(' ')[1] === 'w' ? 'white' : 'black',
+                  darkSquareStyle: { backgroundColor: '#779556' },
+                  lightSquareStyle: { backgroundColor: '#ebecd0' },
+                  animationDurationInMs: 300
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted/20">

@@ -141,7 +141,7 @@ export function AdminPuzzles({ onBack }: { onBack: () => void }) {
               <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-4">
                 <h3 className="font-semibold text-lg">Предпросмотр начальной позиции</h3>
                 <div className="aspect-square w-full">
-                  <Chessboard position={previewFen} boardOrientation={previewFen.split(' ')[1] === 'w' ? 'white' : 'black'} />
+                  <Chessboard options={{ position: previewFen, boardOrientation: previewFen.split(' ')[1] === 'w' ? 'white' : 'black' }} />
                 </div>
                 <div>
                   <h4 className="font-medium text-sm text-muted-foreground mb-1">Распознанные ходы (решение):</h4>
