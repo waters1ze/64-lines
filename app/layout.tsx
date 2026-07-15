@@ -14,7 +14,22 @@ export const metadata: Metadata = {
   verification: {
     google: 'google6fffdecb7dae406a',
   },
-  manifest: '/manifest.json'
+  manifest: '/manifest.json',
+  openGraph: {
+    title: '64 Lines — Шахматная школа | Личный кабинет',
+    description: '64 Lines (64 клетки) — современная шахматная школа онлайн. Ваш личный шахматный хаб: задания, тренировки, дебютные курсы и уроки от тренера.',
+    url: 'https://64-lines.ru',
+    siteName: '64 Lines',
+    images: ['/opengraph-image.png'],
+    locale: 'ru_RU',
+    type: 'website'
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '64 Lines — Шахматная школа | Личный кабинет',
+    description: '64 Lines (64 клетки) — современная шахматная школа онлайн. Ваш личный шахматный хаб: задания, тренировки, дебютные курсы и уроки от тренера.',
+    images: ['/twitter-image.png']
+  }
 }
 
 export const viewport: Viewport = {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { checkAndGrantAchievements } from '@/lib/achievements'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -66,6 +67,29 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           lastActivityDate: now
         }
       })
+
+      // 1. Record Activity Log
+      try {
+        const logDate = new Date(todayStr + 'T00:00:00.000Z')
+        await db.activityLog.upsert({
+          where: {
+            userId_date: {
+              userId: user.id,
+              date: logDate
+            }
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            date: logDate
+          }
+        })
+      } catch (e) {
+        console.error('Error recording activity log in homework:', e)
+      }
+
+      // 2. Check and Grant Achievements
+      await checkAndGrantAchievements(user.id)
     }
 
     const homework = await db.homework.update({

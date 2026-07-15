@@ -6,10 +6,13 @@ import {
   ExternalLink, GraduationCap, ImagePlus, LayoutDashboard, Library,
   LockKeyhole, Menu, Pencil, Plus, RotateCcw, Trophy,
   Settings, Store, Trash2, Upload, UserPlus, Users, Video, X, MessageSquare, ShieldCheck,
-  CheckCircle2, Unlock, Search, Phone, FileSearch, Crown
+  CheckCircle2, Unlock, Search, Phone, FileSearch, Crown, Award, Zap
 } from 'lucide-react'
 import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
+import { ActivityCalendar } from './ActivityCalendar'
+import { AchievementsTab } from './AchievementsTab'
+import { PuzzleRush } from './PuzzleRush'
 import '@uiw/react-md-editor/markdown-editor.css'
 import '@uiw/react-markdown-preview/markdown.css'
 
@@ -31,6 +34,7 @@ type Section =
   | 'overview' | 'students' | 'studentProfile' | 'homework' | 'homeworkPuzzle'
   | 'videos' | 'openings' | 'modules' | 'sales' | 'store' | 'courses' | 'settings' | 'courseViewer'
   | 'leaderboard' | 'users' | 'shop' | 'chat' | 'live' | 'findTeacher' | 'analysis' | 'puzzles' | 'add_puzzle'
+  | 'achievements' | 'puzzleRush'
 
 type TreeNode = { san: string; comment: string; children: TreeNode[] }
 type GameTree = { children: TreeNode[]; comment: string }
@@ -570,18 +574,20 @@ export function TeacherHub({
   ] as const
 
   const studentNavBase = [
-    ['overview',    'Мой обзор',          LayoutDashboard],
-    ['chat',        'Сообщения',          MessageSquare],
-    ['live',        'Уроки',              Video],
-    ['findTeacher', 'Найти учителя',     UserPlus],
-    ['modules',     'Мои курсы',          BookOpen],
-    ['puzzles',     'Задачи',             Trophy],
-    ['shop',        'Магазин модулей',    Store],
-    ['store',       'Витрина дебютов',    Store],
-    ['leaderboard', 'Рейтинг',            Trophy],
-    ['videos',      'Видео с YouTube',    Video],
-    ['openings',    'Мои дебюты',         Library],
-    ['settings',    'Настройки',          Settings],
+    ['overview',     'Мой обзор',          LayoutDashboard],
+    ['chat',         'Сообщения',          MessageSquare],
+    ['live',         'Уроки',              Video],
+    ['findTeacher',  'Найти учителя',      UserPlus],
+    ['modules',      'Мои курсы',          BookOpen],
+    ['puzzles',      'Задачи',             Trophy],
+    ['puzzleRush',   'Puzzle Rush',        Zap],
+    ['achievements', 'Достижения',         Award],
+    ['shop',         'Магазин модулей',    Store],
+    ['store',        'Витрина дебютов',    Store],
+    ['leaderboard',  'Рейтинг',            Trophy],
+    ['videos',       'Видео с YouTube',    Video],
+    ['openings',     'Мои дебюты',         Library],
+    ['settings',     'Настройки',          Settings],
   ] as const
 
   const guestNavBase = [
@@ -918,6 +924,8 @@ export function TeacherHub({
                 notify={notify} />
             )}
             {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} isUserPremium={isPremium} onPremiumClick={purchaseSubscription} />}
+            {section === 'achievements' && <AchievementsTab />}
+            {section === 'puzzleRush' && <PuzzleRush />}
             {section === 'puzzles'     && (
               <>
                 <Head over="Тренировка" title="Тактические задачи" text="Решайте шахматные задачи для повышения своего рейтинга" />
@@ -1360,6 +1368,9 @@ function StudentOverview({
         <Metric label="Серия занятий" value={`${activityStreak} дней`} note="Активность" />
         <Metric label="Точность"      value={`${accuracy}%`} note={`${puzzlesSolvedTotal} задач`} />
       </section>
+      <div className="my-2">
+        <ActivityCalendar />
+      </div>
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
       <section className="grid gap-3 lg:grid-cols-3">
         {homeworks.map(hw => <HwCard key={hw.id} hw={hw} isStudent onOpen={() => onOpenHw(hw.id)} />)}
@@ -3979,14 +3990,17 @@ function SettingsPanel({ notify, initialName, isStudent, isAdmin, globalSettings
 function Leaderboard() {
   const [top, setTop] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<'all-time' | 'week' | 'month'>('all-time')
 
   useEffect(() => {
-    fetch('/api/leaderboard')
+    setLoading(true)
+    const url = period === 'all-time' ? '/api/leaderboard' : `/api/leaderboard?period=${period}`
+    fetch(url)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setTop(data) })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   const medals = [
     <Trophy key={1} className="size-5 text-foreground" />,
@@ -3997,10 +4011,45 @@ function Leaderboard() {
   return (
     <>
       <Head over="Геймификация" title="Таблица рейтинга" text="Рейтинг растёт за каждое решённое домашнее задание. +15 с первой попытки, +10 со второй, +5 с третьей и далее." />
+      
+      {/* Period Selector */}
+      <div className="flex gap-1.5 mb-5 bg-muted/40 border p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setPeriod('all-time')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+            period === 'all-time'
+              ? 'bg-card text-foreground shadow-xs border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Всё время
+        </button>
+        <button
+          onClick={() => setPeriod('week')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+            period === 'week'
+              ? 'bg-card text-foreground shadow-xs border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Неделя
+        </button>
+        <button
+          onClick={() => setPeriod('month')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+            period === 'month'
+              ? 'bg-card text-foreground shadow-xs border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Месяц
+        </button>
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Загрузка...</p>
       ) : top.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Пока нет учеников с рейтингом.</p>
+        <p className="text-sm text-muted-foreground">Пока нет учеников в рейтинге за этот период.</p>
       ) : (
         <div className="rounded-xl border overflow-hidden">
           {top.map((u, i) => (
@@ -4018,12 +4067,18 @@ function Leaderboard() {
                   {u.isPremium && <Crown className="size-4 text-yellow-500" title="Premium Пользователь" />}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {(u._count?.homeworks ?? 0) + (u.puzzlesSolvedTotal ?? 0)} заданий и задач решено
+                  {period === 'all-time'
+                    ? `${(u._count?.homeworks ?? 0) + (u.puzzlesSolvedTotal ?? 0)} заданий и задач решено`
+                    : `${u.solvedCount ?? 0} задач решено за период`}
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className={`text-lg font-semibold tabular-nums ${u.isPremium ? 'text-yellow-600' : ''}`}>{u.rating}</p>
-                <p className="text-xs text-muted-foreground">очков</p>
+                <p className={`text-lg font-semibold tabular-nums ${u.isPremium ? 'text-yellow-600' : ''}`}>
+                  {period === 'all-time' ? u.rating : u.solvedCount ?? 0}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {period === 'all-time' ? 'очков' : 'задач'}
+                </p>
               </div>
             </div>
           ))}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
@@ -135,6 +136,15 @@ export async function POST(req: Request) {
       receiver: { select: { name: true, role: true } }
     }
   })
+
+  // Send push notification to receiver
+  const senderName = message.sender.name || 'Пользователь'
+  const textPreview = message.content.length > 60 ? `${message.content.substring(0, 60)}...` : message.content
+  await sendPushToUser(message.receiverId, {
+    title: `Новое сообщение от ${senderName}`,
+    body: textPreview,
+    url: `/?section=chat&contactId=${session.user.id}`
+  }).catch((e) => console.error('Chat push notify error:', e))
 
   return NextResponse.json(message)
 }

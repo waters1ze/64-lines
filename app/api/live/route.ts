@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,12 @@ export async function POST(req: Request) {
       link: '?section=live'
     }
   })
+
+  await sendPushToUser(studentId, {
+    title: 'Учитель начал урок',
+    body: `${session.user.name || 'Учитель'} начал звонок с вами.`,
+    url: '/?section=live'
+  }).catch((e) => console.error('Live session push notify error:', e))
 
   return NextResponse.json({ session: newSession })
 }

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-messages",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/homework-reminders",
+      "schedule": "0 * * * *"
     }
   ]
 }

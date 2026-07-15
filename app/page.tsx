@@ -108,8 +108,40 @@ export default async function Page() {
     createdAt: p.createdAt.toISOString()
   }))
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    'itemListElement': courses.map((course, idx) => ({
+      '@type': 'ListItem',
+      'position': idx + 1,
+      'item': {
+        '@type': 'Course',
+        'name': course.name,
+        'description': course.description,
+        'provider': {
+          '@type': 'Organization',
+          'name': '64 Lines',
+          'url': 'https://64-lines.ru'
+        },
+        'offers': {
+          '@type': 'Offer',
+          'price': course.price,
+          'priceCurrency': 'RUB',
+          'availability': 'https://schema.org/InStock'
+        }
+      }
+    }))
+  }
+
   return (
     <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Загрузка...</div>}>
+      {/* TODO: Для более точных rich-результатов в будущем рекомендуется создать отдельные SSR-страницы /courses/[id] с индивидуальным JSON-LD на каждую */}
+      {isGuest && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
       <TeacherHub 
         initialRole={
           dbUserRole === 'ADMIN' ? 'ADMIN' :

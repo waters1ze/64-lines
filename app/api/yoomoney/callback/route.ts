@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
+import { sendPushToUser } from '@/lib/push'
 
 export async function POST(req: Request) {
   try {
@@ -95,6 +96,12 @@ export async function POST(req: Request) {
               link: `?section=sales`
             }
           })
+
+          await sendPushToUser(admin.id, {
+            title: '⚠️ Недоплата по платежу ЮMoney',
+            body: `Пользователь ${purchaseTemp.user.email} оплатил ${maxPaid} ₽ вместо ${fallbackExpected} ₽ за заказ ${purchaseTemp.id}.`,
+            url: '/?section=sales'
+          }).catch((e) => console.error('Yoomoney callback underpayment admin push error:', e))
         }
       } catch (eAdmin) {
         console.error('Failed to notify admin on underpayment:', eAdmin)
@@ -190,14 +197,21 @@ export async function POST(req: Request) {
     }
 
     // Notify user
+    const pushMsg = `Ваш платеж успешно подтвержден. ${purchase.course ? 'Курс доступен!' : purchase.moduleId ? 'Доступ к модулю открыт!' : purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM' ? 'Вам начислен Premium!' : ''}`
     await db.notification.create({
       data: {
         userId: purchase.userId,
         title: 'Оплата прошла успешно',
-        message: `Ваш платеж успешно подтвержден. ${purchase.course ? 'Курс доступен!' : purchase.moduleId ? 'Доступ к модулю открыт!' : purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM' ? 'Вам начислен Premium!' : ''}`,
+        message: pushMsg,
         link: purchase.course ? `?section=courseViewer&courseId=${purchase.courseId}` : ''
       }
     })
+
+    await sendPushToUser(purchase.userId, {
+      title: 'Оплата прошла успешно',
+      body: pushMsg,
+      url: purchase.course ? `/?section=courseViewer&courseId=${purchase.courseId}` : '/'
+    }).catch((e) => console.error('Yoomoney callback user push error:', e))
 
     return new NextResponse('OK', { status: 200 })
   } catch (e: any) {

@@ -68,3 +68,29 @@ export async function sendCourseDeliveryEmail(to: string, courseName: string, fi
     attachments,
   })
 }
+
+export async function sendHomeworkDeadlineReminder(to: string, homeworkTitle: string, dueDate: Date) {
+  const siteUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const dateStr = dueDate.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', dateStyle: 'short', timeStyle: 'short' })
+  
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+      <h2 style="color: #333;">Напоминание о домашнем задании! ⏳</h2>
+      <p>У вас осталось менее 24 часов на решение домашнего задания: <b>${homeworkTitle}</b>.</p>
+      <p>Срок сдачи (дедлайн): <b>${dateStr} (МСК)</b>.</p>
+      <div style="margin: 30px 0;">
+        <a href="${siteUrl}" style="display: inline-block; padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          Перейти к решению на сайт
+        </a>
+      </div>
+      <p style="color: #666; font-size: 14px;">Пожалуйста, постарайтесь решить его вовремя.</p>
+    </div>
+  `
+
+  await transporter.sendMail({
+    from: `"Шахматная школа 64 Линии" <${process.env.SMTP_EMAIL}>`,
+    to,
+    subject: `Дедлайн по домашнему заданию: "${homeworkTitle}" — Шахматная школа 64 Линии`,
+    html,
+  })
+}

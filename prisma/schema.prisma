@@ -39,6 +39,10 @@ model User {
   lastActivityDate    DateTime?
   notifications       Notification[]
   solvedPuzzles       SolvedPuzzle[]
+  pushSubscriptions   PushSubscription[]
+  activityLogs        ActivityLog[]
+  achievements        UserAchievement[]
+  puzzleRushResults   PuzzleRushResult[]
 }
 
 model Homework {
@@ -51,9 +55,10 @@ model Homework {
   solved      Boolean   @default(false)
   attempts    Int       @default(0)
   teacherNote String?
-  studentId   String
-  rating      Int?
-  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId      String
+  rating         Int?
+  student        User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  reminderSentAt DateTime?
 }
 
 model Course {
@@ -249,4 +254,52 @@ model SolvedPuzzle {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, puzzleId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  title       String
+  description String
+  icon        String
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model PuzzleRushResult {
+  id       String   @id @default(cuid())
+  userId   String
+  score    Int
+  playedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

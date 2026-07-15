@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/route'
+import { checkAndGrantAchievements } from '@/lib/achievements'
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -98,6 +99,29 @@ export async function POST(req: Request) {
       console.error('Error recording solved puzzle:', e)
     }
   }
+
+  // 1. Record Activity Log
+  try {
+    const logDate = new Date(todayStr + 'T00:00:00.000Z')
+    await db.activityLog.upsert({
+      where: {
+        userId_date: {
+          userId: user.id,
+          date: logDate
+        }
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        date: logDate
+      }
+    })
+  } catch (e) {
+    console.error('Error recording activity log:', e)
+  }
+
+  // 2. Check and Grant Achievements
+  await checkAndGrantAchievements(user.id)
 
   return NextResponse.json({ 
     rating: updated.rating, 

@@ -22,18 +22,22 @@ export async function GET(req: Request) {
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  // Check limits
-  const now = new Date()
-  let solvedToday = user.puzzlesSolvedToday || 0
-  if (user.lastPuzzleDate) {
-    const lastDate = new Date(user.lastPuzzleDate)
-    if (lastDate.toDateString() !== now.toDateString()) {
-      solvedToday = 0
-    }
-  }
+  const mode = url.searchParams.get('mode')
 
-  if (!user.isPremium && solvedToday >= 5) {
-    return NextResponse.json({ error: 'LIMIT_REACHED' }, { status: 403 })
+  // Check limits (skip for Puzzle Rush)
+  if (mode !== 'rush') {
+    const now = new Date()
+    let solvedToday = user.puzzlesSolvedToday || 0
+    if (user.lastPuzzleDate) {
+      const lastDate = new Date(user.lastPuzzleDate)
+      if (lastDate.toDateString() !== now.toDateString()) {
+        solvedToday = 0
+      }
+    }
+
+    if (!user.isPremium && solvedToday >= 5) {
+      return NextResponse.json({ error: 'LIMIT_REACHED' }, { status: 403 })
+    }
   }
 
   const targetRating = user.rating || 1200

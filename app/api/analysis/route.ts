@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,6 +69,12 @@ export async function PUT(req: Request) {
           link: '#modules'
         }
       })
+
+      await sendPushToUser(reqData.userId, {
+        title: 'Разбор партии готов!',
+        body: `Тренер разобрал вашу партию: ${title || 'Без названия'}.`,
+        url: '/?section=courses' // or similar link
+      }).catch((e) => console.error('Analysis push notify error:', e))
     }
     
     return NextResponse.json(updated)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { db } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 export async function POST(req: Request) {
   try {
@@ -88,14 +89,21 @@ export async function POST(req: Request) {
     }
 
     // Notify user
+    const pushMsg = `Ваш платеж успешно подтвержден. ${purchase.course ? 'Курс доступен!' : purchase.moduleId ? 'Доступ к модулю открыт!' : purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM' ? 'Вам начислен Premium!' : ''}`
     await db.notification.create({
       data: {
         userId: purchase.userId,
         title: 'Платеж подтвержден',
-        message: `Ваш платеж успешно подтвержден. ${purchase.course ? 'Курс доступен!' : purchase.moduleId ? 'Доступ к модулю открыт!' : purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM' ? 'Вам начислен Premium!' : ''}`,
+        message: pushMsg,
         link: purchase.course ? `?section=courseViewer&courseId=${purchase.courseId}` : ''
       }
     })
+
+    await sendPushToUser(purchase.userId, {
+      title: 'Платеж подтвержден',
+      body: pushMsg,
+      url: purchase.course ? `/?section=courseViewer&courseId=${purchase.courseId}` : '/'
+    }).catch((e) => console.error('Payment approve push notify error:', e))
 
     // 2. Send Email (Only for courses with PGN currently, but can be adapted)
     if (purchase.course) {
