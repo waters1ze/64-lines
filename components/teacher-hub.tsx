@@ -418,8 +418,24 @@ export function TeacherHub({
     }
 
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 15000)
-    return () => clearInterval(interval)
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+      }
+    }, 45000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const markAsRead = async () => {
@@ -463,8 +479,25 @@ export function TeacherHub({
       }).catch((e) => console.error('fetchLive error:', e))
     }
     fetchLive()
-    const interval = setInterval(fetchLive, 3000)
-    return () => clearInterval(interval)
+    
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchLive()
+      }
+    }, 6000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLive()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {

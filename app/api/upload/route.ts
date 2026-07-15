@@ -12,7 +12,10 @@ export async function POST(req: Request) {
     const imgbbFormData = new FormData()
     imgbbFormData.append('image', file)
 
-    const apiKey = process.env.IMGBB_API_KEY || '723c05b071d7b40c8930e629eeb66a52'
+    const apiKey = process.env.IMGBB_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Upload service not configured' }, { status: 500 })
+    }
     
     const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
       method: 'POST',

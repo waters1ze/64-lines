@@ -13,7 +13,8 @@ export const metadata: Metadata = {
   keywords: ['64 lines', '64-lines', '64 клетки', 'шахматы 64', 'шахматы', 'обучение шахматам', 'шахматная школа', 'тренер по шахматам', 'шахматы для детей', 'онлайн шахматы', '64 линии'],
   verification: {
     google: 'google6fffdecb7dae406a',
-  }
+  },
+  manifest: '/manifest.json'
 }
 
 export const viewport: Viewport = {

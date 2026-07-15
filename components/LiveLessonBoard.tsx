@@ -208,7 +208,7 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, user
 
   // Polling state
   useEffect(() => {
-    let interval = setInterval(async () => {
+    const fetchLiveData = async () => {
       try {
         const res = await fetch('/api/live?t=' + Date.now(), { cache: 'no-store' })
         if (res.ok) {
@@ -222,8 +222,26 @@ export default function LiveLessonBoard({ sessionId, jitsiRoomName, userId, user
           if (session.activeMoveId !== activeMoveId) setActiveMoveId(session.activeMoveId)
         }
       } catch (e) {}
-    }, 1500)
-    return () => clearInterval(interval)
+    }
+
+    let interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveData()
+      }
+    }, 3000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [sessionId, currentFen, activeMoveId, pgn])
 
   const updateState = React.useCallback(async (updates: any) => {

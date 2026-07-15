@@ -17,8 +17,25 @@ export default function ChatComponent({ userId, isTeacher, onStartCall }: { user
 
   useEffect(() => {
     fetchChatData()
-    const interval = setInterval(fetchChatData, 2000)
-    return () => clearInterval(interval)
+    
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchChatData()
+      }
+    }, 4000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchChatData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [activeContactId])
 
   const fetchChatData = async () => {
