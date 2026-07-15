@@ -15,7 +15,7 @@ export function Puzzles({
   onRatingChange?: (newRating: number) => void 
 }) {
   const [puzzle, setPuzzle] = useState<any>(null)
-  const [game, setGame] = useState<Chess | null>(null)
+  const [game, setGame] = useState<Chess>(new Chess())
   const [playerColor, setPlayerColor] = useState<'white' | 'black'>('white')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -220,7 +220,6 @@ export function Puzzles({
     }, 1000)
   }
 
-  const [game, setGame] = useState<Chess>(new Chess())
 
   if (error === 'LIMIT_REACHED') {
     return (
