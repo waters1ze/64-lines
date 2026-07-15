@@ -383,11 +383,29 @@ export function TeacherHub({
   const [liveSession, setLiveSession] = useState<any>(null)
   const [globalSettings, setGlobalSettings] = useState<{ subscriptionPrice: number, analysisPrice: number }>({ subscriptionPrice: 300, analysisPrice: 70 })
 
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  const fetchNotifications = () => {
+    fetch('/api/notifications').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setNotifications(data)
+    }).catch(() => {})
+  }
+
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(data => {
       if (data && !data.error) setGlobalSettings(data)
     }).catch(() => {})
+
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 15000)
+    return () => clearInterval(interval)
   }, [])
+
+  const markAsRead = async () => {
+    await fetch('/api/notifications/read', { method: 'POST' })
+    fetchNotifications()
+  }
 
   const refreshPurchases = () => {
     if (isStudent || role === 'Ученик') {
@@ -725,6 +743,11 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
+            {isPremium && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-yellow-600 bg-yellow-500/20 px-2 py-1 rounded-md border border-yellow-500/50">
+                <Crown className="size-3" /> Premium
+              </span>
+            )}
             <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">{role}</span>
             {isGuest && (
               <Link href="/login" className="button ml-2 py-1 px-3 text-xs">
@@ -732,7 +755,37 @@ export function TeacherHub({
               </Link>
             )}
           </div>
-          <button className="icon-button" onClick={() => notify('Новых уведомлений нет')}><Bell /></button>
+          <div className="relative">
+            <button className="icon-button relative" onClick={() => { setShowNotifications(!showNotifications); markAsRead(); }}>
+              <Bell />
+              {notifications.filter(n => !n.isRead).length > 0 && (
+                <span className="absolute top-1 right-1 flex size-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full size-3 bg-red-500"></span>
+                </span>
+              )}
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 bg-background border rounded-xl shadow-xl z-50 overflow-hidden text-left">
+                <div className="p-3 border-b bg-muted/30 font-semibold flex justify-between items-center">
+                  Уведомления
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="p-4 text-center text-sm text-muted-foreground">Нет уведомлений</p>
+                  ) : (
+                    notifications.map(n => (
+                      <div key={n.id} className={`p-4 border-b last:border-0 hover:bg-muted/50 cursor-pointer ${!n.isRead ? 'bg-primary/5' : ''}`} onClick={() => { if (n.link) router.push(n.link); setShowNotifications(false) }}>
+                        <p className="font-semibold text-sm mb-1">{n.title}</p>
+                        <p className="text-sm text-muted-foreground">{n.message}</p>
+                        <p className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
         {liveSession && section !== 'live' && (
@@ -2395,6 +2448,7 @@ function ModulesEditor({ modules, setModules, students, notify }: {
             <label className="field">Видимость
               <select className="input" value={editModule.visibility || 'ALL'} onChange={e => setEditModule(p => ({ ...p!, visibility: e.target.value as any }))}>
                 <option value="ALL">🌐 Всем (бесплатно)</option>
+                <option value="PREMIUM">👑 Только с премиумом</option>
                 <option value="PAID">💳 По оплате</option>
                 <option value="STUDENTS">👤 Конкретным ученикам</option>
               </select>

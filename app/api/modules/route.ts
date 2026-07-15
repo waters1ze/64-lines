@@ -7,6 +7,11 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   const userId = (session?.user as any)?.id as string | undefined
 
+  let user: { isPremium: boolean } | null = null
+  if (userId) {
+    user = await db.user.findUnique({ where: { id: userId }, select: { isPremium: true } })
+  }
+
   const modules = await db.module.findMany({
     orderBy: { order: 'asc' },
     include: {
@@ -20,6 +25,7 @@ export async function GET() {
     ...m,
     hasAccess: userId
       ? m.visibility === 'ALL' ||
+        (m.visibility === 'PREMIUM' && user?.isPremium) ||
         (m.accesses as any[]).some((a: any) => a.userId === userId)
       : m.visibility === 'ALL',
     accesses: undefined,

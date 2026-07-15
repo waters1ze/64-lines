@@ -96,6 +96,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // Notify user
+    await db.notification.create({
+      data: {
+        userId: purchase.userId,
+        title: 'Оплата прошла успешно',
+        message: `Ваш платеж успешно подтвержден. ${purchase.course ? 'Курс доступен!' : purchase.moduleId ? 'Доступ к модулю открыт!' : purchase.type === 'SUBSCRIPTION' || purchase.type === 'PREMIUM' ? 'Вам начислен Premium!' : ''}`,
+        link: purchase.course ? `?section=courseViewer&courseId=${purchase.courseId}` : ''
+      }
+    })
+
     return new NextResponse('OK', { status: 200 })
   } catch (e: any) {
     console.error('YooMoney callback error:', e)

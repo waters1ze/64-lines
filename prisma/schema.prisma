@@ -33,6 +33,7 @@ model User {
   studentInvites      TeacherStudentInvite[] @relation("StudentInvites")
   puzzlesSolvedToday  Int            @default(0)
   lastPuzzleDate      DateTime?
+  notifications       Notification[]
 }
 
 model Homework {
@@ -218,3 +219,16 @@ model Puzzle {
   themes     String
   openingTags String?
 }
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+

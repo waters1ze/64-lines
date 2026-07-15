@@ -157,6 +157,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         ) : (
           <div className="w-full h-full relative">
             <Chessboard 
+              key={fen}
               position={fen} 
               onPieceDrop={onDrop}
               boardOrientation={fen.split(' ')[1] === 'w' ? 'white' : 'black'}

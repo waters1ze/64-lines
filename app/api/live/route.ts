@@ -64,6 +64,16 @@ export async function POST(req: Request) {
     }
   })
 
+  // Notify student
+  await db.notification.create({
+    data: {
+      userId: studentId,
+      title: 'Входящий звонок!',
+      message: `${session.user.name || 'Учитель'} начал звонок с вами.`,
+      link: '?section=live'
+    }
+  })
+
   return NextResponse.json({ session: newSession })
 }
 
