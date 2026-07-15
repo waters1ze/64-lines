@@ -31,27 +31,25 @@ async function seed() {
     if (puzzles.length === 0) continue
 
     console.log(`Received ${puzzles.length} puzzles for range ${range.min}-${range.max}. Inserting...`)
-    let insertedForRange = 0
+    const dataToInsert = puzzles.map(p => ({
+      id: p.PuzzleId,
+      fen: p.FEN,
+      moves: p.Moves,
+      rating: p.Rating,
+      ratingDeviation: p.RatingDeviation || 0,
+      themes: p.Themes || '',
+      openingTags: p.OpeningTags || ''
+    }))
 
-    for (const p of puzzles) {
-      try {
-        await prisma.puzzle.upsert({
-          where: { id: p.PuzzleId },
-          update: {},
-          create: {
-            id: p.PuzzleId,
-            fen: p.FEN,
-            moves: p.Moves,
-            rating: p.Rating,
-            ratingDeviation: p.RatingDeviation || 0,
-            themes: p.Themes || '',
-            openingTags: p.OpeningTags || ''
-          }
-        })
-        insertedForRange++
-      } catch (err) {
-        // Silently skip duplicates or errors
-      }
+    let insertedForRange = 0
+    try {
+      const result = await prisma.puzzle.createMany({
+        data: dataToInsert,
+        skipDuplicates: true
+      })
+      insertedForRange = result.count
+    } catch (err) {
+      console.error('Error during bulk insert:', err)
     }
     console.log(`Successfully inserted ${insertedForRange} puzzles for this range.`)
     totalInserted += insertedForRange
