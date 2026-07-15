@@ -314,6 +314,7 @@ export function TeacherHub({
   initialRole = 'Учитель', 
   userName = 'Учитель', 
   userRating = 1200,
+  userRank,
   initialStudents,
   initialHomeworks,
   initialCourses,
