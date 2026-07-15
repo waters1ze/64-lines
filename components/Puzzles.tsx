@@ -458,7 +458,7 @@ export function Puzzles({
             <Chessboard 
               key={puzzle?.fen || 'start'}
               options={{
-                id: puzzle?.id || 'board',
+                id: `board-${puzzle?.id || 'default'}`,
                 position: game.fen(),
                 boardOrientation: playerColor,
                 onPieceDrop: onDrop,
