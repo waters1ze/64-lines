@@ -280,6 +280,14 @@ export function Puzzles({
             )}
           </div>
         )}
+        <div className="p-4 bg-muted text-xs font-mono overflow-auto break-all">
+          <p>Debug Info:</p>
+          <p>Puzzle FEN: {puzzle?.fen}</p>
+          <p>Game FEN: {game?.fen()}</p>
+          <p>Player Color: {playerColor}</p>
+          <p>Puzzle Moves: {puzzle?.moves}</p>
+          <p>Move Index: {moveIndex}</p>
+        </div>
       </div>
       
       <div className="flex-1 flex flex-col justify-center space-y-6">
