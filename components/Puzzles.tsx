@@ -256,6 +256,7 @@ export function Puzzles({
 
             {showBoard ? (
                 <Chessboard 
+                  key={`puzzles-board-key-${puzzle.id}`}
                   id={`puzzles-board-${puzzle.id}`}
                   position={game.fen()}
                   onPieceDrop={onDrop}
