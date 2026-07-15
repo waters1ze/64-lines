@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { Calendar } from 'lucide-react'
 
 export function ActivityCalendar() {
   const [dates, setDates] = useState<string[]>([])
@@ -45,8 +46,9 @@ export function ActivityCalendar() {
   return (
     <div className="bg-card border rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-xs text-foreground flex items-center gap-1">
-          <span>📅 Календарь активности (90 дней)</span>
+        <h4 className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+          <span>Календарь активности (90 дней)</span>
         </h4>
         <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
           Активных дней: {dates.length}
