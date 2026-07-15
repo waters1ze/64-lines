@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { title, pgn, studentId, dueDate } = await req.json()
+    const { title, pgn, studentId, dueDate, rating } = await req.json()
     if (!title || !studentId) return new NextResponse('Bad Request', { status: 400 })
 
     const homework = await db.homework.create({
@@ -21,6 +21,7 @@ export async function POST(req: Request) {
         title,
         pgn: pgn || '',
         studentId,
+        rating: rating ? parseInt(rating) : null,
         ...(dueDate && { dueDate: new Date(dueDate) })
       }
     })

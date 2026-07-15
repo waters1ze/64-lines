@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { isCorrect } = await req.json()
+  const { isCorrect, puzzleRating } = await req.json()
 
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -28,10 +28,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'LIMIT_REACHED' }, { status: 403 })
   }
 
-  // Calculate rating change
-  // Simple Elo for puzzles: +10 if correct, -10 if wrong
-  let ratingChange = isCorrect ? 10 : -10
-  const newRating = Math.max(100, (user.rating || 1200) + ratingChange)
+  // Calculate rating change using Elo formula
+  const currentRating = user.rating || 1200
+  const pRating = puzzleRating || currentRating
+  const K = 32
+  const E = 1 / (1 + Math.pow(10, (pRating - currentRating) / 400))
+  const score = isCorrect ? 1 : 0
+  let ratingChange = Math.round(K * (score - E))
+  
+  const newRating = Math.max(100, currentRating + ratingChange)
 
   // Calculate new stats
   const puzzlesSolvedTotal = (user.puzzlesSolvedTotal || 0) + (isCorrect ? 1 : 0)

@@ -51,6 +51,7 @@ model Homework {
   attempts    Int       @default(0)
   teacherNote String?
   studentId   String
+  rating      Int?
   student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 

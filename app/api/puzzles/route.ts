@@ -5,7 +5,10 @@ import { authOptions } from '../auth/[...nextauth]/route'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url)
+  const difficulty = url.searchParams.get('difficulty') || 'normal'
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,12 +34,23 @@ export async function GET() {
   const targetRating = user.rating || 1200
   let puzzle = null
 
+  let minDiff = -100
+  let maxDiff = 100
+
+  if (difficulty === 'easy') {
+    minDiff = -400
+    maxDiff = -150
+  } else if (difficulty === 'hard') {
+    minDiff = 300
+    maxDiff = 500
+  }
+
   // Get from our own DB
   let puzzles = await db.puzzle.findMany({
     where: {
       rating: {
-        gte: targetRating - 100,
-        lte: targetRating + 100,
+        gte: targetRating + minDiff,
+        lte: targetRating + maxDiff,
       }
     }
   })
@@ -45,8 +59,8 @@ export async function GET() {
     puzzles = await db.puzzle.findMany({
       where: {
         rating: {
-          gte: targetRating - 200,
-          lte: targetRating + 200,
+          gte: targetRating - 300,
+          lte: targetRating + 300,
         }
       }
     })

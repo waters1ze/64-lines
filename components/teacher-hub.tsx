@@ -15,6 +15,7 @@ import '@uiw/react-markdown-preview/markdown.css'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor').then(m => m.default), { ssr: false })
 const MarkdownPreview = dynamic(() => import('@uiw/react-markdown-preview').then(m => m.default), { ssr: false })
+const Chessboard = dynamic(() => import('react-chessboard').then(m => m.Chessboard), { ssr: false })
 
 import ChatComponent from './ChatComponent'
 import LiveLessonBoard from './LiveLessonBoard'
@@ -38,7 +39,7 @@ type Student = { id: string | number; name: string; rating: number; email?: stri
 type HW = {
   id: string | number; studentId: string | number; title: string; assignedAt?: string; dueDate?: string | null
   progress: number; solved: boolean; attempts: number; pgn: string; status?: string; assigned?: string; due?: string
-  teacherNote?: string;
+  teacherNote?: string; rating?: number;
 }
 type Course = {
   id: string | number;
@@ -327,6 +328,7 @@ export function TeacherHub({
   initialRole?: string, 
   userName: string
   userRating: number
+  userRank?: number
   isPremium: boolean
   puzzlesSolvedTotal?: number
   puzzlesAttempted?: number
@@ -841,6 +843,7 @@ export function TeacherHub({
               ? <StudentOverview 
                   userName={userName} 
                   userRating={ratingState} 
+                  userRank={userRank}
                   homeworks={homeworks} 
                   onOpenHw={openHwPuzzle} 
                   notify={notify}
@@ -1278,6 +1281,7 @@ function TeacherOverview({ userName, go, homeworks, students, videosCount, onOpe
 function StudentOverview({ 
   userName, 
   userRating, 
+  userRank = 0,
   homeworks, 
   onOpenHw, 
   notify,
@@ -1287,6 +1291,7 @@ function StudentOverview({
 }: { 
   userName: string; 
   userRating: number; 
+  userRank?: number;
   homeworks: HW[]; 
   onOpenHw: (id: string | number) => void; 
   notify: (s: string) => void;
@@ -1307,7 +1312,7 @@ function StudentOverview({
       <Head over="Личный кабинет" title={`${userName}, продолжим тренировку`} text="Статистика и задания тренера." />
       <OverviewInvitesWidget role="STUDENT" notify={notify} />
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Рейтинг"       value={String(userRating)} note="Текущий Эло" />
+        <Metric label="Рейтинг"       value={String(userRating)} note={userRank > 0 ? `Топ ${userRank} сайта` : "Текущий Эло"} />
         <Metric label="Выполнено"     value={`${totalSolved}`} note="заданий и задач" />
         <Metric label="Серия занятий" value={`${activityStreak} дней`} note="Активность" />
         <Metric label="Точность"      value={`${accuracy}%`} note={`${puzzlesSolvedTotal} задач`} />
@@ -1412,15 +1417,60 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
   const [hwTitle, setHwTitle] = useState('')
   const [hwDue,   setHwDue]   = useState('')
   const [hwPgn,   setHwPgn]   = useState('')
+  const [hwRating, setHwRating] = useState('1200')
+  const [hwFen, setHwFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
+  const [hwChess, setHwChess] = useState(() => new Chess())
+  const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Reset editor when opened
+  useEffect(() => {
+    if (showAdd) {
+      setHwTitle(''); setHwDue(''); setHwPgn(''); setHwRating('1200');
+      setHwFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+      setHwChess(new Chess());
+      setBoardOrientation('white');
+    }
+  }, [showAdd])
+
+  const handleFenChange = (newFen: string) => {
+    setHwFen(newFen)
+    try {
+      const g = new Chess(newFen)
+      setHwChess(g)
+      setHwPgn(g.pgn())
+      setBoardOrientation(newFen.split(' ')[1] === 'w' ? 'white' : 'black')
+    } catch(e) {}
+  }
+
+  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
+    const clone = new Chess()
+    clone.loadPgn(hwChess.pgn())
+    try {
+      clone.move({ from: sourceSquare, to: targetSquare, promotion: 'q' })
+      setHwChess(clone)
+      setHwPgn(clone.pgn())
+      return true
+    } catch(e) {
+      return false
+    }
+  }
+
+  const handleUndo = () => {
+    const clone = new Chess()
+    clone.loadPgn(hwChess.pgn())
+    clone.undo()
+    setHwChess(clone)
+    setHwPgn(clone.pgn())
+  }
 
   const done = homeworks.filter(h => h.solved).length
   const avgAttempts = done > 0 ? (homeworks.filter(h => h.solved).reduce((a, h) => a + h.attempts, 0) / done).toFixed(1) : '—'
 
   const handleAdd = () => {
-    if (!hwTitle || !hwPgn) { notify('Заполните название и добавьте PGN'); return }
-    onAddHw({ studentId: student.id, title: hwTitle, dueDate: hwDue || undefined, progress: 0, pgn: hwPgn })
-    setShowAdd(false); setHwTitle(''); setHwDue(''); setHwPgn('')
+    if (!hwTitle || !hwPgn) { notify('Заполните название и добавьте ходы на доске (PGN)'); return }
+    onAddHw({ studentId: student.id, title: hwTitle, dueDate: hwDue || undefined, progress: 0, pgn: hwPgn, rating: parseInt(hwRating) })
+    setShowAdd(false);
   }
 
   return (
@@ -1454,20 +1504,41 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
       </div>
 
       {showAdd && (
-        <Modal title="Добавить домашнее задание" close={() => setShowAdd(false)}>
-          <label className="field">Название задания<input className="input" value={hwTitle} onChange={e => setHwTitle(e.target.value)} placeholder="Тактика: вилка конём" /></label>
-          <label className="field">Срок (дата)<input className="input" type="date" value={hwDue} onChange={e => setHwDue(e.target.value)} /></label>
-          <div className="field">
-            <span>PGN-файл с позицией и решением</span>
-            <label className="drop-zone cursor-pointer">
-              <Upload /><b>{hwPgn ? '✅ PGN загружен' : 'Выбрать PGN-файл'}</b><span>Ходы в PGN — это правильное решение</span>
-              <input ref={fileRef} className="sr-only" type="file" accept=".pgn,.txt"
-                onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => setHwPgn(String(r.result)); r.readAsText(f) } }} />
-            </label>
-            <textarea className="textarea font-mono text-xs min-h-24" value={hwPgn} onChange={e => setHwPgn(e.target.value)}
-              placeholder="Или вставьте PGN вручную: 1. e4 e5 2. Nf3 Nc6 3. Bb5" />
+        <Modal title="Добавить домашнее задание" close={() => setShowAdd(false)} wide>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-4">
+              <label className="field">Название задания<input className="input" value={hwTitle} onChange={e => setHwTitle(e.target.value)} placeholder="Тактика: вилка конём" /></label>
+              <div className="flex gap-4">
+                <label className="field flex-1">Срок (дата)<input className="input" type="date" value={hwDue} onChange={e => setHwDue(e.target.value)} /></label>
+                <label className="field flex-1">Рейтинг (Elo)<input className="input" type="number" value={hwRating} onChange={e => setHwRating(e.target.value)} placeholder="1200" /></label>
+              </div>
+              <label className="field">Стартовая позиция (FEN)<input className="input font-mono text-xs" value={hwFen} onChange={e => handleFenChange(e.target.value)} placeholder="rnbqkbnr/..." /></label>
+              
+              <div className="bg-muted/30 p-4 rounded-xl border flex-1 flex flex-col">
+                <p className="text-sm font-semibold mb-2">Запись ходов (PGN)</p>
+                <p className="text-xs text-muted-foreground mb-3">Двигайте фигуры на доске справа, чтобы записать правильное решение. Либо вставьте готовый PGN.</p>
+                <textarea className="textarea font-mono text-xs flex-1 w-full" value={hwPgn} onChange={e => { setHwPgn(e.target.value); try { const g = new Chess(); g.loadPgn(e.target.value); setHwChess(g); } catch(err){} }} placeholder="Или вставьте PGN вручную" />
+                <div className="flex items-center gap-2 mt-3">
+                  <label className="outline-button flex-1 text-center cursor-pointer text-xs py-2">
+                    <Upload className="size-4 inline-block mr-1"/>Загрузить PGN
+                    <input ref={fileRef} className="sr-only" type="file" accept=".pgn,.txt" onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => { const pgnStr = String(r.result); setHwPgn(pgnStr); try { const g = new Chess(); g.loadPgn(pgnStr); setHwChess(g); } catch(err){} }; r.readAsText(f) } }} />
+                  </label>
+                  <button className="outline-button flex-1 text-xs py-2" onClick={handleUndo}><RotateCcw className="size-4 inline-block mr-1"/>Отменить ход</button>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <div className="w-full aspect-square border rounded-md overflow-hidden bg-muted/20">
+                <Chessboard 
+                  position={hwChess.fen()} 
+                  boardOrientation={boardOrientation}
+                  onPieceDrop={onPieceDrop}
+                  animationDuration={200}
+                />
+              </div>
+              <button className="button mt-auto pt-4" onClick={handleAdd}>Назначить ученику</button>
+            </div>
           </div>
-          <button className="button" onClick={handleAdd}>Назначить ученику</button>
         </Modal>
       )}
     </>

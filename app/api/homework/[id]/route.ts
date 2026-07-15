@@ -27,9 +27,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     let ratingDelta = 0
     if (!isTeacher && solved === true && !hw.solved) {
       const currentAttempts = (attempts !== undefined ? attempts : hw.attempts) || 1
-      if (currentAttempts <= 1) ratingDelta = 15
-      else if (currentAttempts === 2) ratingDelta = 10
-      else ratingDelta = 5
+      const currentRating = user.rating || 1200
+      const hwRating = hw.rating || 1200
+      const E = 1 / (1 + Math.pow(10, (hwRating - currentRating) / 400))
+      
+      let score = 1.0
+      if (currentAttempts === 2) score = 0.5
+      else if (currentAttempts >= 3) score = 0.0
+
+      ratingDelta = Math.round(32 * (score - E))
 
       // Calculate streak
       const now = new Date()

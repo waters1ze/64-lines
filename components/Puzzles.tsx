@@ -31,8 +31,10 @@ export function Puzzles({
     setIsClient(true)
   }, [])
 
+  const [difficulty, setDifficulty] = useState('normal')
+
   // Fetch puzzle
-  const fetchPuzzle = async () => {
+  const fetchPuzzle = async (diff = difficulty) => {
     setLoading(true)
     setError(null)
     setSolved(false)
@@ -43,7 +45,7 @@ export function Puzzles({
     setIsPlayingSolution(false)
     
     try {
-      const res = await fetch('/api/puzzles')
+      const res = await fetch(`/api/puzzles?difficulty=${diff}`)
       if (res.status === 403) {
         setError('LIMIT_REACHED')
         setLoading(false)
@@ -91,7 +93,7 @@ export function Puzzles({
       const res = await fetch('/api/puzzles/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isCorrect })
+        body: JSON.stringify({ isCorrect, puzzleRating: puzzle?.rating })
       })
       const data = await res.json()
       if (data.rating && onRatingChange) {
@@ -284,6 +286,12 @@ export function Puzzles({
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-2">Тактика</h2>
           <p className="text-muted-foreground">Решайте задачи подходящие под ваш рейтинг, чтобы улучшить свои навыки.</p>
+          
+          <div className="flex gap-2 mt-4">
+            <button onClick={() => { setDifficulty('easy'); fetchPuzzle('easy'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'easy' ? 'bg-green-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Изи</button>
+            <button onClick={() => { setDifficulty('normal'); fetchPuzzle('normal'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'normal' ? 'bg-blue-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Нормал</button>
+            <button onClick={() => { setDifficulty('hard'); fetchPuzzle('hard'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'hard' ? 'bg-red-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Хард</button>
+          </div>
         </div>
 
         {puzzle && (

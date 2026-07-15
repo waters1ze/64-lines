@@ -6,9 +6,6 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const top = await db.user.findMany({
-      where: { 
-        role: 'STUDENT'
-      },
       select: {
         id: true,
         name: true,
