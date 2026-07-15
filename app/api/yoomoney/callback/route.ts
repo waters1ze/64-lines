@@ -86,6 +86,22 @@ export async function POST(req: Request) {
       })
     }
 
+    // Create GameAnalysisRequest if it's an ANALYSIS
+    if (purchase.type === 'ANALYSIS') {
+      const pgnMatch = purchase.comment?.match(/PGN: ([\s\S]*?)(?:\n\n|$)/)
+      const pgn = pgnMatch ? pgnMatch[1] : ''
+      const userComment = purchase.comment?.replace(/PGN: [\s\S]*?(?:\n\n|$)/, '').trim()
+      
+      await db.gameAnalysisRequest.create({
+        data: {
+          userId: purchase.userId,
+          pgn: pgn || 'PGN not provided',
+          comment: userComment || null,
+          status: 'PENDING'
+        }
+      })
+    }
+
     // Send course email if it's a course
     if (purchase.course) {
       try {

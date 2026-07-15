@@ -31,7 +31,10 @@ export default async function Page() {
       userName = dbUser.name || session.user.name || 'Гость'
       dbUserRole = dbUser.role
       isPremium = dbUser.isPremium
-      
+      if (isPremium && dbUser.premiumUntil && dbUser.premiumUntil < new Date()) {
+        await db.user.update({ where: { id: dbUser.id }, data: { isPremium: false, premiumUntil: null } })
+        isPremium = false
+      }
       // Override session with database data to prevent stale JWT session issues
       session.user.id = dbUser.id
       
