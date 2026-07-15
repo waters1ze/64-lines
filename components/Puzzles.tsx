@@ -82,11 +82,12 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
     } catch (e) {}
   }
 
-  const onDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
-    if (solved || wrong) return false
+  const onDrop = ({ sourceSquare, targetSquare, piece }: any) => {
+    if (solved || wrong || !game) return false
 
     try {
-      const move = game?.move({ from: sourceSquare, to: targetSquare, promotion: piece[1].toLowerCase() ?? 'q' })
+      const pieceStr = piece.pieceType || piece
+      const move = game.move({ from: sourceSquare, to: targetSquare, promotion: pieceStr[1]?.toLowerCase() ?? 'q' })
       if (!move) return false
 
       setGame(new Chess(game.fen()))
