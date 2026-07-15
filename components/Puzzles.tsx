@@ -55,11 +55,11 @@ export function Puzzles({
       const data = await res.json()
       
       setPuzzle(data)
-      const newGame = new Chess()
+      let newGame = new Chess()
       console.log('Loaded puzzle data:', data)
       try {
-        const loaded = newGame.load(data.fen)
-        console.log('FEN loaded successfully:', loaded, newGame.fen())
+        newGame = new Chess(data.fen)
+        console.log('FEN loaded successfully:', newGame.fen())
       } catch (err) {
         console.error('Error loading FEN:', data.fen, err)
       }
