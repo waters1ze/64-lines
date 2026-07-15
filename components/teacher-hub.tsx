@@ -1494,8 +1494,8 @@ function StudentOverview({
             onClick={() => onGoSection?.('puzzles')}
             className="mt-1 px-5 py-2 bg-foreground text-background rounded-xl font-semibold text-sm hover:bg-foreground/90 transition flex items-center gap-2"
           >
-            <Zap className="w-4 h-4" />
-            Puzzle Rush!
+            <Trophy className="w-4 h-4" />
+            Решать задачи
           </button>
         </div>
       ) : (
