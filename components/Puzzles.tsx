@@ -15,6 +15,11 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
   const [wrong, setWrong] = useState(false)
   const [moveIndex, setMoveIndex] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Fetch puzzle
   const fetchPuzzle = async () => {
@@ -68,80 +73,60 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
     } catch (e) {}
   }
 
-  function onDrop(sourceSquare: string, targetSquare: string, piece: string) {
-    if (solved || wrong || loading || !game) return false;
-    
-    const move = {
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: piece[1].toLowerCase() ?? 'q',
-    };
+  const onDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
+    if (solved || wrong) return false
 
-    const gameCopy = new Chess(game.fen());
-    let moveResult = null;
-    
     try {
-      moveResult = gameCopy.move(move);
-    } catch (e) {
-      return false;
-    }
+      const move = game?.move({ from: sourceSquare, to: targetSquare, promotion: piece[1].toLowerCase() ?? 'q' })
+      if (!move) return false
 
-    if (moveResult) {
-      // Check if move is correct according to puzzle solution
-      const expectedMoves = puzzle.moves.split(' ')
-      const expectedMoveStr = expectedMoves[moveIndex]
-      const userMoveStr = moveResult.lan || (move.from + move.to + (move.promotion !== 'q' ? move.promotion : ''))
+      setGame(new Chess(game.fen()))
 
-      if (expectedMoveStr === userMoveStr || expectedMoveStr.startsWith(move.from + move.to)) {
+      const moves = puzzle.moves.split(' ')
+      if (moveIndex < moves.length && moves[moveIndex] === move.lan) {
         // Correct move
-        setGame(gameCopy);
-        const nextIndex = moveIndex + 1;
-        
-        if (nextIndex >= expectedMoves.length) {
-          // Puzzle solved!
+        if (moveIndex === moves.length - 1) {
+          // Solved
           setSolved(true)
           submitResult(true)
         } else {
-          // Opponent replies
-          setMoveIndex(nextIndex + 1)
+          // Next move by opponent
+          setMoveIndex(m => m + 1)
           setTimeout(() => {
-            const oppMoveStr = expectedMoves[nextIndex]
-            const oppGame = new Chess(gameCopy.fen())
-            oppGame.move({ 
-              from: oppMoveStr.substring(0, 2), 
-              to: oppMoveStr.substring(2, 4), 
-              promotion: oppMoveStr.length > 4 ? oppMoveStr[4] : undefined 
-            })
-            setGame(oppGame)
-          }, 400)
+            if (game) {
+              const oppMove = moves[moveIndex + 1]
+              game.move({ from: oppMove.substring(0, 2), to: oppMove.substring(2, 4), promotion: oppMove.length > 4 ? oppMove[4] : undefined })
+              setGame(new Chess(game.fen()))
+              setMoveIndex(m => m + 1)
+              if (moveIndex + 1 === moves.length - 1) {
+                setSolved(true)
+                submitResult(true)
+              }
+            }
+          }, 500)
         }
-        return true;
+        return true
       } else {
         // Wrong move
+        game?.undo()
         setWrong(true)
         submitResult(false)
-        return false;
+        return false
       }
+    } catch (e) {
+      return false
     }
-    return false;
   }
 
   if (error === 'LIMIT_REACHED') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center space-y-6 bg-muted/20 rounded-xl border border-muted">
-        <Crown className="h-16 w-16 text-yellow-500 mb-2" />
-        <h2 className="text-2xl font-bold">Дневной лимит задач исчерпан</h2>
-        <p className="text-muted-foreground max-w-md">
-          Бесплатным пользователям доступно 5 задач в день. 
-          Оформите Premium-подписку, чтобы решать неограниченное количество задач, получать доступ к приватным видео и выделяться в таблице лидеров!
-        </p>
-        <button 
-          onClick={onPremiumClick}
-          className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-8 rounded-full transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
-        >
-          <Crown className="w-5 h-5" />
-          Купить Premium
-        </button>
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-6 max-w-md mx-auto">
+        <div className="size-20 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+          <Crown className="size-10" />
+        </div>
+        <h2 className="text-2xl font-bold">Лимит исчерпан</h2>
+        <p className="text-muted-foreground">Вам доступно 5 бесплатных задач в день. Чтобы решать задачи без ограничений, приобретите Premium подписку.</p>
+        <button onClick={onPremiumClick} className="button w-full bg-amber-500 hover:bg-amber-600 text-white border-0 py-3 text-lg font-semibold shadow-lg shadow-amber-500/20">Оформить Premium</button>
       </div>
     )
   }
@@ -149,12 +134,16 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
   return (
     <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl mx-auto">
       <div className="w-full md:w-[600px] aspect-square rounded-xl overflow-hidden shadow-lg border border-border bg-card">
-        {!puzzle || !game ? (
+        {!isClient || !puzzle || !game ? (
           <div className="w-full h-full flex items-center justify-center bg-muted/20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
           <div className="w-full h-full relative">
+            {/* DEBUG INFO: Удали позже */}
+            <div className="absolute z-10 bottom-2 right-2 bg-black/80 text-white text-[10px] p-2 rounded max-w-xs break-all hidden">
+              FEN: {game.fen()}
+            </div>
             <Chessboard 
               key={`${puzzle.id}-${refreshKey}`}
               id={`puzzles-board-${puzzle.id}`}
