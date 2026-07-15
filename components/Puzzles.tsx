@@ -150,19 +150,21 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
           </div>
         ) : (
           <div className="w-full h-full relative">
-            {/* DEBUG INFO: Удали позже */}
-            <div className="absolute z-10 bottom-2 right-2 bg-black/80 text-white text-[10px] p-2 rounded max-w-xs break-all">
-              FEN: {game.fen()}
+            {/* DEBUG INFO */}
+            <div className="absolute z-20 top-2 left-2 bg-black/90 text-red-400 text-xs p-3 rounded max-w-[300px] break-words shadow-2xl border border-red-500/50">
+              <p className="font-bold text-white mb-1">DEBUG INFO (Отправь это AI):</p>
+              <p>1. data.fen: {puzzle?.fen || 'NULL'}</p>
+              <p>2. game.fen: {game?.fen() || 'NULL'}</p>
+              <p>3. moves: {puzzle?.moves || 'NULL'}</p>
+              <p>4. isClient: {isClient ? 'YES' : 'NO'}</p>
+              <p>5. board_position_prop: {game?.fen()}</p>
             </div>
             <Chessboard 
-              key={`${puzzle.id}-${refreshKey}`}
-              id={`puzzles-board-${puzzle.id}`}
+              id="puzzle-board-unique"
               position={game.fen()}
               onPieceDrop={onDrop}
               boardOrientation={game.fen().split(' ')[1] === 'w' ? 'white' : 'black'}
-              customDarkSquareStyle={{ backgroundColor: '#779556' }}
-              customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-              animationDuration={300}
+              animationDuration={200}
             />
             {error && error !== 'LIMIT_REACHED' && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
