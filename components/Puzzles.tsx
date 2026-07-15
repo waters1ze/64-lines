@@ -247,37 +247,12 @@ export function Puzzles({
           ) : (
             <div className="w-full h-full relative">
             <Chessboard 
+              id={puzzle?.id || 'board'}
               key={puzzle?.id || 'start'}
-              position={(() => {
-                const fen = game.fen();
-                const obj: any = {};
-                const rows = fen.split(' ')[0].split('/');
-                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-                rows.forEach((row, rankIndex) => {
-                  let fileIndex = 0;
-                  for (let i = 0; i < row.length; i++) {
-                    const c = row[i];
-                    if (!isNaN(parseInt(c))) {
-                      fileIndex += parseInt(c);
-                    } else {
-                      const color = c === c.toUpperCase() ? 'w' : 'b';
-                      const type = c.toUpperCase();
-                      obj[`${files[fileIndex]}${8 - rankIndex}`] = `${color}${type}`;
-                      fileIndex++;
-                    }
-                  }
-                });
-                return obj;
-              })()}
-              onPieceDrop={onDrop}
+              position={game.fen()}
               boardOrientation={playerColor}
-              customDarkSquareStyle={{ backgroundColor: '#779556' }}
-              customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-              animationDuration={300}
-              customSquareStyles={failedSquares ? {
-                [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
-                [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
-              } : {}}
+              onPieceDrop={onDrop}
+              animationDuration={0}
             />
             {error && error !== 'LIMIT_REACHED' && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
@@ -286,14 +261,6 @@ export function Puzzles({
             )}
           </div>
           )}
-        </div>
-        <div className="w-full md:w-[600px] p-4 bg-muted text-xs font-mono overflow-auto break-all mt-4 rounded-xl">
-          <p>Debug Info:</p>
-          <p>Puzzle FEN: {puzzle?.fen}</p>
-          <p>Game FEN: {game?.fen()}</p>
-          <p>Player Color: {playerColor}</p>
-          <p>Puzzle Moves: {puzzle?.moves}</p>
-          <p>Move Index: {moveIndex}</p>
         </div>
       </div>
       
