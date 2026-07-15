@@ -38,6 +38,7 @@ model User {
   activityStreak      Int            @default(0)
   lastActivityDate    DateTime?
   notifications       Notification[]
+  solvedPuzzles       SolvedPuzzle[]
 }
 
 model Homework {
@@ -240,3 +241,12 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model SolvedPuzzle {
+  id        String   @id @default(cuid())
+  userId    String
+  puzzleId  String
+  solvedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, puzzleId])
+}

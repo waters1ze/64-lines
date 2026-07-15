@@ -8,6 +8,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const difficulty = url.searchParams.get('difficulty') || 'normal'
+  const themesQuery = url.searchParams.get('themes')
+  
+  const selectedThemes = themesQuery
+    ? themesQuery.split(',').map(t => t.trim()).filter(Boolean).slice(0, 3)
+    : []
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
@@ -45,44 +50,88 @@ export async function GET(req: Request) {
     maxDiff = 500
   }
 
-  // Get from our own DB
+  // Fetch solved puzzles for user to exclude them
+  const solvedPuzzles = await db.solvedPuzzle.findMany({
+    where: { userId: user.id },
+    select: { puzzleId: true }
+  })
+  const solvedIds = solvedPuzzles.map(s => s.puzzleId)
+
+  // Helper filter function for themes in JS (exact word match)
+  const filterByThemes = (puzzleList: any[]) => {
+    if (selectedThemes.length === 0) return puzzleList
+    return puzzleList.filter(p =>
+      selectedThemes.every(t => p.themes.split(' ').includes(t))
+    )
+  }
+
+  // 1. Try target range
   let puzzles = await db.puzzle.findMany({
     where: {
+      id: { notIn: solvedIds },
       rating: {
         gte: targetRating + minDiff,
         lte: targetRating + maxDiff,
       }
     }
   })
+  let filtered = filterByThemes(puzzles)
 
-  if (puzzles.length === 0) {
+  // 2. Fallback to wider range
+  if (filtered.length === 0) {
     puzzles = await db.puzzle.findMany({
       where: {
+        id: { notIn: solvedIds },
         rating: {
           gte: targetRating - 300,
           lte: targetRating + 300,
         }
       }
     })
+    filtered = filterByThemes(puzzles)
   }
 
-  if (puzzles.length === 0) {
-    // Get closest above or below
-    const allPuzzles = await db.puzzle.findMany()
-    if (allPuzzles.length > 0) {
-      // Sort by absolute rating difference
-      allPuzzles.sort((a, b) => Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating))
-      puzzles = [allPuzzles[0]]
+  // 3. Fallback to all unsolved puzzles sorted by closest rating
+  if (filtered.length === 0) {
+    const allUnsolved = await db.puzzle.findMany({
+      where: {
+        id: { notIn: solvedIds }
+      }
+    })
+    filtered = filterByThemes(allUnsolved)
+    if (filtered.length > 0) {
+      filtered.sort((a, b) => Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating))
     }
   }
 
-  if (puzzles.length > 0) {
-    puzzle = puzzles[Math.floor(Math.random() * puzzles.length)]
+  if (filtered.length > 0) {
+    puzzle = filtered[Math.floor(Math.random() * filtered.length)]
   }
 
   if (!puzzle) {
+    if (selectedThemes.length > 0) {
+      // Differentiate: why did we find 0 puzzles?
+      // Find if there are ANY puzzles with these themes in the DB (even solved ones)
+      const potentialPuzzles = await db.puzzle.findMany({
+        where: {
+          AND: selectedThemes.map(t => ({
+            themes: { contains: t }
+          }))
+        }
+      })
+      const hasAnyForThemes = potentialPuzzles.some(p =>
+        selectedThemes.every(t => p.themes.split(' ').includes(t))
+      )
+
+      if (hasAnyForThemes) {
+        return NextResponse.json({ error: 'ALL_SOLVED_FOR_THEMES' }, { status: 200 })
+      } else {
+        return NextResponse.json({ error: 'NO_PUZZLES_FOR_THEMES' }, { status: 200 })
+      }
+    }
     return NextResponse.json({ error: 'No puzzles available' }, { status: 404 })
   }
 
   return NextResponse.json(puzzle)
 }
+

@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { isCorrect, puzzleRating } = await req.json()
+  const { isCorrect, puzzleRating, puzzleId } = await req.json()
 
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -77,6 +77,27 @@ export async function POST(req: Request) {
       lastActivityDate: now
     }
   })
+
+  // Save solved puzzle to prevent repeating using upsert
+  if (puzzleId) {
+    try {
+      await db.solvedPuzzle.upsert({
+        where: {
+          userId_puzzleId: {
+            userId: user.id,
+            puzzleId: puzzleId
+          }
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          puzzleId: puzzleId
+        }
+      })
+    } catch (e) {
+      console.error('Error recording solved puzzle:', e)
+    }
+  }
 
   return NextResponse.json({ 
     rating: updated.rating, 

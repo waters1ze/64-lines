@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
-import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, Crown, Trophy, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { PUZZLE_THEMES, MAX_SELECTED_THEMES } from '@/lib/puzzleThemes'
+import { NotificationBanner } from '@/components/NotificationBanner'
 
 export function Puzzles({ 
   isPremium, 
@@ -28,16 +30,62 @@ export function Puzzles({
   const [isPlayingSolution, setIsPlayingSolution] = useState(false)
   const [ratingDiff, setRatingDiff] = useState<number | null>(null)
 
+  const [difficulty, setDifficulty] = useState('normal')
+  const [selectedThemes, setSelectedThemes] = useState<string[]>([])
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null)
+  const [bannerType, setBannerType] = useState<'error' | 'warning' | 'info'>('warning')
+  const [showAllThemes, setShowAllThemes] = useState(false)
+
+  const changeDifficulty = (newDiff: string) => {
+    setDifficulty(newDiff)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('puzzle_difficulty', newDiff)
+    }
+    fetchPuzzle(newDiff, selectedThemes)
+  }
+
+  const toggleTheme = (themeCode: string) => {
+    let nextThemes = [...selectedThemes]
+    if (selectedThemes.includes(themeCode)) {
+      nextThemes = nextThemes.filter(t => t !== themeCode)
+    } else {
+      if (selectedThemes.length >= MAX_SELECTED_THEMES) {
+        setBannerType('warning')
+        setBannerMessage(`Можно выбрать не более ${MAX_SELECTED_THEMES} тем одновременно.`)
+        return
+      }
+      nextThemes.push(themeCode)
+    }
+    setSelectedThemes(nextThemes)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('puzzleThemes', JSON.stringify(nextThemes))
+    }
+    fetchPuzzle(difficulty, nextThemes)
+  }
+
   useEffect(() => {
     setIsClient(true)
+    const savedDiff = typeof window !== 'undefined' ? localStorage.getItem('puzzle_difficulty') || 'normal' : 'normal'
+    setDifficulty(savedDiff)
+    
+    let savedThemes: string[] = []
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('puzzleThemes')
+        if (raw) savedThemes = JSON.parse(raw)
+      } catch (e) {
+        console.error('Error parsing saved themes', e)
+      }
+    }
+    setSelectedThemes(savedThemes)
+    fetchPuzzle(savedDiff, savedThemes)
   }, [])
 
-  const [difficulty, setDifficulty] = useState('normal')
-
   // Fetch puzzle
-  const fetchPuzzle = async (diff = difficulty) => {
+  const fetchPuzzle = async (diff = difficulty, themes = selectedThemes) => {
     setLoading(true)
     setError(null)
+    setPuzzle(null)
     setSolved(false)
     setWrong(false)
     setMoveIndex(0)
@@ -47,7 +95,8 @@ export function Puzzles({
     setRatingDiff(null)
     
     try {
-      const res = await fetch(`/api/puzzles?difficulty=${diff}`)
+      const themesParam = themes.length ? `&themes=${themes.join(',')}` : ''
+      const res = await fetch(`/api/puzzles?difficulty=${diff}${themesParam}`)
       if (res.status === 403) {
         setError('LIMIT_REACHED')
         setLoading(false)
@@ -56,6 +105,24 @@ export function Puzzles({
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
       
+      if (data.error === 'NO_PUZZLES_FOR_THEMES') {
+        setPuzzle(null)
+        setGame(new Chess())
+        setBannerType('info')
+        setBannerMessage('Активных задач по выбранным темам нет — показана начальная позиция.')
+        setLoading(false)
+        return
+      }
+
+      if (data.error === 'ALL_SOLVED_FOR_THEMES') {
+        setPuzzle(null)
+        setGame(new Chess())
+        setBannerType('info')
+        setBannerMessage('Вы решили все задачи по этой теме!')
+        setLoading(false)
+        return
+      }
+
       setPuzzle(data)
       let newGame = new Chess()
       console.log('Loaded puzzle data:', data)
@@ -86,16 +153,13 @@ export function Puzzles({
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetchPuzzle()
-  }, [])
-
   const submitResult = async (isCorrect: boolean) => {
+    if (!puzzle) return
     try {
       const res = await fetch('/api/puzzles/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isCorrect, puzzleRating: puzzle?.rating })
+        body: JSON.stringify({ isCorrect, puzzleRating: puzzle?.rating, puzzleId: puzzle?.id })
       })
       const data = await res.json()
       if (data.ratingChange !== undefined) {
@@ -108,7 +172,7 @@ export function Puzzles({
   }
 
   const onDrop = ({ sourceSquare, targetSquare, piece }: any) => {
-    if (solved || wrong || isPlayingSolution || !game) return false
+    if (solved || wrong || isPlayingSolution || !game || !puzzle) return false
 
     try {
       const pieceStr = piece.pieceType || piece
@@ -288,9 +352,63 @@ export function Puzzles({
           <p className="text-muted-foreground">Решайте задачи подходящие под ваш рейтинг, чтобы улучшить свои навыки.</p>
           
           <div className="flex gap-2 mt-4">
-            <button onClick={() => { setDifficulty('easy'); fetchPuzzle('easy'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'easy' ? 'bg-green-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Изи</button>
-            <button onClick={() => { setDifficulty('normal'); fetchPuzzle('normal'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'normal' ? 'bg-blue-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Нормал</button>
-            <button onClick={() => { setDifficulty('hard'); fetchPuzzle('hard'); }} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'hard' ? 'bg-red-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Хард</button>
+            <button onClick={() => changeDifficulty('easy')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'easy' ? 'bg-green-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Изи</button>
+            <button onClick={() => changeDifficulty('normal')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'normal' ? 'bg-blue-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Нормал</button>
+            <button onClick={() => changeDifficulty('hard')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${difficulty === 'hard' ? 'bg-red-500 text-white shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>Хард</button>
+          </div>
+
+          <div className="mt-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-semibold text-muted-foreground">Темы задач ({selectedThemes.length}/3):</span>
+              <button 
+                onClick={() => setShowAllThemes(!showAllThemes)} 
+                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+              >
+                {showAllThemes ? (
+                  <>Свернуть <ChevronUp className="w-3.5 h-3.5" /></>
+                ) : (
+                  <>Показать все темы <ChevronDown className="w-3.5 h-3.5" /></>
+                )}
+              </button>
+            </div>
+            
+            {selectedThemes.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 animate-in fade-in duration-200">
+                {selectedThemes.map(code => {
+                  const name = PUZZLE_THEMES.find(t => t.code === code)?.ru || code
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => toggleTheme(code)}
+                      className="px-3 py-1 rounded-full text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      {name} <span>×</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className={`transition-all duration-300 overflow-hidden ${showAllThemes ? 'max-h-[300px] overflow-y-auto pr-1' : 'max-h-0'}`}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 bg-muted/20 rounded-xl border border-muted">
+                {PUZZLE_THEMES.map(theme => {
+                  const isSelected = selectedThemes.includes(theme.code)
+                  return (
+                    <button
+                      key={theme.code}
+                      onClick={() => toggleTheme(theme.code)}
+                      className={`px-2 py-1.5 rounded-lg text-xs text-left font-medium transition-all ${
+                        isSelected 
+                          ? 'bg-primary text-primary-foreground shadow-sm' 
+                          : 'bg-background hover:bg-muted text-foreground border border-border/60'
+                      }`}
+                    >
+                      {theme.ru}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -305,11 +423,14 @@ export function Puzzles({
             </div>
             {puzzle.themes && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {puzzle.themes.split(' ').slice(0, 3).map((t: string) => (
-                  <span key={t} className="text-[10px] px-2 py-1 bg-background rounded-full border border-border text-muted-foreground uppercase tracking-wider">
-                    {t}
-                  </span>
-                ))}
+                {puzzle.themes.split(' ').slice(0, 3).map((t: string) => {
+                  const name = PUZZLE_THEMES.find(pt => pt.code === t)?.ru || t
+                  return (
+                    <span key={t} className="text-[10px] px-2 py-1 bg-background rounded-full border border-border text-muted-foreground uppercase tracking-wider">
+                      {name}
+                    </span>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -360,6 +481,11 @@ export function Puzzles({
           {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Следующая задача'}
         </button>
       </div>
+      <NotificationBanner 
+        message={bannerMessage} 
+        onClose={() => setBannerMessage(null)} 
+        type={bannerType} 
+      />
     </div>
   )
 }

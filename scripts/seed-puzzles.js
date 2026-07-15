@@ -20,7 +20,8 @@ async function seed() {
     { min: 800, max: 1200, count: 1000 },
     { min: 1200, max: 1600, count: 1000 },
     { min: 1600, max: 2000, count: 1000 },
-    { min: 2000, max: 2500, count: 1000 }
+    { min: 2000, max: 2500, count: 1000 },
+    { min: 2500, max: 3000, count: 1000 }
   ]
 
   let totalInserted = 0
