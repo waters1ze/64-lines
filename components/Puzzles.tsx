@@ -41,7 +41,14 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
       const data = await res.json()
       
       setPuzzle(data)
-      const newGame = new Chess(data.fen)
+      const newGame = new Chess()
+      console.log('Loaded puzzle data:', data)
+      try {
+        const loaded = newGame.load(data.fen)
+        console.log('FEN loaded successfully:', loaded, newGame.fen())
+      } catch (err) {
+        console.error('Error loading FEN:', data.fen, err)
+      }
       
       // Make the first move automatically (opponent's move)
       const moves = data.moves.split(' ')
@@ -50,10 +57,13 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         try {
           newGame.move({ from: move.substring(0, 2), to: move.substring(2, 4), promotion: move.length > 4 ? move[4] : undefined })
           setMoveIndex(1)
-        } catch(e) {}
+        } catch(e) {
+          console.error('Error making first move:', move, e)
+        }
       }
       setGame(newGame)
     } catch (e) {
+      console.error('Outer fetch error:', e)
       setError('Не удалось загрузить задачу')
     }
     setLoading(false)
@@ -141,7 +151,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         ) : (
           <div className="w-full h-full relative">
             {/* DEBUG INFO: Удали позже */}
-            <div className="absolute z-10 bottom-2 right-2 bg-black/80 text-white text-[10px] p-2 rounded max-w-xs break-all hidden">
+            <div className="absolute z-10 bottom-2 right-2 bg-black/80 text-white text-[10px] p-2 rounded max-w-xs break-all">
               FEN: {game.fen()}
             </div>
             <Chessboard 
