@@ -16,6 +16,7 @@ export function Puzzles({
 }) {
   const [puzzle, setPuzzle] = useState<any>(null)
   const [game, setGame] = useState<Chess | null>(null)
+  const [playerColor, setPlayerColor] = useState<'white' | 'black'>('white')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [solved, setSolved] = useState(false)
@@ -68,6 +69,7 @@ export function Puzzles({
           console.error('Error making first move:', move, e)
         }
       }
+      setPlayerColor(newGame.fen().split(' ')[1] === 'w' ? 'white' : 'black')
       setGame(newGame)
     } catch (e) {
       console.error('Outer fetch error:', e)
@@ -180,7 +182,7 @@ export function Puzzles({
                   id: `puzzles-board-${puzzle.id}`,
                   position: game.fen(),
                   onPieceDrop: onDrop,
-                  boardOrientation: game.fen().split(' ')[1] === 'w' ? 'white' : 'black',
+                  boardOrientation: playerColor,
                   darkSquareStyle: { backgroundColor: '#779556' },
                   lightSquareStyle: { backgroundColor: '#ebecd0' },
                   animationDurationInMs: 300
