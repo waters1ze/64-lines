@@ -24,6 +24,8 @@ export function Puzzles({
   const [moveIndex, setMoveIndex] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isClient, setIsClient] = useState(false)
+  const [failedSquares, setFailedSquares] = useState<{from: string, to: string} | null>(null)
+  const [isPlayingSolution, setIsPlayingSolution] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -37,6 +39,8 @@ export function Puzzles({
     setWrong(false)
     setMoveIndex(0)
     setRefreshKey(k => k + 1)
+    setFailedSquares(null)
+    setIsPlayingSolution(false)
     
     try {
       const res = await fetch('/api/puzzles')
@@ -97,14 +101,26 @@ export function Puzzles({
   }
 
   const onDrop = ({ sourceSquare, targetSquare, piece }: any) => {
-    if (solved || wrong || !game) return false
+    if (solved || wrong || isPlayingSolution || !game) return false
 
     try {
       const pieceStr = piece.pieceType || piece
-      const move = game.move({ from: sourceSquare, to: targetSquare, promotion: pieceStr[1]?.toLowerCase() ?? 'q' })
-      if (!move) return false
+      
+      const testGame = new Chess(game.fen())
+      let move = null
+      try {
+         move = testGame.move({ from: sourceSquare, to: targetSquare, promotion: pieceStr[1]?.toLowerCase() ?? 'q' })
+      } catch(e) {
+         move = null
+      }
 
-      setGame(new Chess(game.fen()))
+      if (!move) {
+        setFailedSquares({ from: sourceSquare, to: targetSquare })
+        setTimeout(() => setFailedSquares(null), 1000)
+        return false
+      }
+
+      setGame(new Chess(testGame.fen()))
 
       const moves = puzzle.moves.split(' ')
       if (moveIndex < moves.length && moves[moveIndex] === move.lan) {
@@ -117,22 +133,24 @@ export function Puzzles({
           // Next move by opponent
           setMoveIndex(m => m + 1)
           setTimeout(() => {
-            if (game) {
+            try {
               const oppMove = moves[moveIndex + 1]
-              game.move({ from: oppMove.substring(0, 2), to: oppMove.substring(2, 4), promotion: oppMove.length > 4 ? oppMove[4] : undefined })
-              setGame(new Chess(game.fen()))
+              testGame.move({ from: oppMove.substring(0, 2), to: oppMove.substring(2, 4), promotion: oppMove.length > 4 ? oppMove[4] : undefined })
+              setGame(new Chess(testGame.fen()))
               setMoveIndex(m => m + 1)
               if (moveIndex + 1 === moves.length - 1) {
                 setSolved(true)
                 submitResult(true)
               }
-            }
+            } catch(e) {}
           }, 500)
         }
         return true
       } else {
         // Wrong move
-        game?.undo()
+        setGame(new Chess(game.fen()))
+        setFailedSquares({ from: sourceSquare, to: targetSquare })
+        setTimeout(() => setFailedSquares(null), 1000)
         setWrong(true)
         submitResult(false)
         return false
@@ -140,6 +158,64 @@ export function Puzzles({
     } catch (e) {
       return false
     }
+  }
+
+  const getSolutionSan = () => {
+    if (!puzzle) return ''
+    const temp = new Chess(puzzle.fen)
+    const moves = puzzle.moves.split(' ')
+    const sanMoves = []
+    let fullMoveNumber = parseInt(temp.fen().split(' ')[5]) || 1
+    
+    for (let i = 0; i < moves.length; i++) {
+      try {
+        const m = moves[i]
+        const turn = temp.turn()
+        const res = temp.move({ from: m.substring(0, 2), to: m.substring(2, 4), promotion: m.length > 4 ? m[4] : undefined })
+        
+        if (i > 0) {
+          if (turn === 'w') {
+            sanMoves.push(`${fullMoveNumber}. ${res.san}`)
+          } else {
+            if (i === 1) sanMoves.push(`${fullMoveNumber}... ${res.san}`)
+            else sanMoves.push(`${res.san}`)
+          }
+        }
+        
+        if (turn === 'b') fullMoveNumber++
+      } catch(e) {
+        if (i > 0) sanMoves.push(moves[i])
+      }
+    }
+    return sanMoves.join(' ')
+  }
+
+  const playSolution = () => {
+    setIsPlayingSolution(true)
+    setFailedSquares(null)
+    
+    const newGame = new Chess(puzzle.fen)
+    const moves = puzzle.moves.split(' ')
+    if (moves.length > 0) {
+      const opp = moves[0]
+      try { newGame.move({ from: opp.substring(0, 2), to: opp.substring(2, 4), promotion: opp.length > 4 ? opp[4] : undefined }) } catch(e) {}
+    }
+    setGame(new Chess(newGame.fen()))
+    
+    let i = 1
+    const interval = setInterval(() => {
+      if (i >= moves.length) {
+        clearInterval(interval)
+        setIsPlayingSolution(false)
+        return
+      }
+      const m = moves[i]
+      try { 
+        newGame.move({ from: m.substring(0, 2), to: m.substring(2, 4), promotion: m.length > 4 ? m[4] : undefined }) 
+        setGame(new Chess(newGame.fen()))
+      } catch(e) {}
+      i++
+    }, 1000)
   }
 
   const [showBoard, setShowBoard] = useState(false)
@@ -177,17 +253,19 @@ export function Puzzles({
           <div className="w-full h-full relative">
 
             {showBoard ? (
-              <Chessboard 
-                options={{
-                  id: `puzzles-board-${puzzle.id}`,
-                  position: game.fen(),
-                  onPieceDrop: onDrop,
-                  boardOrientation: playerColor,
-                  darkSquareStyle: { backgroundColor: '#779556' },
-                  lightSquareStyle: { backgroundColor: '#ebecd0' },
-                  animationDurationInMs: 300
-                }}
-              />
+                <Chessboard 
+                  id={`puzzles-board-${puzzle.id}`}
+                  position={game.fen()}
+                  onPieceDrop={onDrop}
+                  boardOrientation={playerColor}
+                  customDarkSquareStyle={{ backgroundColor: '#779556' }}
+                  customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
+                  animationDuration={300}
+                  customSquareStyles={failedSquares ? {
+                    [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                    [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+                  } : {}}
+                />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted/20">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -234,14 +312,21 @@ export function Puzzles({
             <div className="flex flex-col items-center text-green-500 animate-in fade-in zoom-in text-center px-4">
               <CheckCircle2 className="w-8 h-8 mb-2" />
               <span className="font-bold">Верно! +10 рейтинга</span>
-              <span className="text-sm text-foreground mt-2 font-medium">Ответ: {puzzle?.moves.split(' ').map((m: string) => m.substring(0, 2) + '-' + m.substring(2, 4)).join(', ')}</span>
+              <span className="text-sm text-foreground mt-2 font-medium">Ответ: {getSolutionSan()}</span>
             </div>
           )}
           {wrong && (
             <div className="flex flex-col items-center text-red-500 animate-in fade-in zoom-in text-center px-4">
               <XCircle className="w-8 h-8 mb-2" />
               <span className="font-bold">Неверный ход. -10 рейтинга</span>
-              <span className="text-sm text-foreground mt-2 font-medium">Правильное решение: {puzzle?.moves.split(' ').map((m: string) => m.substring(0, 2) + '-' + m.substring(2, 4)).join(', ')}</span>
+              <span className="text-sm text-foreground mt-2 font-medium">Правильное решение: {getSolutionSan()}</span>
+              <button 
+                onClick={playSolution} 
+                disabled={isPlayingSolution}
+                className="mt-4 px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {isPlayingSolution ? 'Показываем...' : 'Посмотреть на доске'}
+              </button>
             </div>
           )}
           {!solved && !wrong && game && (
