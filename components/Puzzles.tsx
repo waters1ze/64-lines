@@ -173,7 +173,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
               <Chessboard 
                 key={`${puzzle.id}-${refreshKey}`}
                 id={`puzzles-board-${puzzle.id}`}
-                position={game.fen()} 
+                position={game.fen().split(' ')[0]} 
                 onPieceDrop={onDrop}
                 boardOrientation={game.fen().split(' ')[1] === 'w' ? 'white' : 'black'}
                 customDarkSquareStyle={{ backgroundColor: '#779556' }}
