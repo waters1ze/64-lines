@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
-import dynamic from 'next/dynamic'
-const Chessboard = dynamic(() => import('react-chessboard').then(m => m.Chessboard), { ssr: false })
+import { Chessboard } from 'react-chessboard'
 import { Loader2, Crown, Trophy, CheckCircle2, XCircle } from 'lucide-react'
 
 export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onPremiumClick: () => void }) {
@@ -159,13 +158,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
               <p>4. isClient: {isClient ? 'YES' : 'NO'}</p>
               <p>5. board_position_prop: {game?.fen()}</p>
             </div>
-            <Chessboard 
-              id="puzzle-board-unique"
-              position={game.fen()}
-              onPieceDrop={onDrop}
-              boardOrientation={game.fen().split(' ')[1] === 'w' ? 'white' : 'black'}
-              animationDuration={200}
-            />
+            <Chessboard position={game.fen()} onPieceDrop={onDrop} />
             {error && error !== 'LIMIT_REACHED' && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                 <p className="text-red-500 font-semibold">{error}</p>
