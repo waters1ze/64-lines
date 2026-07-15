@@ -220,16 +220,7 @@ export function Puzzles({
     }, 1000)
   }
 
-  const [showBoard, setShowBoard] = useState(false)
-
-  useEffect(() => {
-    if (game && puzzle && game.fen() !== 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1') {
-      const timer = setTimeout(() => setShowBoard(true), 100)
-      return () => clearTimeout(timer)
-    } else {
-      setShowBoard(false)
-    }
-  }, [game, puzzle])
+  const [game, setGame] = useState<Chess>(new Chess())
 
   if (error === 'LIMIT_REACHED') {
     return (
@@ -254,33 +245,25 @@ export function Puzzles({
             </div>
           ) : (
             <div className="w-full h-full relative">
-
-              {showBoard ? (
-                  <Chessboard 
-                    key={`puzzles-board-key-${puzzle.id}`}
-                    id={`puzzles-board-${puzzle.id}`}
-                    position={game.fen().split(' ')[0]}
-                    onPieceDrop={onDrop}
-                    boardOrientation={playerColor}
-                    customDarkSquareStyle={{ backgroundColor: '#779556' }}
-                    customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
-                    animationDuration={300}
-                    customSquareStyles={failedSquares ? {
-                      [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
-                      [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
-                    } : {}}
-                  />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted/20">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              )}
-              {error && error !== 'LIMIT_REACHED' && (
-                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                  <p className="text-red-500 font-semibold">{error}</p>
-                </div>
-              )}
-            </div>
+            <Chessboard 
+              id={`puzzles-board`}
+              position={game.fen()}
+              onPieceDrop={onDrop}
+              boardOrientation={playerColor}
+              customDarkSquareStyle={{ backgroundColor: '#779556' }}
+              customLightSquareStyle={{ backgroundColor: '#ebecd0' }}
+              animationDuration={300}
+              customSquareStyles={failedSquares ? {
+                [failedSquares.from]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' },
+                [failedSquares.to]: { backgroundColor: 'rgba(239, 68, 68, 0.5)' }
+              } : {}}
+            />
+            {error && error !== 'LIMIT_REACHED' && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                <p className="text-red-500 font-semibold">{error}</p>
+              </div>
+            )}
+          </div>
           )}
         </div>
         <div className="w-full md:w-[600px] p-4 bg-muted text-xs font-mono overflow-auto break-all mt-4 rounded-xl">
