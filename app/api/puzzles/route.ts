@@ -60,14 +60,31 @@ export async function GET() {
     let puzzles = await db.puzzle.findMany({
       where: {
         rating: {
-          gte: targetRating - 200,
-          lte: targetRating + 200,
+          gte: targetRating - 100,
+          lte: targetRating + 100,
         }
       }
     })
 
     if (puzzles.length === 0) {
-      puzzles = await db.puzzle.findMany({ take: 10 })
+      puzzles = await db.puzzle.findMany({
+        where: {
+          rating: {
+            gte: targetRating - 200,
+            lte: targetRating + 200,
+          }
+        }
+      })
+    }
+
+    if (puzzles.length === 0) {
+      // Get closest above or below
+      const allPuzzles = await db.puzzle.findMany()
+      if (allPuzzles.length > 0) {
+        // Sort by absolute rating difference
+        allPuzzles.sort((a, b) => Math.abs(a.rating - targetRating) - Math.abs(b.rating - targetRating))
+        puzzles = [allPuzzles[0]]
+      }
     }
 
     if (puzzles.length > 0) {
