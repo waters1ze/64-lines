@@ -32,12 +32,12 @@ export async function POST(req: Request) {
     console.log('YooMoney webhook. label:', label, 'hashMatch:', hash === sha1_hash, 'type:', notification_type)
 
     // Find the purchase by label
-    const purchase = await db.purchase.findUnique({
+    const purchaseTemp = await db.purchase.findUnique({
       where: { id: label },
       include: { user: true, course: true, module: true }
     })
 
-    if (!purchase) {
+    if (!purchaseTemp) {
       console.error('Purchase not found for label:', label)
       return new NextResponse('OK', { status: 200 })
     }
@@ -46,21 +46,98 @@ export async function POST(req: Request) {
       console.error('YooMoney hash mismatch. Expected:', hash, 'Got:', sha1_hash)
       // Store debug info
       await db.purchase.update({
-        where: { id: purchase.id },
+        where: { id: purchaseTemp.id },
         data: { comment: `Hash mismatch! expected=${hash} got=${sha1_hash} secret_len=${secret.length}` }
       })
       return new NextResponse('OK', { status: 200 })
     }
 
-    if (purchase.status === 'APPROVED') {
+    // Verify Amount
+    const amountVal = parseFloat(amount) || 0
+    const withdrawVal = parseFloat(params.get('withdraw_amount') || '') || 0
+    const maxPaid = Math.max(amountVal, withdrawVal)
+    
+    const expected = purchaseTemp.amount ?? purchaseTemp.course?.price ?? purchaseTemp.module?.price ?? 0
+    let fallbackExpected = expected
+    if (fallbackExpected === 0) {
+      if (purchaseTemp.type === 'SUBSCRIPTION' || purchaseTemp.type === 'PREMIUM') {
+        const settings = await db.settings.findUnique({ where: { id: 'global' } }) || { subscriptionPrice: 300 }
+        fallbackExpected = settings.subscriptionPrice
+      } else if (purchaseTemp.type === 'ANALYSIS') {
+        const settings = await db.settings.findUnique({ where: { id: 'global' } }) || { analysisPrice: 70 }
+        fallbackExpected = settings.analysisPrice
+      }
+    }
+
+    console.log(`YooMoney payment values for label ${label}: amount=${amountVal}, withdraw_amount=${withdrawVal}, expected=${fallbackExpected}`)
+
+    const hasSufficientAmount = maxPaid >= (fallbackExpected * 0.97)
+
+    if (!hasSufficientAmount) {
+      console.error(`Insufficient payment amount for purchase ${label}. Expected: ${fallbackExpected}, Paid (max): ${maxPaid}`)
+      
+      // Mark purchase as requiring manual review in comment
+      const commentMsg = `WARNING: underpayment! expected=${fallbackExpected} paid=${maxPaid} (amount=${amountVal}, withdraw=${withdrawVal})`
+      await db.purchase.update({
+        where: { id: purchaseTemp.id },
+        data: { comment: commentMsg }
+      })
+      
+      // Notify admin
+      try {
+        const admin = await db.user.findFirst({ where: { role: 'ADMIN' } })
+        if (admin) {
+          await db.notification.create({
+            data: {
+              userId: admin.id,
+              title: '⚠️ Недоплата по платежу ЮMoney',
+              message: `Пользователь ${purchaseTemp.user.email} оплатил ${maxPaid} ₽ вместо ${fallbackExpected} ₽ за заказ ${purchaseTemp.id}. Проверьте вручную.`,
+              link: `?section=sales`
+            }
+          })
+        }
+      } catch (eAdmin) {
+        console.error('Failed to notify admin on underpayment:', eAdmin)
+      }
+      
       return new NextResponse('OK', { status: 200 })
     }
 
-    // Approve purchase
-    await db.purchase.update({
-      where: { id: purchase.id },
-      data: { status: 'APPROVED', comment: null }
+    // Approve purchase atomically using a transaction to prevent race conditions
+    const result = await db.$transaction(async (tx) => {
+      const p = await tx.purchase.findUnique({
+        where: { id: label },
+        include: { user: true, course: true, module: true }
+      })
+
+      if (!p) {
+        throw new Error('Purchase not found')
+      }
+
+      if (p.status === 'APPROVED') {
+        throw new Error('Already approved')
+      }
+
+      const updated = await tx.purchase.update({
+        where: { id: p.id },
+        data: { status: 'APPROVED', comment: null },
+        include: { user: true, course: true, module: true }
+      })
+
+      return { purchase: updated }
+    }).catch(err => {
+      return { error: err.message }
     })
+
+    if ('error' in result) {
+      if (result.error === 'Already approved') {
+        return new NextResponse('OK', { status: 200 })
+      }
+      console.error('YooMoney callback transaction error:', result.error)
+      return new NextResponse('OK', { status: 200 })
+    }
+
+    const { purchase } = result
 
     // Grant premium if it's a subscription
     if (purchase.type === 'PREMIUM' || purchase.type === 'SUBSCRIPTION') {

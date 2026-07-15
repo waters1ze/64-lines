@@ -12,6 +12,7 @@ export async function POST(req: Request) {
 
     const { courseId, moduleId, type, senderName, comment, paymentMethod, pgn } = await req.json()
     
+    let amount = 0
     // For course/module
     if (!type || type === 'COURSE' || type === 'MODULE') {
       if (!courseId && !moduleId) {
@@ -20,10 +21,18 @@ export async function POST(req: Request) {
       if (courseId) {
         const course = await db.course.findUnique({ where: { id: String(courseId) } })
         if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+        amount = course.price
       } else if (moduleId) {
         const mod = await db.module.findUnique({ where: { id: String(moduleId) } })
         if (!mod) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+        amount = mod.price
       }
+    } else if (type === 'SUBSCRIPTION' || type === 'PREMIUM') {
+      const settings = await db.settings.findUnique({ where: { id: 'global' } }) || { subscriptionPrice: 300 }
+      amount = settings.subscriptionPrice
+    } else if (type === 'ANALYSIS') {
+      const settings = await db.settings.findUnique({ where: { id: 'global' } }) || { analysisPrice: 70 }
+      amount = settings.analysisPrice
     }
 
     // Check if purchase already exists (only for COURSE/MODULE)
@@ -45,7 +54,8 @@ export async function POST(req: Request) {
           data: { 
             senderName: senderName || null, 
             comment: comment || null,
-            paymentMethod: paymentMethod || 'sbp'
+            paymentMethod: paymentMethod || 'sbp',
+            amount: amount
           },
           include: { user: true, course: true, module: true }
         })
@@ -59,6 +69,7 @@ export async function POST(req: Request) {
         courseId: courseId ? String(courseId) : null,
         moduleId: moduleId ? String(moduleId) : null,
         type: type || 'COURSE',
+        amount: amount,
         status: 'PENDING',
         senderName: senderName || null,
         comment: (type === 'ANALYSIS' && pgn) ? `PGN: ${pgn}\n\n${comment || ''}` : (comment || null),

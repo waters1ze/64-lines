@@ -15,24 +15,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Purchase ID is required' }, { status: 400 })
     }
 
-    const purchase = await db.purchase.findUnique({
-      where: { id: String(purchaseId) },
-      include: { user: true, course: true }
+    const result = await db.$transaction(async (tx) => {
+      const p = await tx.purchase.findUnique({
+        where: { id: String(purchaseId) },
+        include: { user: true, course: true }
+      })
+
+      if (!p) {
+        throw new Error('Purchase not found')
+      }
+
+      if (p.status === 'APPROVED') {
+        throw new Error('Already approved')
+      }
+
+      const updated = await tx.purchase.update({
+        where: { id: p.id },
+        data: { status: 'APPROVED' },
+        include: { user: true, course: true }
+      })
+
+      return { purchase: updated, previous: p }
+    }).catch(err => {
+      return { error: err.message }
     })
 
-    if (!purchase) {
-      return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
+    if ('error' in result) {
+      const isNotFound = result.error === 'Purchase not found'
+      return NextResponse.json({ error: result.error }, { status: isNotFound ? 404 : 400 })
     }
 
-    if (purchase.status === 'APPROVED') {
-      return NextResponse.json({ error: 'Already approved' }, { status: 400 })
-    }
-
-    // 1. Update purchase status
-    await db.purchase.update({
-      where: { id: purchase.id },
-      data: { status: 'APPROVED' }
-    })
+    const { purchase } = result
 
     // 1.5 If it's a module, grant module access
     if (purchase.moduleId) {

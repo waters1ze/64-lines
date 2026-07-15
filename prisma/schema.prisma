@@ -74,6 +74,7 @@ model Purchase {
   courseId   String?
   moduleId   String?
   type       String   @default("COURSE") // COURSE, MODULE, SUBSCRIPTION, ANALYSIS
+  amount     Int?
   createdAt  DateTime @default(now())
   status         String   @default("PENDING")
   paymentMethod  String   @default("sbp")

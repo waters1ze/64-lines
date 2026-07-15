@@ -396,6 +396,7 @@ export function TeacherHub({
 
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [yoomoneyConfigured, setYoomoneyConfigured] = useState<boolean | null>(null)
 
   const fetchNotifications = () => {
     fetch('/api/notifications').then(r => r.json()).then(data => {
@@ -407,6 +408,14 @@ export function TeacherHub({
     fetch('/api/settings').then(r => r.json()).then(data => {
       if (data && !data.error) setGlobalSettings(data)
     }).catch(() => {})
+
+    if (isAdmin) {
+      fetch('/api/settings/check').then(r => r.json()).then(data => {
+        if (data && data.yoomoneySecretConfigured !== undefined) {
+          setYoomoneyConfigured(data.yoomoneySecretConfigured)
+        }
+      }).catch(() => {})
+    }
 
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 15000)
@@ -948,7 +957,7 @@ export function TeacherHub({
             {section === 'users'       && isAdmin && <UsersManager notify={notify} />}
             {section === 'users'       && isTeacher && !isAdmin && <AvailableStudents notify={notify} />}
             {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
-            {section === 'sales'       && isAdmin && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} />}
+            {section === 'sales'       && isAdmin && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} yoomoneyConfigured={yoomoneyConfigured} />}
             {section === 'store'       && <Storefront courses={courses} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
               <OpeningCourses courses={courses} isTeacher={isAdmin} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)}
@@ -1000,7 +1009,7 @@ export function TeacherHub({
         
         const price = isSub ? globalSettings.subscriptionPrice : (isAnalysis ? globalSettings.analysisPrice : (course?.price || 0))
         const title = isSub ? 'Оплата подписки (Premium)' : (isAnalysis ? 'Оплата разбора партии' : 'Оплата курса')
-        const isYooMoneyOnly = isSub || isAnalysis
+        const isYooMoneyOnly = false
 
         return (
           <Modal title={title} close={() => setPaymentCourseId(null)}>
@@ -3005,14 +3014,22 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
 
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
-function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void; onDelete: (id: string) => void }) {
-  const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.course?.price || p.module?.price || 0), 0)
-  const pending = purchases.filter(p => p.status === 'PENDING' && p.paymentMethod !== 'yoomoney')
+function Sales({ purchases, onApprove, onReject, onDelete, yoomoneyConfigured }: { purchases: any[]; onApprove: (id: string) => void; onReject: (id: string) => void; onDelete: (id: string) => void; yoomoneyConfigured: boolean | null }) {
+  const revenue = purchases.filter(p => p.status === 'APPROVED').reduce((acc, p) => acc + (p.amount ?? p.course?.price ?? p.module?.price ?? 0), 0)
+  const pending = purchases.filter(p => p.status === 'PENDING')
   const history = purchases.filter(p => p.status === 'APPROVED' || p.status === 'REJECTED')
   
   return (
     <>
       <Head over="Коммерция" title="Продажи" text="Заявки на оплату и статистика." />
+      
+      {yoomoneyConfigured === false && (
+        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-300 text-red-800">
+          <p className="font-semibold">⚠️ Внимание: Автоматическая оплата отключена!</p>
+          <p className="text-sm">Переменная окружения <code className="bg-red-100 px-1 rounded">YOOMONEY_SECRET</code> не настроена. Автоматические платежи ЮMoney не будут подтверждаться. Пожалуйста, добавьте секретное слово в настройки окружения Vercel.</p>
+        </div>
+      )}
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Выручка"  value={`${revenue.toLocaleString('ru-RU')} ₽`} note="Всего" />
         <Metric label="Заказов"  value={`${purchases.length}`} note={`Ожидают: ${pending.length}`} />
@@ -3030,10 +3047,15 @@ function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[];
                     <p className="text-sm text-muted-foreground">
                       {p.comment?.startsWith('[Модуль]') ? (
                         <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-blue-100 text-blue-700">Модуль</span> {p.comment.replace('[Модуль] ', '').split(' — ')[0]}</span>
+                      ) : p.type === 'SUBSCRIPTION' || p.type === 'PREMIUM' ? (
+                        <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-purple-100 text-purple-700">Подписка</span> Premium (30 дней)</span>
+                      ) : p.type === 'ANALYSIS' ? (
+                        <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-amber-100 text-amber-700">Разбор</span> Анализ партии</span>
                       ) : (
                         <span className="inline-flex items-center gap-1"><span className="badge text-xs">Дебют</span> {p.course?.name}</span>
                       )}
-                      {' · '}{p.course?.price?.toLocaleString('ru-RU')} ₽
+                      {' · '}{(p.amount ?? p.course?.price ?? p.module?.price ?? 0).toLocaleString('ru-RU')} ₽
+                      {' · '}<span className="text-[10px] font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded">{p.paymentMethod === 'yoomoney' ? 'ЮMoney (Авто)' : 'СБП (Ручной)'}</span>
                     </p>
                     {p.senderName && <p className="mt-1 text-sm"><b>Отправитель:</b> {p.senderName}</p>}
                     {p.comment && <p className="mt-0.5 text-sm text-muted-foreground"><b>Комментарий:</b> {p.comment}</p>}
@@ -3057,7 +3079,19 @@ function Sales({ purchases, onApprove, onReject, onDelete }: { purchases: any[];
             <div key={p.id} className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <p className="font-medium">{p.user?.name || p.user?.email}</p>
-                <p className="text-sm text-muted-foreground">{p.course?.name} · {p.course?.price?.toLocaleString('ru-RU')} ₽</p>
+                <p className="text-sm text-muted-foreground">
+                  {p.comment?.startsWith('[Модуль]') ? (
+                    <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-slate-100 text-slate-700">Модуль</span> {p.comment.replace('[Модуль] ', '').split(' — ')[0]}</span>
+                  ) : p.type === 'SUBSCRIPTION' || p.type === 'PREMIUM' ? (
+                    <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-slate-100 text-slate-700">Подписка</span> Premium</span>
+                  ) : p.type === 'ANALYSIS' ? (
+                    <span className="inline-flex items-center gap-1"><span className="badge text-xs bg-slate-100 text-slate-700">Разбор</span> Анализ партии</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1"><span className="badge text-xs">Дебют</span> {p.course?.name}</span>
+                  )}
+                  {' · '}{(p.amount ?? p.course?.price ?? p.module?.price ?? 0).toLocaleString('ru-RU')} ₽
+                  {' · '}<span className="text-[10px] font-mono uppercase bg-slate-100 px-1 py-0.5 rounded">{p.paymentMethod === 'yoomoney' ? 'ЮMoney' : 'СБП'}</span>
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <span className={`badge ${p.status === 'APPROVED' ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-600'}`}>
