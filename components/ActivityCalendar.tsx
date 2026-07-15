@@ -62,16 +62,16 @@ export function ActivityCalendar() {
               title={`${day.dateStr}${day.isActive ? ' (Активный день!)' : ' (Нет активности)'}`}
               className={`w-[10px] h-[10px] rounded-[2px] transition-colors duration-200 ${
                 day.isActive
-                  ? 'bg-zinc-800 hover:bg-zinc-900 dark:bg-zinc-300 dark:hover:bg-white'
-                  : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800'
+                  ? 'bg-blue-500 hover:bg-blue-400 dark:bg-blue-400 dark:hover:bg-blue-300'
+                  : 'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700'
               }`}
             />
           ))}
         </div>
         <div className="flex items-center justify-end w-full gap-1 mt-2 text-[10px] text-muted-foreground">
           <span>Меньше</span>
-          <div className="w-[10px] h-[10px] rounded-[2px] bg-zinc-100 dark:bg-zinc-800/50" />
-          <div className="w-[10px] h-[10px] rounded-[2px] bg-zinc-800 dark:bg-zinc-300" />
+          <div className="w-[10px] h-[10px] rounded-[2px] bg-zinc-200 dark:bg-zinc-800" />
+          <div className="w-[10px] h-[10px] rounded-[2px] bg-blue-500 dark:bg-blue-400" />
           <span>Больше</span>
         </div>
       </div>
