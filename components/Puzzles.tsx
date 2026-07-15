@@ -227,17 +227,19 @@ export function Puzzles({
           </div>
         )}
 
-        <div className="h-24 flex items-center justify-center rounded-xl border border-dashed border-muted-foreground/30">
+        <div className="min-h-24 p-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/30">
           {solved && (
-            <div className="flex flex-col items-center text-green-500 animate-in fade-in zoom-in">
+            <div className="flex flex-col items-center text-green-500 animate-in fade-in zoom-in text-center px-4">
               <CheckCircle2 className="w-8 h-8 mb-2" />
               <span className="font-bold">Верно! +10 рейтинга</span>
+              <span className="text-sm text-foreground mt-2 font-medium">Ответ: {puzzle?.moves.split(' ').map((m: string) => m.substring(0, 2) + '-' + m.substring(2, 4)).join(', ')}</span>
             </div>
           )}
           {wrong && (
-            <div className="flex flex-col items-center text-red-500 animate-in fade-in zoom-in">
+            <div className="flex flex-col items-center text-red-500 animate-in fade-in zoom-in text-center px-4">
               <XCircle className="w-8 h-8 mb-2" />
               <span className="font-bold">Неверный ход. -10 рейтинга</span>
+              <span className="text-sm text-foreground mt-2 font-medium">Правильное решение: {puzzle?.moves.split(' ').map((m: string) => m.substring(0, 2) + '-' + m.substring(2, 4)).join(', ')}</span>
             </div>
           )}
           {!solved && !wrong && game && (
