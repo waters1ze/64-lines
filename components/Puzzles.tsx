@@ -257,7 +257,7 @@ export function Puzzles({
           ) : (
             <div className="w-full h-full relative">
             <Chessboard 
-              key={puzzle?.id || 'start'}
+              key={puzzle?.fen || 'start'}
               options={{
                 id: puzzle?.id || 'board',
                 position: game.fen(),
@@ -320,7 +320,7 @@ export function Puzzles({
             <div className="flex flex-col items-center text-green-500 animate-in fade-in zoom-in text-center px-4">
               <CheckCircle2 className="w-8 h-8 mb-2" />
               <span className="font-bold">
-                Верно! {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '+10'} рейтинга
+                Верно! {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '...'} рейтинга
               </span>
               <span className="text-sm text-foreground mt-2 font-medium">Ответ: {getSolutionSan()}</span>
             </div>
@@ -329,7 +329,7 @@ export function Puzzles({
             <div className="flex flex-col items-center text-red-500 animate-in fade-in zoom-in text-center px-4">
               <XCircle className="w-8 h-8 mb-2" />
               <span className="font-bold">
-                Неверный ход. {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '-10'} рейтинга
+                Неверный ход. {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '...'} рейтинга
               </span>
               <span className="text-sm text-foreground mt-2 font-medium">Правильное решение: {getSolutionSan()}</span>
               <button 
