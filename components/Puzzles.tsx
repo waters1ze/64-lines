@@ -248,7 +248,27 @@ export function Puzzles({
             <div className="w-full h-full relative">
             <Chessboard 
               key={puzzle?.id || 'start'}
-              position={game.fen()}
+              position={(() => {
+                const fen = game.fen();
+                const obj: any = {};
+                const rows = fen.split(' ')[0].split('/');
+                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                rows.forEach((row, rankIndex) => {
+                  let fileIndex = 0;
+                  for (let i = 0; i < row.length; i++) {
+                    const c = row[i];
+                    if (!isNaN(parseInt(c))) {
+                      fileIndex += parseInt(c);
+                    } else {
+                      const color = c === c.toUpperCase() ? 'w' : 'b';
+                      const type = c.toUpperCase();
+                      obj[`${files[fileIndex]}${8 - rankIndex}`] = `${color}${type}`;
+                      fileIndex++;
+                    }
+                  }
+                });
+                return obj;
+              })()}
               onPieceDrop={onDrop}
               boardOrientation={playerColor}
               customDarkSquareStyle={{ backgroundColor: '#779556' }}
