@@ -13,6 +13,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
   const [solved, setSolved] = useState(false)
   const [wrong, setWrong] = useState(false)
   const [moveIndex, setMoveIndex] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Fetch puzzle
   const fetchPuzzle = async () => {
@@ -21,6 +22,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
     setSolved(false)
     setWrong(false)
     setMoveIndex(0)
+    setRefreshKey(k => k + 1)
     
     try {
       const res = await fetch('/api/puzzles')
@@ -153,7 +155,7 @@ export function Puzzles({ isPremium, onPremiumClick }: { isPremium: boolean, onP
         ) : (
           <div className="w-full h-full relative">
             <Chessboard 
-              key={puzzle.id}
+              key={`${puzzle.id}-${refreshKey}`}
               id={`puzzles-board-${puzzle.id}`}
               position={game.fen()}
               onPieceDrop={onDrop}
