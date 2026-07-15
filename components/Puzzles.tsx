@@ -26,6 +26,7 @@ export function Puzzles({
   const [isClient, setIsClient] = useState(false)
   const [failedSquares, setFailedSquares] = useState<{from: string, to: string} | null>(null)
   const [isPlayingSolution, setIsPlayingSolution] = useState(false)
+  const [ratingDiff, setRatingDiff] = useState<number | null>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -43,6 +44,7 @@ export function Puzzles({
     setRefreshKey(k => k + 1)
     setFailedSquares(null)
     setIsPlayingSolution(false)
+    setRatingDiff(null)
     
     try {
       const res = await fetch(`/api/puzzles?difficulty=${diff}`)
@@ -96,6 +98,9 @@ export function Puzzles({
         body: JSON.stringify({ isCorrect, puzzleRating: puzzle?.rating })
       })
       const data = await res.json()
+      if (data.ratingChange !== undefined) {
+        setRatingDiff(data.ratingChange)
+      }
       if (data.rating && onRatingChange) {
         onRatingChange(data.rating)
       }
@@ -314,14 +319,18 @@ export function Puzzles({
           {solved && (
             <div className="flex flex-col items-center text-green-500 animate-in fade-in zoom-in text-center px-4">
               <CheckCircle2 className="w-8 h-8 mb-2" />
-              <span className="font-bold">Верно! +10 рейтинга</span>
+              <span className="font-bold">
+                Верно! {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '+10'} рейтинга
+              </span>
               <span className="text-sm text-foreground mt-2 font-medium">Ответ: {getSolutionSan()}</span>
             </div>
           )}
           {wrong && (
             <div className="flex flex-col items-center text-red-500 animate-in fade-in zoom-in text-center px-4">
               <XCircle className="w-8 h-8 mb-2" />
-              <span className="font-bold">Неверный ход. -10 рейтинга</span>
+              <span className="font-bold">
+                Неверный ход. {ratingDiff !== null ? (ratingDiff >= 0 ? `+${ratingDiff}` : ratingDiff) : '-10'} рейтинга
+              </span>
               <span className="text-sm text-foreground mt-2 font-medium">Правильное решение: {getSolutionSan()}</span>
               <button 
                 onClick={playSolution} 
