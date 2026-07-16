@@ -30,6 +30,8 @@ import { ResizableBoardContainer } from './ResizableBoard'
 import { Puzzles } from './Puzzles'
 import { FriendsTab } from './FriendsTab'
 import { AdminPuzzles } from './admin-puzzles'
+import { DailyPuzzleCard } from './DailyPuzzleCard'
+import { TournamentsWidget } from './TournamentsWidget'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1507,7 +1509,7 @@ function PersonalStatsSection({
 
 function TeacherOverview({
   userName, go, homeworks, students, videosCount, onOpenHw, onSelectStudent, notify,
-  userRating = 1200, puzzlesSolvedTotal = 0, puzzlesAttempted = 0, activityStreak = 0
+  userRating = 1200, puzzlesSolvedTotal = 0, puzzlesAttempted = 0, activityStreak = 0, role = 'Учитель'
 }: {
   userName: string
   go: (s: Section) => void
@@ -1521,6 +1523,7 @@ function TeacherOverview({
   puzzlesSolvedTotal?: number
   puzzlesAttempted?: number
   activityStreak?: number
+  role?: string
 }) {
   const recent = homeworks.slice(0, 3)
 
@@ -1552,6 +1555,9 @@ function TeacherOverview({
         activityStreak={activityStreak}
         onGoSection={go}
       />
+
+      <DailyPuzzleCard />
+      <TournamentsWidget role={role} notify={notify} />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Активные ученики" value={String(students.length)}  note="всего" />
@@ -1611,7 +1617,107 @@ function pluralDays(n: number) {
   return `${n} дней`
 }
 
+// ─── Student self-service AI recommendations ─────────────────────────────────
+
+function StudentRecommendationsBlock() {
+  const [report, setReport] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [fetched, setFetched] = React.useState(false)
+
+  const fetchReport = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/my/weak-themes')
+      const data = await res.json()
+      if (data.report) {
+        setReport(data.report)
+      } else {
+        setError(data.error || 'Нет данных')
+      }
+    } catch {
+      setError('Ошибка сети')
+    }
+    setLoading(false)
+    setFetched(true)
+  }
+
+  const recommendations = React.useMemo(() => {
+    if (!report?.recommendationsJson) return null
+    try { return JSON.parse(report.recommendationsJson) } catch { return null }
+  }, [report])
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="flex items-center justify-between p-5 border-b">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center">
+            <Zap className="w-5 h-5 text-violet-500" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">AI-рекомендации</p>
+            <p className="text-xs text-muted-foreground">Видео и дебюты под ваши слабые темы</p>
+          </div>
+        </div>
+        <button
+          className="outline-button text-xs py-1.5"
+          onClick={fetchReport}
+          disabled={loading}
+        >
+          {loading ? 'Анализ...' : fetched ? 'Обновить' : 'Получить рекомендации'}
+        </button>
+      </div>
+      {!fetched ? (
+        <p className="text-sm text-muted-foreground p-5">Нажмите «Получить рекомендации», чтобы AI проанализировал ваши ошибки и подобрал материалы.</p>
+      ) : error ? (
+        <p className="text-sm text-muted-foreground p-5">{error}</p>
+      ) : report ? (
+        <div className="p-5 flex flex-col gap-4">
+          <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-4">
+            <p className="text-xs font-semibold text-violet-600 mb-1.5">Рекомендация тренера AI</p>
+            <p className="text-sm">{report.recommendation}</p>
+          </div>
+          {recommendations?.recommendedVideos?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Видеоуроки</p>
+              <div className="flex flex-col gap-2">
+                {recommendations.recommendedVideos.map((v: any) => (
+                  <div key={v.id} className="flex items-start gap-2 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <Video className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">{v.title}</p>
+                      {v.reason && <p className="text-xs text-muted-foreground mt-0.5">{v.reason}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {recommendations?.recommendedOpenings?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Дебютные курсы</p>
+              <div className="flex flex-col gap-2">
+                {recommendations.recommendedOpenings.map((o: any) => (
+                  <div key={o.id} className="flex items-start gap-2 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <BookOpen className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">{o.title}</p>
+                      {o.reason && <p className="text-xs text-muted-foreground mt-0.5">{o.reason}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function StudentOverview({ 
+
   userName, 
   userRating, 
   userRank = 0,
@@ -1664,6 +1770,10 @@ function StudentOverview({
         activityStreak={activityStreak}
         onGoSection={onGoSection}
       />
+
+      <DailyPuzzleCard />
+      <TournamentsWidget role="Ученик" notify={notify} />
+      <StudentRecommendationsBlock />
 
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
       {activeHw.length === 0 ? (

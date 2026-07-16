@@ -37,6 +37,8 @@ model User {
   puzzlesAttempted       Int                       @default(0)
   activityStreak         Int                       @default(0)
   lastActivityDate       DateTime?
+  dailyPuzzleStreak      Int                       @default(0)
+  lastDailyPuzzleDate    String?                   // "YYYY-MM-DD" UTC
   notifications          Notification[]
   solvedPuzzles          SolvedPuzzle[]
   pushSubscriptions      PushSubscription[]
@@ -50,6 +52,8 @@ model User {
   receivedFriendRequests FriendRequest[]           @relation("ReceivedFriendRequests")
   createdMatches         PuzzleRushMatch[]            @relation("MatchCreator")
   matchParticipations    PuzzleRushMatchParticipant[] @relation("MatchParticipant")
+  dailyPuzzleAttempts    DailyPuzzleAttempt[]
+  activityEvents         ActivityEvent[]
 }
 
 model Homework {
@@ -104,6 +108,7 @@ model Video {
   meta      String
   url       String
   isPremium Boolean  @default(false)
+  tags      String?  // puzzle themes space-separated: "fork pin skewer"
   createdAt DateTime @default(now())
 }
 
@@ -111,6 +116,7 @@ model Opening {
   id        String   @id @default(cuid())
   title     String
   pgn       String
+  tags      String?  // puzzle themes space-separated: "fork pin skewer"
   createdAt DateTime @default(now())
 }
 
@@ -232,13 +238,14 @@ model GameAnalysisRequest {
 }
 
 model Puzzle {
-  id              String  @id
+  id              String        @id
   fen             String
   moves           String
   rating          Int
-  ratingDeviation Int     @default(0)
+  ratingDeviation Int           @default(0)
   themes          String
   openingTags     String?
+  dailyPuzzles    DailyPuzzle[]
 }
 
 model Notification {
@@ -326,14 +333,15 @@ model MissedPuzzle {
 }
 
 model StudentWeakThemesReport {
-  id             String   @id @default(cuid())
-  studentId      String
-  teacherId      String
-  themesJson     String
-  recommendation String
-  generatedAt    DateTime @default(now())
-  student        User     @relation("WeakThemesStudent", fields: [studentId], references: [id], onDelete: Cascade)
-  teacher        User     @relation("WeakThemesTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  studentId           String
+  teacherId           String
+  themesJson          String
+  recommendation      String
+  recommendationsJson String?  // JSON: {recommendedVideos:[{id,title,reason}], recommendedOpenings:[{id,title,reason}]}
+  generatedAt         DateTime @default(now())
+  student             User     @relation("WeakThemesStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher             User     @relation("WeakThemesTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
 }
 
 model FriendRequest {
@@ -373,4 +381,41 @@ model PuzzleRushMatchParticipant {
   user        User            @relation("MatchParticipant", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, userId])
+}
+
+model DailyPuzzle {
+  id       String @id @default(cuid())
+  date     String @unique // "YYYY-MM-DD" UTC
+  puzzleId String
+  puzzle   Puzzle @relation(fields: [puzzleId], references: [id])
+}
+
+model DailyPuzzleAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String   // "YYYY-MM-DD" UTC
+  solved      Boolean
+  attemptedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // PUZZLE_MILESTONE | ACHIEVEMENT | MATCH_WIN | STREAK_MILESTONE
+  message   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Tournament {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  lichessUrl  String
+  startsAt    DateTime
+  endsAt      DateTime
+  createdAt   DateTime @default(now())
 }

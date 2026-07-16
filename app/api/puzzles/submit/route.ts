@@ -144,6 +144,24 @@ export async function POST(req: Request) {
   // 2. Check and Grant Achievements
   await checkAndGrantAchievements(user.id)
 
+  // 3. Puzzle milestone ActivityEvent
+  if (isCorrect) {
+    const milestones = [10, 25, 50, 100, 200, 500, 1000]
+    if (milestones.includes(puzzlesSolvedTotal)) {
+      try {
+        await db.activityEvent.create({
+          data: {
+            userId: user.id,
+            type: 'PUZZLE_MILESTONE',
+            message: `Решено ${puzzlesSolvedTotal} задач! 🎯`
+          }
+        })
+      } catch (e) {
+        console.error('ActivityEvent error:', e)
+      }
+    }
+  }
+
   return NextResponse.json({ 
     rating: updated.rating, 
     ratingChange, 

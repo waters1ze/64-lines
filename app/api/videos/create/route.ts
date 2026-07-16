@@ -11,13 +11,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, meta, url, isPremium } = await req.json()
+    const { title, meta, url, isPremium, tags } = await req.json()
     if (!title || !url) {
       return NextResponse.json({ error: 'Title and URL are required' }, { status: 400 })
     }
 
     const video = await db.video.create({
-      data: { title, meta: meta || '', url, isPremium: !!isPremium }
+      data: { title, meta: meta || '', url, isPremium: !!isPremium, tags: tags || null }
     })
 
     // Broadcast notification to all users (excluding the admin who published)

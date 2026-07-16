@@ -52,6 +52,24 @@ export async function PATCH(
           where: { id: matchId },
           data: { status: 'FINISHED', finishedAt: new Date() }
         })
+
+        // Find winner (highest score) and create ActivityEvent
+        const winner = activeParticipants.reduce((best, p) =>
+          (p.score ?? 0) > (best.score ?? 0) ? p : best
+        )
+        if (winner) {
+          try {
+            await db.activityEvent.create({
+              data: {
+                userId: winner.userId,
+                type: 'MATCH_WIN',
+                message: `Победа в матче Puzzle Rush со счётом ${winner.score ?? 0}! ⚔️`
+              }
+            })
+          } catch (e) {
+            console.error('ActivityEvent MATCH_WIN error:', e)
+          }
+        }
       }
     }
 

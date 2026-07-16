@@ -30,14 +30,11 @@ export async function POST(req: Request) {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { title, pgn } = await req.json()
+    const { title, pgn, tags } = await req.json()
     if (!title || !pgn) return new NextResponse('Bad Request', { status: 400 })
 
     const opening = await db.opening.create({
-      data: {
-        title,
-        pgn
-      }
+      data: { title, pgn, tags: tags || null }
     })
 
     // Broadcast notification to all users (excluding the teacher/admin who published)
