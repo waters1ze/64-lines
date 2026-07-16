@@ -51,7 +51,7 @@ export function MatchLeaderboard({ matchId, currentUserId }: { matchId: string, 
     return () => clearInterval(interval)
   }, [matchId, match?.status])
 
-  if (!match) return <Card><CardContent className="p-4">Загрузка...</CardContent></Card>
+  if (!match) return <div className="p-4 bg-card border rounded-xl shadow-sm">Загрузка...</div>
 
   // Sort participants by score (descending)
   const sortedParticipants = [...match.participants].sort((a, b) => (b.score || 0) - (a.score || 0))
