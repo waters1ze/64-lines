@@ -350,6 +350,7 @@ export function TeacherHub({
   initialCourses,
   initialVideos,
   initialOpenings,
+  initialCategories = [],
   initialPurchases = [],
   isPremium = false,
   premiumUntil = null,
@@ -374,6 +375,7 @@ export function TeacherHub({
   initialCourses?: any[],
   initialVideos?: any[],
   initialOpenings?: any[],
+  initialCategories?: any[],
   initialPurchases?: any[],
 }) {
   const { data: session } = useSession()
