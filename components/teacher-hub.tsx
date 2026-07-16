@@ -457,6 +457,36 @@ export function TeacherHub({
     fetchNotifications()
   }
 
+  const handleMatchRespond = async (e: React.MouseEvent, relatedId: string, action: 'accept' | 'decline') => {
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/puzzle-rush/match/${relatedId}/respond`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      })
+      if (res.ok) {
+        if (action === 'accept') {
+          router.push(`/puzzle-rush/match/${relatedId}`)
+          setShowNotifications(false)
+        }
+        fetchNotifications()
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleFriendRequestRespond = async (e: React.MouseEvent, relatedId: string, action: 'accept' | 'reject') => {
+    e.stopPropagation()
+    try {
+      await fetch(`/api/friends/${relatedId}/${action}`, { method: 'POST' })
+      fetchNotifications()
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const refreshPurchases = () => {
     if (isStudent || role === 'Ученик') {
       fetch('/api/purchases').then(r => r.json()).then(data => {
@@ -852,13 +882,49 @@ export function TeacherHub({
                   {notifications.length === 0 ? (
                     <p className="p-4 text-center text-sm text-muted-foreground">Нет уведомлений</p>
                   ) : (
-                    notifications.map(n => (
-                      <div key={n.id} className={`p-4 border-b last:border-0 hover:bg-muted/50 cursor-pointer ${!n.isRead ? 'bg-primary/5' : ''}`} onClick={() => { if (n.link) router.push(n.link); setShowNotifications(false) }}>
-                        <p className="font-semibold text-sm mb-1">{n.title}</p>
-                        <p className="text-sm text-muted-foreground">{n.message}</p>
-                        <p className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
-                      </div>
-                    ))
+                    notifications.map(n => {
+                      if (n.type === 'MATCH_INVITE') {
+                        return (
+                          <div key={n.id} className={`p-4 border-b last:border-0 hover:bg-muted/50 cursor-default ${!n.isRead ? 'bg-primary/5' : ''}`}>
+                            <p className="font-semibold text-sm mb-1 text-blue-700 flex items-center gap-2"><Zap className="w-4 h-4 fill-yellow-500 text-yellow-500" /> {n.title}</p>
+                            <p className="text-sm text-muted-foreground">{n.message}</p>
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={(e) => handleMatchRespond(e, n.relatedId, 'accept')} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 transition">
+                                Принять
+                              </button>
+                              <button onClick={(e) => handleMatchRespond(e, n.relatedId, 'decline')} className="px-3 py-1.5 bg-stone-200 text-stone-700 text-xs font-semibold rounded hover:bg-stone-300 transition">
+                                Отклонить
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
+                          </div>
+                        )
+                      }
+                      if (n.type === 'FRIEND_REQUEST') {
+                        return (
+                          <div key={n.id} className={`p-4 border-b last:border-0 hover:bg-muted/50 cursor-default ${!n.isRead ? 'bg-primary/5' : ''}`}>
+                            <p className="font-semibold text-sm mb-1 text-blue-700 flex items-center gap-2"><UserPlus className="w-4 h-4" /> {n.title}</p>
+                            <p className="text-sm text-muted-foreground">{n.message}</p>
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={(e) => handleFriendRequestRespond(e, n.relatedId, 'accept')} className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 transition">
+                                Принять
+                              </button>
+                              <button onClick={(e) => handleFriendRequestRespond(e, n.relatedId, 'reject')} className="px-3 py-1.5 bg-stone-200 text-stone-700 text-xs font-semibold rounded hover:bg-stone-300 transition">
+                                Отклонить
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={n.id} className={`p-4 border-b last:border-0 hover:bg-muted/50 cursor-pointer ${!n.isRead ? 'bg-primary/5' : ''}`} onClick={() => { if (n.link) router.push(n.link); setShowNotifications(false) }}>
+                          <p className="font-semibold text-sm mb-1">{n.title}</p>
+                          <p className="text-sm text-muted-foreground">{n.message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-2">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </div>

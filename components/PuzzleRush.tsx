@@ -3,10 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
-import { Timer, Trophy, Zap, AlertCircle, Play, RefreshCw, Star, Loader2 } from 'lucide-react'
+import { Timer, Trophy, Zap, AlertCircle, Play, RefreshCw, Star, Loader2, Users } from 'lucide-react'
 import { ResponsiveBoard } from '@/components/ResponsiveBoard'
+import { useRouter } from 'next/navigation'
+import { MatchInviteModal } from '@/components/MatchInviteModal'
+import { Button } from './ui/button'
 
-export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: string }) {
+export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: string }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [timeLeft, setTimeLeft] = useState(180) // 3 minutes
   const [score, setScore] = useState(0)
@@ -20,13 +23,20 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
   const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false)
   const [failedSquares, setFailedSquares] = useState<{ from: string; to: string } | null>(null)
+  
+  const [invites, setInvites] = useState<any[]>([])
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const router = useRouter()
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Load high score and leaderboard on mount
+  // Load high score, leaderboard, and invites on mount
   useEffect(() => {
     fetchLeaderboard()
-  }, [])
+    if (!matchId) {
+      fetchInvites()
+    }
+  }, [matchId])
 
   const fetchLeaderboard = async () => {
     setLoadingLeaderboard(true)
@@ -35,15 +45,42 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
       if (res.ok) {
         const data = await res.json()
         setLeaderboard(data.results || [])
-        // Find user's high score
-        // We can check user identity or just take their highest score if returned
-        // For simplicity, we fetch high score from the leaderboard list by matching their name (or just API can return)
-        // Let's find if they are in the list. Wait, we can fetch high score easily from their own history or just the top result.
       }
     } catch (e) {
       console.error(e)
     }
     setLoadingLeaderboard(false)
+  }
+
+  const fetchInvites = async () => {
+    try {
+      const res = await fetch('/api/puzzle-rush/match/invites')
+      if (res.ok) {
+        const data = await res.json()
+        setInvites(data)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleRespond = async (matchIdToRespond: string, action: 'accept' | 'decline') => {
+    try {
+      const res = await fetch(`/api/puzzle-rush/match/${matchIdToRespond}/respond`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      })
+      if (res.ok) {
+        if (action === 'accept') {
+          router.push(`/puzzle-rush/match/${matchIdToRespond}`)
+        } else {
+          setInvites(prev => prev.filter(inv => inv.matchId !== matchIdToRespond))
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   // Timer logic
@@ -80,7 +117,7 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
     setStatus('finished')
     if (timerRef.current) clearInterval(timerRef.current)
 
-    // Submit score
+    // Submit score globally
     if (score > 0) {
       fetch('/api/puzzle-rush/finish', {
         method: 'POST',
@@ -91,13 +128,14 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
       })
     }
 
-    if (duelId) {
-      fetch(`/api/puzzle-rush/duel/${duelId}`, {
-        method: 'POST',
+    // Submit match score
+    if (matchId) {
+      fetch(`/api/puzzle-rush/match/${matchId}/score`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score })
       }).then(() => {
-        // Duel score submitted
+        // Match score submitted
       })
     }
   }
@@ -111,14 +149,12 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
       }
       const data = await res.json()
       if (data.error === 'LIMIT_REACHED') {
-        // Fallback or ignore since we bypassed it, but just in case
         throw new Error('Limit reached')
       }
 
       setPuzzle(data)
       const newGame = new Chess(data.fen)
       
-      // Opponent's first move
       const moves = data.moves.split(' ')
       if (moves.length > 0) {
         const firstMove = moves[0]
@@ -135,7 +171,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
       setStatus('playing')
     } catch (e) {
       console.error(e)
-      // Retry in 1 second if error
       setTimeout(loadNextPuzzle, 1000)
     }
     setLoadingPuzzle(false)
@@ -164,7 +199,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
       }
 
       if (!move) {
-        // Invalid move in general
         setFailedSquares({ from: sourceSquare, to: targetSquare })
         setTimeout(() => setFailedSquares(null), 500)
         return false
@@ -172,18 +206,15 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
 
       const moves = puzzle.moves.split(' ')
       if (moveIndex < moves.length && moves[moveIndex] === move.lan) {
-        // Correct move!
         setGame(new Chess(testGame.fen()))
 
         if (moveIndex === moves.length - 1) {
-          // Entire puzzle solved!
           setScore((s) => s + 1)
           setStatus('correct')
           setTimeout(() => {
             loadNextPuzzle()
           }, 400)
         } else {
-          // Play opponent's response
           const nextIndex = moveIndex + 1
           setMoveIndex(nextIndex + 1)
           
@@ -198,7 +229,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
               setGame(new Chess(testGame.fen()))
               
               if (nextIndex === moves.length - 1) {
-                // Opponent's move completed the puzzle (sometimes moves list ends here)
                 setScore((s) => s + 1)
                 setStatus('correct')
                 setTimeout(() => {
@@ -212,7 +242,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
         }
         return true
       } else {
-        // Wrong move! Flash board and load next puzzle immediately to keep speed
         setFailedSquares({ from: sourceSquare, to: targetSquare })
         setStatus('wrong')
         setTimeout(() => {
@@ -233,8 +262,7 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Find high score from leaderboard
-  const myHighScore = leaderboard.find((item) => item.role === 'STUDENT')?.score || 0 // fallback representation
+  const myHighScore = leaderboard.find((item) => item.role === 'STUDENT')?.score || 0
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
@@ -259,6 +287,38 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
           </div>
         </div>
       </div>
+
+      {!matchId && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold">Многопользовательский режим</h3>
+            <Button onClick={() => setIsInviteModalOpen(true)} className="flex items-center gap-2">
+              <Users className="w-4 h-4" /> Пригласить соперников
+            </Button>
+          </div>
+          
+          {invites.length > 0 && (
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-3">
+              <h4 className="font-semibold text-blue-800 text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" /> У вас есть активные вызовы!
+              </h4>
+              <div className="space-y-2">
+                {invites.map(inv => (
+                  <div key={inv.id} className="flex items-center justify-between bg-white p-3 rounded-lg border shadow-sm">
+                    <span className="text-sm">
+                      <span className="font-semibold">{inv.match.creator.name}</span> вызывает вас на матч!
+                    </span>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleRespond(inv.matchId, 'accept')}>Принять</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleRespond(inv.matchId, 'decline')}>Отклонить</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Game Area */}
@@ -285,17 +345,18 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
               <p className="text-sm text-muted-foreground mt-1 mb-6">
                 Вы успешно решили <span className="font-bold text-foreground text-lg">{score}</span> задач.
               </p>
-              <button
-                onClick={startRush}
-                className="px-6 py-3 bg-foreground text-background font-bold rounded-xl hover:bg-foreground/90 transition flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Попробовать еще раз
-              </button>
+              {!matchId && (
+                <button
+                  onClick={startRush}
+                  className="px-6 py-3 bg-foreground text-background font-bold rounded-xl hover:bg-foreground/90 transition flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Попробовать еще раз
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-card border rounded-2xl p-4 shadow-sm space-y-4 relative">
-              {/* Game Stats Bar */}
               <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3">
                 <div className="flex items-center gap-2">
                   <Timer className="w-5 h-5 text-muted-foreground" />
@@ -309,7 +370,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
                 </div>
               </div>
 
-              {/* Progress bar */}
               <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-1000 ${timeLeft < 30 ? 'bg-red-500' : 'bg-emerald-500'}`}
@@ -317,7 +377,6 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
                 />
               </div>
 
-              {/* Chessboard Wrapper */}
               <ResponsiveBoard
                 className={`border-4 transition-all duration-200 ${
                   status === 'correct' ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' :
@@ -358,7 +417,7 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
           <div className="bg-card border rounded-2xl p-4 shadow-sm h-full">
             <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5 mb-4">
               <Trophy className="w-4 h-4 text-yellow-500" />
-              <span>Лидерборд Puzzle Rush</span>
+              <span>Глобальный Лидерборд</span>
             </h3>
 
             {loadingLeaderboard ? (
@@ -406,6 +465,7 @@ export function PuzzleRush({ duelId, userId }: { duelId?: string, userId?: strin
           </div>
         </div>
       </div>
+      <MatchInviteModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} />
     </div>
   )
 }

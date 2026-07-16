@@ -122,12 +122,12 @@ export function FriendsTab({ notify, userId }: { notify: (s: string) => void, us
                 </div>
                 <button className="outline-button py-1 text-xs justify-center w-full" onClick={async () => {
                   try {
-                    const res = await fetch('/api/puzzle-rush/duel/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opponentId: friend.id }) })
+                    const res = await fetch('/api/puzzle-rush/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opponentUserIds: [friend.id] }) })
                     const data = await res.json()
-                    if (data.id) window.open('/duel/' + data.id, '_blank')
-                  } catch { notify('Ошибка создания дуэли') }
+                    if (data.matchId) window.open('/puzzle-rush/match/' + data.matchId, '_blank')
+                  } catch { notify('Ошибка создания матча') }
                 }}>
-                  <Swords className="size-3 mr-1" /> Вызвать на дуэль
+                  <Swords className="size-3 mr-1" /> Вызвать на матч
                 </button>
               </div>
             ))}

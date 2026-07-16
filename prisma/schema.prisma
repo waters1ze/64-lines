@@ -48,8 +48,8 @@ model User {
   weakThemesAsTeacher    StudentWeakThemesReport[] @relation("WeakThemesTeacher")
   sentFriendRequests     FriendRequest[]           @relation("SentFriendRequests")
   receivedFriendRequests FriendRequest[]           @relation("ReceivedFriendRequests")
-  createdDuels           PuzzleRushDuel[]          @relation("DuelCreator")
-  opponentDuels          PuzzleRushDuel[]          @relation("DuelOpponent")
+  createdMatches         PuzzleRushMatch[]            @relation("MatchCreator")
+  matchParticipations    PuzzleRushMatchParticipant[] @relation("MatchParticipant")
 }
 
 model Homework {
@@ -248,6 +248,8 @@ model Notification {
   message   String
   isRead    Boolean  @default(false)
   link      String?
+  type      String?
+  relatedId String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -346,15 +348,28 @@ model FriendRequest {
   @@unique([senderId, receiverId])
 }
 
-model PuzzleRushDuel {
-  id            String   @id @default(cuid())
-  creatorId     String?
-  opponentId    String?
-  creatorScore  Int?
-  opponentScore Int?
-  status        String   @default("PENDING") // PENDING, COMPLETED
-  createdAt     DateTime @default(now())
+model PuzzleRushMatch {
+  id          String   @id @default(cuid())
+  creatorId   String
+  status      String   @default("WAITING") // WAITING, ACTIVE, FINISHED
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
 
-  creator  User? @relation("DuelCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  opponent User? @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: SetNull)
+  creator     User     @relation("MatchCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  participants PuzzleRushMatchParticipant[]
+}
+
+model PuzzleRushMatchParticipant {
+  id          String   @id @default(cuid())
+  matchId     String
+  userId      String
+  status      String   @default("INVITED") // INVITED, ACCEPTED, DECLINED
+  score       Int?
+  finishedAt  DateTime?
+
+  match       PuzzleRushMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user        User            @relation("MatchParticipant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
 }

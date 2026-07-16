@@ -37,6 +37,8 @@ export async function POST(req: Request) {
       title: 'Новая заявка в друзья',
       message: `${user.name || 'Пользователь'} хочет добавить вас в друзья.`,
       link: '/?section=overview',
+      type: 'FRIEND_REQUEST',
+      relatedId: request.id,
     }
   })
 
