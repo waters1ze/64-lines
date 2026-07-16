@@ -34,6 +34,11 @@ export async function PATCH(
       data: { score, finishedAt: new Date() }
     })
 
+    await db.user.update({
+      where: { id: user.id },
+      data: { seasonPuzzlesSolved: (user.seasonPuzzlesSolved || 0) + score }
+    })
+
     // Check if everyone accepted has finished
     const match = await db.puzzleRushMatch.findUnique({
       where: { id: matchId },

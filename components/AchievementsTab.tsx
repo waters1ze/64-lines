@@ -51,6 +51,12 @@ export function AchievementsTab() {
     } else if (code === 'streak_30') {
       current = stats.activityStreak
       target = 30
+    } else if (code === 'FIRST_REFERRAL' || code === 'FIRST_IMPORT' || code === 'FIRST_MATCH') {
+      current = unlocked.has(code) ? 1 : 0
+      target = 1
+    } else if (code === 'SEASON_PRO') {
+      current = stats.seasonRating || 1200
+      target = 1600
     }
 
     const percent = Math.min(Math.round((current / target) * 100), 100)

@@ -7,6 +7,7 @@ import { Timer, Trophy, Zap, AlertCircle, Play, RefreshCw, Star, Loader2, Users 
 import { ResponsiveBoard } from '@/components/ResponsiveBoard'
 import { useRouter } from 'next/navigation'
 import { MatchInviteModal } from '@/components/MatchInviteModal'
+import { MatchHistoryList } from '@/components/MatchHistoryList'
 import { Button } from './ui/button'
 
 export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: string }) {
@@ -499,8 +500,15 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
               </div>
             )}
           </div>
+          
+          {userId && (
+            <div className="bg-card border rounded-2xl p-4 shadow-sm h-full max-h-[400px] overflow-y-auto">
+              <MatchHistoryList currentUserId={userId} />
+            </div>
+          )}
         </div>
       </div>
+
       <MatchInviteModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} />
     </div>
   )

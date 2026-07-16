@@ -28,6 +28,9 @@ export default async function Page() {
   let puzzlesAttempted = 0
   let activityStreak = 0
   let userRank = 0
+  let premiumUntil: Date | null = null
+  let premiumSource: string | null = null
+  let seasonRating = 1500
   
   if (session?.user?.email) {
     const dbUser = await db.user.findUnique({ where: { email: session.user.email } })
@@ -42,9 +45,14 @@ export default async function Page() {
       userRank = await db.user.count({ where: { rating: { gt: dbUser.rating } } }) + 1
       
       if (isPremium && dbUser.premiumUntil && dbUser.premiumUntil < new Date()) {
-        await db.user.update({ where: { id: dbUser.id }, data: { isPremium: false, premiumUntil: null } })
+        await db.user.update({ where: { id: dbUser.id }, data: { isPremium: false, premiumUntil: null, premiumSource: null } })
         isPremium = false
+      } else if (isPremium) {
+        premiumUntil = dbUser.premiumUntil
+        premiumSource = dbUser.premiumSource
       }
+      
+      seasonRating = dbUser.seasonRating
       // Override session with database data to prevent stale JWT session issues
       session.user.id = dbUser.id
       
@@ -60,6 +68,7 @@ export default async function Page() {
   const courses = await db.course.findMany({ orderBy: { createdAt: 'desc' } })
   const videos = await db.video.findMany({ orderBy: { createdAt: 'desc' } })
   const openings = await db.opening.findMany({ orderBy: { createdAt: 'desc' } })
+  const categories = await db.category.findMany({ orderBy: { createdAt: 'asc' } })
 
   let students: any[] = []
   let homeworksRaw: any[] = []
@@ -152,6 +161,9 @@ export default async function Page() {
         userRating={userRating}
         userRank={userRank}
         isPremium={isPremium}
+        premiumUntil={premiumUntil}
+        premiumSource={premiumSource}
+        seasonRating={seasonRating}
         puzzlesSolvedTotal={puzzlesSolvedTotal}
         puzzlesAttempted={puzzlesAttempted}
         activityStreak={activityStreak}
@@ -161,6 +173,7 @@ export default async function Page() {
         initialVideos={videos}
         initialOpenings={openings}
         initialPurchases={purchases}
+        initialCategories={categories}
       />
     </Suspense>
   )

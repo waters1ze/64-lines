@@ -39,6 +39,14 @@ model User {
   lastActivityDate       DateTime?
   dailyPuzzleStreak      Int                       @default(0)
   lastDailyPuzzleDate    String?                   // "YYYY-MM-DD" UTC
+  premiumSource          String?                   // "PAID" | "REFERRAL" | "TRIAL" | null
+  referralCode           String?                   @unique @default(cuid())
+  referredById           String?
+  referredBy             User?                     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals              User[]                    @relation("Referrals")
+  referralRewardsCount   Int                       @default(0)
+  seasonRating           Int                       @default(1500)
+  seasonPuzzlesSolved    Int                       @default(0)
   notifications          Notification[]
   solvedPuzzles          SolvedPuzzle[]
   pushSubscriptions      PushSubscription[]
@@ -54,6 +62,7 @@ model User {
   matchParticipations    PuzzleRushMatchParticipant[] @relation("MatchParticipant")
   dailyPuzzleAttempts    DailyPuzzleAttempt[]
   activityEvents         ActivityEvent[]
+  importedGames          ImportedGame[]
 }
 
 model Homework {
@@ -82,6 +91,8 @@ model Course {
   fileUrl     String?
   pgn         String?
   isPremium   Boolean    @default(false)
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   purchases   Purchase[]
 }
 
@@ -103,13 +114,16 @@ model Purchase {
 }
 
 model Video {
-  id        String   @id @default(cuid())
-  title     String
-  meta      String
-  url       String
-  isPremium Boolean  @default(false)
-  tags      String?  // puzzle themes space-separated: "fork pin skewer"
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  title         String
+  meta          String
+  url           String
+  isPremium     Boolean   @default(false)
+  tags          String?   // puzzle themes space-separated: "fork pin skewer"
+  createdAt     DateTime  @default(now())
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isPremiumOnly Boolean   @default(false)
 }
 
 model Opening {
@@ -377,10 +391,30 @@ model PuzzleRushMatchParticipant {
   startedAt   DateTime?
   finishedAt  DateTime?
 
-  match       PuzzleRushMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user        User            @relation("MatchParticipant", fields: [userId], references: [id], onDelete: Cascade)
+  match PuzzleRushMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User            @relation("MatchParticipant", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, userId])
+}
+
+model Season {
+  id        String   @id @default(cuid())
+  name      String
+  startsAt  DateTime
+  endsAt    DateTime
+  isActive  Boolean  @default(true)
+}
+
+model ImportedGame {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform     String
+  pgn          String
+  playedAt     DateTime
+  opponentName String
+  result       String?
+  createdAt    DateTime @default(now())
 }
 
 model DailyPuzzle {
@@ -418,4 +452,15 @@ model Tournament {
   startsAt    DateTime
   endsAt      DateTime
   createdAt   DateTime @default(now())
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // "OPENING" | "VIDEO"
+  createdAt DateTime @default(now())
+  courses   Course[]
+  videos    Video[]
+
+  @@unique([name, type])
 }

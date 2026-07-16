@@ -39,6 +39,13 @@ export async function POST(req: Request) {
   
   const newRating = Math.max(100, currentRating + ratingChange)
 
+  // Calculate season rating change
+  const currentSeasonRating = user.seasonRating || 1500
+  const ESeason = 1 / (1 + Math.pow(10, (pRating - currentSeasonRating) / 400))
+  let seasonRatingChange = Math.round(K * (score - ESeason))
+  const newSeasonRating = Math.max(100, currentSeasonRating + seasonRatingChange)
+  const seasonPuzzlesSolved = (user.seasonPuzzlesSolved || 0) + (isCorrect ? 1 : 0)
+
   // Calculate new stats
   const puzzlesSolvedTotal = (user.puzzlesSolvedTotal || 0) + (isCorrect ? 1 : 0)
   const puzzlesAttempted = (user.puzzlesAttempted || 0) + 1
@@ -65,7 +72,6 @@ export async function POST(req: Request) {
     activityStreak = 1
   }
 
-  // Update user
   const updated = await db.user.update({
     where: { id: user.id },
     data: {
@@ -75,9 +81,57 @@ export async function POST(req: Request) {
       puzzlesSolvedTotal,
       puzzlesAttempted,
       activityStreak,
-      lastActivityDate: now
+      lastActivityDate: now,
+      seasonRating: newSeasonRating,
+      seasonPuzzlesSolved
     }
   })
+
+  // Check for Referral Reward
+  if (isCorrect && (!user.puzzlesSolvedTotal || user.puzzlesSolvedTotal === 0)) {
+    if (user.referredById) {
+      try {
+        const referrer = await db.user.findUnique({ where: { id: user.referredById } })
+        if (referrer) {
+          const oneMonthFromNow = new Date()
+          oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1)
+          
+          let newPremiumUntil = oneMonthFromNow
+          if (referrer.isPremium && referrer.premiumUntil && referrer.premiumUntil > new Date()) {
+            newPremiumUntil = new Date(referrer.premiumUntil)
+            newPremiumUntil.setMonth(newPremiumUntil.getMonth() + 1)
+          }
+
+          // If they are not premium, or they are premium via referral/trial, we update source.
+          // If they are PAID, we KEEP it PAID.
+          const newPremiumSource = (referrer.isPremium && referrer.premiumSource === 'PAID') 
+            ? 'PAID' 
+            : 'REFERRAL'
+
+          await db.user.update({
+            where: { id: referrer.id },
+            data: {
+              isPremium: true,
+              premiumUntil: newPremiumUntil,
+              premiumSource: newPremiumSource,
+              referralRewardsCount: { increment: 1 }
+            }
+          })
+          
+          // Add notification for referrer
+          await db.activityEvent.create({
+            data: {
+              userId: referrer.id,
+              type: 'REFERRAL_REWARD',
+              message: `Ваш друг ${user.name || 'пользователь'} решил первую задачу! Вы получаете +1 месяц Premium 🌟`
+            }
+          })
+        }
+      } catch (e) {
+        console.error('Error processing referral reward:', e)
+      }
+    }
+  }
 
   // Save solved puzzle or missed puzzle
   if (puzzleId) {

@@ -22,6 +22,16 @@ export async function POST(req: Request) {
       }
     })
 
+    const dbUser = await db.user.findUnique({ where: { id: session.user.id } })
+    if (dbUser) {
+      await db.user.update({
+        where: { id: session.user.id },
+        data: {
+          seasonPuzzlesSolved: (dbUser.seasonPuzzlesSolved || 0) + score
+        }
+      })
+    }
+
     return NextResponse.json({ success: true, result })
   } catch (error) {
     console.error('Puzzle Rush finish error:', error)

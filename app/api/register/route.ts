@@ -6,7 +6,7 @@ import crypto from "crypto"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, name, email, password } = body
+    const { token, name, email, password, refCode } = body
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Пожалуйста, заполните все поля" }, { status: 400 })
@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10)
     const verificationToken = crypto.randomUUID()
+    
+    let referredById = null
+    if (refCode) {
+      const referrer = await db.user.findUnique({ where: { referralCode: refCode } })
+      if (referrer) {
+        referredById = referrer.id
+      }
+    }
 
     const user = await db.user.create({
       data: {
@@ -48,6 +56,7 @@ export async function POST(req: NextRequest) {
         role: role as any,
         teacherId,
         verificationToken,
+        referredById,
       }
     })
 

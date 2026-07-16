@@ -6,7 +6,28 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
-    const period = url.searchParams.get('period') // 'week' | 'month' | null
+    const period = url.searchParams.get('period') // 'week' | 'month' | 'season' | null
+
+    if (period === 'season') {
+      const top = await db.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          seasonRating: true,
+          isPremium: true,
+          seasonPuzzlesSolved: true,
+          _count: { select: { homeworks: true } }
+        },
+        orderBy: { seasonRating: 'desc' },
+        take: 50
+      })
+      
+      return NextResponse.json(top.map(u => ({
+        ...u,
+        rating: u.seasonRating, // Map to rating so UI can just render it
+        puzzlesSolvedTotal: u.seasonPuzzlesSolved // Map to puzzlesSolvedTotal for UI
+      })))
+    }
 
     if (period === 'week' || period === 'month') {
       const days = period === 'week' ? 7 : 30

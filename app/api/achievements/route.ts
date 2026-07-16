@@ -18,6 +18,7 @@ export async function GET() {
         rating: true,
         activityStreak: true,
         puzzlesSolvedTotal: true,
+        seasonRating: true,
         achievements: {
           include: {
             achievement: true
@@ -34,7 +35,8 @@ export async function GET() {
       stats: {
         rating: user.rating,
         activityStreak: user.activityStreak,
-        puzzlesSolvedTotal: user.puzzlesSolvedTotal
+        puzzlesSolvedTotal: user.puzzlesSolvedTotal,
+        seasonRating: user.seasonRating
       },
       unlocked: user.achievements.map((ua) => ua.achievement.code)
     })

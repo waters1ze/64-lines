@@ -35,5 +35,29 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: 'Месячный марафон',
     description: 'Стрик активности достиг 30 дней',
     icon: '🏆'
+  },
+  {
+    code: 'FIRST_REFERRAL',
+    title: 'Душа компании',
+    description: 'Пригласить первого друга',
+    icon: '🤝'
+  },
+  {
+    code: 'FIRST_IMPORT',
+    title: 'Аналитик',
+    description: 'Импортировать партию для разбора',
+    icon: '🔍'
+  },
+  {
+    code: 'FIRST_MATCH',
+    title: 'Гладиатор',
+    description: 'Сыграть первый турнир или дуэль',
+    icon: '⚔️'
+  },
+  {
+    code: 'SEASON_PRO',
+    title: 'Герой Сезона',
+    description: 'Достичь сезонного рейтинга 1600',
+    icon: '🌟'
   }
 ]

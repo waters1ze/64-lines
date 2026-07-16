@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function RegisterPage() {
   const router = useRouter()
+  
+  const searchParams = useSearchParams()
+  const refCode = searchParams.get('ref')
   
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -24,7 +27,8 @@ export default function RegisterPage() {
         body: JSON.stringify({
           name,
           email,
-          password
+          password,
+          refCode
         })
       })
 

@@ -30,8 +30,14 @@ import { ResizableBoardContainer } from './ResizableBoard'
 import { Puzzles } from './Puzzles'
 import { FriendsTab } from './FriendsTab'
 import { AdminPuzzles } from './admin-puzzles'
+import { OpeningTrainer as OpeningTrainerComponent } from './OpeningTrainer'
 import { DailyPuzzleCard } from './DailyPuzzleCard'
 import { TournamentsWidget } from './TournamentsWidget'
+import { PremiumCountdownBadge } from './PremiumCountdownBadge'
+import { ReferralWidget } from './ReferralWidget'
+import { ImportedGamesWidget } from './ImportedGamesWidget'
+
+// ─── Header ──────────────────────────────────────────────────────────────────
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +75,14 @@ type Video = {
   meta: string;
   url: string;
   isPremium?: boolean;
+  categoryId?: string | null;
+  isPremiumOnly?: boolean;
+}
+
+type Category = {
+  id: string;
+  name: string;
+  type: string;
 }
 
 type Opening = {
@@ -329,6 +343,7 @@ export function TeacherHub({
   initialRole = 'Учитель', 
   userName = 'Учитель', 
   userRating = 1200,
+  seasonRating = 1500,
   userRank,
   initialStudents,
   initialHomeworks,
@@ -337,6 +352,8 @@ export function TeacherHub({
   initialOpenings,
   initialPurchases = [],
   isPremium = false,
+  premiumUntil = null,
+  premiumSource = null,
   puzzlesSolvedTotal,
   puzzlesAttempted,
   activityStreak,
@@ -344,8 +361,11 @@ export function TeacherHub({
   initialRole?: string, 
   userName: string
   userRating: number
+  seasonRating?: number
   userRank?: number
   isPremium: boolean
+  premiumUntil?: Date | string | null
+  premiumSource?: string | null
   puzzlesSolvedTotal?: number
   puzzlesAttempted?: number
   activityStreak?: number
@@ -387,6 +407,7 @@ export function TeacherHub({
   const [videos, setVideos] = useState<Video[]>(initialVideos || INIT_VIDEOS)
   const [openings, setOpenings] = useState<Opening[]>(initialOpenings || INIT_OPENINGS)
   const [purchases, setPurchases] = useState<any[]>(initialPurchases)
+  const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [modules, setModules] = useState<Module[]>([])
   const [paymentModuleId, setPaymentModuleId] = useState<string | null>(null)
   
@@ -850,6 +871,14 @@ export function TeacherHub({
           )}
           <b className="truncate text-sm">{sectionLabel}</b>
           <div className="ml-auto flex items-center gap-2">
+            <PremiumCountdownBadge 
+              premiumUntil={premiumUntil} 
+              premiumSource={premiumSource} 
+              onExpire={() => {
+                // To force UI update we could trigger router.refresh() 
+                // but for now we just let the component hide itself
+              }} 
+            />
             <div className="flex items-center gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-500 px-2 py-1 rounded-md text-sm font-bold border border-amber-200 dark:border-amber-800/50 shadow-sm mr-2" title="Ваш рейтинг (Эло)">
               <Trophy className="size-4" />
               {ratingState}
@@ -1019,7 +1048,7 @@ export function TeacherHub({
                 onDelete={!isStudent ? deleteHomework : undefined}
                 notify={notify} />
             )}
-            {section === 'videos'      && <VideosSection videos={videos} setVideos={setVideos} teacher={isAdmin} notify={notify} isUserPremium={isPremium} onPremiumClick={purchaseSubscription} />}
+            {section === 'videos'      && <VideosSection videos={videos} categories={categories.filter(c => c.type === 'VIDEO')} setCategories={setCategories} setVideos={setVideos} teacher={isAdmin} notify={notify} isUserPremium={isPremium} onPremiumClick={purchaseSubscription} />}
             {section === 'achievements' && <AchievementsTab />}
             {section === 'puzzles'     && (
               <>
@@ -1158,11 +1187,11 @@ export function TeacherHub({
             {section === 'leaderboard' && <Leaderboard />}
             {section === 'users'       && isAdmin && <UsersManager notify={notify} />}
             {section === 'users'       && isTeacher && !isAdmin && <AvailableStudents notify={notify} />}
-            {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} />}
+            {section === 'courseViewer' && viewingCourse && <CourseViewer course={viewingCourse} canDownloadPgn={isPremium && premiumSource === 'PAID'} />}
             {section === 'sales'       && isAdmin && <Sales purchases={purchases} onApprove={approvePurchase} onReject={rejectPurchase} onDelete={deletePurchase} yoomoneyConfigured={yoomoneyConfigured} />}
-            {section === 'store'       && <Storefront courses={courses} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
+            {section === 'store'       && <Storefront courses={courses} categories={categories.filter(c => c.type === 'OPENING')} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)} onPurchase={purchaseCourse} onOpen={openCourseViewer} />}
             {section === 'courses'  && (
-              <OpeningCourses courses={courses} isTeacher={isAdmin} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)}
+              <OpeningCourses courses={courses} categories={categories.filter(c => c.type === 'OPENING')} setCategories={setCategories} isTeacher={isAdmin} purchasedIds={courses.filter(hasAccessToCourse).map(c => c.id as number)}
                 onPurchase={purchaseCourse} onOpen={openCourseViewer}
                 onAdd={async c => {
                   try {
@@ -1441,8 +1470,21 @@ function PersonalStatsSection({
     ? Math.round((puzzlesSolvedTotal / puzzlesAttempted) * 100)
     : 0
 
+  let levelName = 'Новичок'
+  let levelIcon = '♟️'
+  if (puzzlesSolvedTotal >= 1000) { levelName = 'Гроссмейстер'; levelIcon = '♔' }
+  else if (puzzlesSolvedTotal >= 500) { levelName = 'Мастер'; levelIcon = '♕' }
+  else if (puzzlesSolvedTotal >= 100) { levelName = 'Кандидат'; levelIcon = '♖' }
+  else if (puzzlesSolvedTotal >= 50) { levelName = 'Продвинутый'; levelIcon = '♗' }
+  else if (puzzlesSolvedTotal >= 10) { levelName = 'Любитель'; levelIcon = '♘' }
+
   return (
     <>
+      <div className="flex items-center gap-2 mb-4 bg-primary/10 border border-primary/20 text-primary w-fit px-4 py-2 rounded-xl shadow-sm">
+        <span className="text-xl leading-none">{levelIcon}</span>
+        <span className="font-bold text-sm tracking-wide uppercase">Уровень: {levelName}</span>
+      </div>
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric
           label="Рейтинг"
@@ -1558,6 +1600,7 @@ function TeacherOverview({
 
       <DailyPuzzleCard />
       <TournamentsWidget role={role} notify={notify} />
+      <ReferralWidget />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Активные ученики" value={String(students.length)}  note="всего" />
@@ -1773,6 +1816,8 @@ function StudentOverview({
 
       <DailyPuzzleCard />
       <TournamentsWidget role="Ученик" notify={notify} />
+      <ReferralWidget />
+      <ImportedGamesWidget />
       <StudentRecommendationsBlock />
 
       <div><h2 className="text-lg font-semibold">Мои домашние задания</h2></div>
@@ -2005,6 +2050,10 @@ function StudentProfile({ student, homeworks, onOpenHw, onAddHw, onDeleteStudent
         {homeworks.length === 0
           ? <p className="mt-2 text-sm text-muted-foreground">Заданий пока нет. Нажмите «Добавить ДЗ».</p>
           : <div className="mt-3 grid gap-3 lg:grid-cols-3">{homeworks.map(hw => <HwCard key={hw.id} hw={hw} onOpen={() => onOpenHw(hw.id)} />)}</div>}
+      </div>
+
+      <div className="mt-8">
+        <ImportedGamesWidget studentId={student.id} />
       </div>
 
       <div className="mt-8">
@@ -3682,10 +3731,10 @@ function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Co
 
 // ─── Opening Courses (CRUD) ───────────────────────────────────────────────────
 
-type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string; isPremium: boolean }
+type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string; isPremium: boolean; categoryId: string | null }
 
-function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, onAdd, onUpdate, onDelete, notify }: {
-  courses: Course[]; isTeacher: boolean; purchasedIds: number[]
+function OpeningCourses({ courses, categories, setCategories, isTeacher, purchasedIds, onPurchase, onOpen, onAdd, onUpdate, onDelete, notify }: {
+  courses: Course[]; categories: Category[]; setCategories: any; isTeacher: boolean; purchasedIds: number[]
   onPurchase: (id: string | number) => void
   onOpen?: (id: string | number) => void
   onAdd: (c: Omit<Course, 'id' | 'createdAt'>) => void
@@ -3695,15 +3744,23 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
 }) {
   const [modal, setModal] = useState<null | 'add' | 'detail' | string | number>(null)
   const [detailId, setDetailId] = useState<string | number | null>(null)
-  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false })
+  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null })
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pgnFileRef = useRef<HTMLInputElement>(null)
 
-  const sorted = [...courses].sort((a, b) => b.createdAt - a.createdAt)
+  const sorted = [...courses]
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    .filter(c => {
+      if (selectedCategory === 'PREMIUM') return c.isPremium
+      if (selectedCategory === null) return true
+      return c.categoryId === selectedCategory
+    })
   const detailCourse = courses.find(c => c.id === detailId)
 
-  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false }); setModal('add') }
-  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '', isPremium: !!c.isPremium }); setModal(c.id) }
+  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null }); setModal('add') }
+  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '', isPremium: !!c.isPremium, categoryId: c.categoryId ?? null }); setModal(c.id) }
   async function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     const formData = new FormData()
@@ -3719,11 +3776,40 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
   }
   function handleSave() {
     if (!form.name || !form.price) { notify('Заполните название и цену'); return }
-    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined, isPremium: form.isPremium }
+    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined, isPremium: form.isPremium, categoryId: form.categoryId }
     const isEdit = modal !== 'add' && modal !== 'detail' && modal !== null
     if (modal === 'add') onAdd(data)
     else if (isEdit) onUpdate(modal as string | number, data)
     setModal(null); notify(modal === 'add' ? 'Курс добавлен!' : 'Курс обновлён!')
+  }
+
+  async function handleAddCategory() {
+    if (!newCategoryName.trim()) return
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName, type: 'OPENING' })
+      })
+      if (res.ok) {
+        const cat = await res.json()
+        setCategories((prev: Category[]) => [...prev, cat])
+        setNewCategoryName('')
+        notify('Категория добавлена')
+      } else notify('Ошибка при создании категории')
+    } catch { notify('Ошибка сети') }
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (!confirm('Точно удалить категорию? Курсы останутся, но будут без категории.')) return
+    try {
+      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setCategories((prev: Category[]) => prev.filter(c => c.id !== id))
+        if (selectedCategory === id) setSelectedCategory(null)
+        notify('Категория удалена')
+      } else notify('Ошибка при удалении категории')
+    } catch { notify('Ошибка сети') }
   }
 
   return (
@@ -3732,7 +3818,8 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
         text={isTeacher ? 'Создавайте и редактируйте авторские дебютные курсы.' : 'Авторские курсы по дебютам от тренера.'}
         action={isTeacher ? <button className="button" onClick={openAdd}><Plus />Добавить курс</button> : undefined} />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex-1 grid gap-4 md:grid-cols-2">
         {sorted.map(c => {
           const purchased = purchasedIds.includes(c.id)
           return (
@@ -3776,8 +3863,43 @@ function OpeningCourses({ courses, isTeacher, purchasedIds, onPurchase, onOpen, 
             </article>
           )
         })}
-      </div>
+        {sorted.length === 0 && <p className="text-muted-foreground text-sm col-span-full">Нет курсов в этой категории.</p>}
+        </div>
 
+        <div className="w-full lg:w-64 shrink-0 flex flex-col gap-3 sticky top-6">
+          <h3 className="font-medium mb-1">Категории</h3>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === null ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>Все курсы</span>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('PREMIUM')}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === 'PREMIUM' ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>⭐ Premium</span>
+            </button>
+            {categories.map(c => (
+              <div key={c.id} className={`group flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === c.id ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}>
+                <button className="flex-1 text-left truncate" onClick={() => setSelectedCategory(c.id)}>{c.name}</button>
+                {isTeacher && (
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteCategory(c.id) }} className={`ml-2 shrink-0 ${selectedCategory === c.id ? 'text-primary-foreground/70 hover:text-primary-foreground' : 'text-muted-foreground/50 hover:text-destructive'} opacity-0 group-hover:opacity-100 transition-opacity`} title="Удалить категорию">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {isTeacher && (
+            <div className="flex gap-2 mt-2 pt-4 border-t">
+              <input type="text" className="input text-sm flex-1" placeholder="Новая..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCategory()} />
+              <button className="button shrink-0 px-2" onClick={handleAddCategory}><Plus className="size-4" /></button>
+            </div>
+          )}
+        </div>
+      </div>
       {/* Add / Edit modal */}
       {(modal === 'add' || (modal !== null && modal !== 'detail')) && (
         <Modal title={modal === 'add' ? 'Добавить курс' : 'Редактировать курс'} close={() => setModal(null)}>
@@ -3984,7 +4106,7 @@ function MoveNodeList({ nodes, activeId, onSelect }: { nodes: MoveNode[], active
   )
 }
 
-function CourseViewer({ course }: { course: Course }) {
+function CourseViewer({ course, canDownloadPgn }: { course: Course, canDownloadPgn?: boolean }) {
   const games = useMemo(() => parsePgnGames(course.pgn ?? ''), [course.pgn])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [activeMoveId, setActiveMoveId] = useState<string | null>(null)
@@ -4065,11 +4187,19 @@ function CourseViewer({ course }: { course: Course }) {
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-semibold">Партии ({games.length})</p>
             {course.pgn && (
-              <a
-                href={`data:application/x-chess-pgn;charset=utf-8,${encodeURIComponent(course.pgn)}`}
-                download={`${course.name}.pgn`}
-                className="outline-button text-xs py-1 px-2 h-auto"
-              >⬇ Скачать PGN</a>
+              canDownloadPgn ? (
+                <a
+                  href={`/api/courses/${course.id}/download`}
+                  download={`${course.name}.pgn`}
+                  className="outline-button text-xs py-1 px-2 h-auto"
+                >⬇ Скачать PGN</a>
+              ) : (
+                <button
+                  disabled
+                  className="outline-button text-xs py-1 px-2 h-auto opacity-50 cursor-not-allowed"
+                  title="Скачивание PGN доступно только с платной Premium-подпиской. Ваш текущий премиум получен бесплатно и позволяет только просматривать контент."
+                >⬇ Скачать PGN</button>
+              )
             )}
           </div>
           <div className="rounded-lg border overflow-hidden max-h-[600px] overflow-y-auto">
@@ -4459,7 +4589,7 @@ function SettingsPanel({ notify, initialName, isStudent, isAdmin, globalSettings
 function Leaderboard() {
   const [top, setTop] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState<'all-time' | 'week' | 'month'>('all-time')
+  const [period, setPeriod] = useState<'all-time' | 'season' | 'week' | 'month'>('all-time')
 
   useEffect(() => {
     setLoading(true)
@@ -4492,6 +4622,16 @@ function Leaderboard() {
           }`}
         >
           Всё время
+        </button>
+        <button
+          onClick={() => setPeriod('season')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+            period === 'season'
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-500 shadow-xs border border-amber-200 dark:border-amber-800/50'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🏆 Текущий Сезон
         </button>
         <button
           onClick={() => setPeriod('week')}
