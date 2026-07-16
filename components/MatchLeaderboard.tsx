@@ -137,7 +137,7 @@ export function MatchLeaderboard({ matchId, currentUserId }: { matchId: string, 
                       return <span className="text-xs text-stone-400">Пропустил</span>
                     } else {
                       // INVITED
-                      const isExpired = new Date().getTime() - new Date(match.createdAt).getTime() > 60000;
+                      const isExpired = new Date().getTime() - new Date(match.createdAt).getTime() > 15 * 60 * 1000;
                       if (isExpired && match.creatorId === currentUserId) {
                         return <button onClick={() => reinvite(p.userId)} className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200">Вызвать</button>
                       } else if (isExpired) {
