@@ -309,8 +309,8 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
                       <span className="font-semibold">{inv.match.creator.name}</span> вызывает вас на матч!
                     </span>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleRespond(inv.matchId, 'accept')}>Принять</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleRespond(inv.matchId, 'decline')}>Отклонить</Button>
+                      <Button size="sm" onClick={() => handleRespond(inv.matchId, 'accept')} className="bg-blue-600 hover:bg-blue-700 text-white">Принять</Button>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={() => handleRespond(inv.matchId, 'decline')}>Отклонить</Button>
                     </div>
                   </div>
                 ))}

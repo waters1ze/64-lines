@@ -17,11 +17,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
+    const match = await db.puzzleRushMatch.findUnique({ where: { id: matchId } })
+    if (!match) return NextResponse.json({ error: 'Матч не найден' }, { status: 404 })
+
     const participant = await db.puzzleRushMatchParticipant.findUnique({
       where: { matchId_userId: { matchId, userId: user.id } }
     })
 
-    if (!participant) return NextResponse.json({ error: 'Not invited' }, { status: 403 })
+    if (!participant) return NextResponse.json({ error: 'Вы не приглашены' }, { status: 403 })
+
+    if (action === 'accept') {
+      const isExpired = Date.now() - new Date(match.createdAt).getTime() > 60 * 1000
+      if (isExpired) {
+        return NextResponse.json({ error: 'Время приглашения (1 минута) истекло' }, { status: 400 })
+      }
+    }
 
     const newStatus = action === 'accept' ? 'ACCEPTED' : 'DECLINED'
 

@@ -893,7 +893,7 @@ export function TeacherHub({
                               <button onClick={(e) => handleMatchRespond(e, n.relatedId, 'accept')} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 transition">
                                 Принять
                               </button>
-                              <button onClick={(e) => handleMatchRespond(e, n.relatedId, 'decline')} className="px-3 py-1.5 bg-stone-200 text-stone-700 text-xs font-semibold rounded hover:bg-stone-300 transition">
+                              <button onClick={(e) => handleMatchRespond(e, n.relatedId, 'decline')} className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 transition">
                                 Отклонить
                               </button>
                             </div>

@@ -18,7 +18,7 @@ export async function GET() {
         match: {
           status: 'WAITING',
           createdAt: {
-            gte: new Date(Date.now() - 1000 * 60 * 60 * 24) // only from last 24 hours
+            gte: new Date(Date.now() - 1000 * 60) // only from last 1 minute
           }
         }
       },
