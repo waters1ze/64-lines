@@ -23,6 +23,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
 
+    const user = await db.user.findUnique({ where: { email: session.user.email } })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    const isParticipant = match.participants.some(p => p.userId === user.id)
+    if (!isParticipant) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     return NextResponse.json(match)
   } catch (error) {
     console.error('Error fetching match:', error)

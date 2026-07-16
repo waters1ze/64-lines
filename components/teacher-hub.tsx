@@ -468,7 +468,7 @@ export function TeacherHub({
       })
       if (res.ok) {
         if (action === 'accept') {
-          router.push(`/puzzle-rush/match/${relatedId}`)
+          router.push(`/?section=puzzles&matchId=${relatedId}`)
           setShowNotifications(false)
         }
         fetchNotifications()

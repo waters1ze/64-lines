@@ -20,25 +20,39 @@ type Match = {
   id: string
   status: string
   createdAt: string
+  creatorId: string
   participants: Participant[]
 }
 
 export function MatchLeaderboard({ matchId, currentUserId }: { matchId: string, currentUserId: string }) {
-  const [match, setMatch] = useState<Match | null>(null)
+  const [match, setMatch] = useState<any>(null)
+  
+  const reinvite = async (targetUserId: string) => {
+    try {
+      await fetch(`/api/puzzle-rush/match/${matchId}/reinvite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId })
+      })
+      fetchMatch()
+    } catch(e) { console.error(e) }
+  }
+
+  const fetchMatch = async () => {
+    try {
+      const res = await fetch(`/api/puzzle-rush/match/${matchId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMatch(data)
+      } else if (res.status === 403) {
+        window.location.href = '/' // fallback if they are not part of the match
+      }
+    } catch (err) {
+      console.error('Error fetching match:', err)
+    }
+  }
 
   useEffect(() => {
-    const fetchMatch = async () => {
-      try {
-        const res = await fetch(`/api/puzzle-rush/match/${matchId}`)
-        if (res.ok) {
-          const data = await res.json()
-          setMatch(data)
-        }
-      } catch (err) {
-        console.error('Error fetching match:', err)
-      }
-    }
-
     fetchMatch()
     
     // Poll every 3 seconds if not finished
@@ -98,22 +112,40 @@ export function MatchLeaderboard({ matchId, currentUserId }: { matchId: string, 
                 </div>
                 
                 <div className="text-right flex flex-col items-end">
-                  {p.status === 'ACCEPTED' ? (
-                    <>
-                      <span className="font-bold text-lg leading-none">{p.score !== null ? p.score : '-'}</span>
-                      {p.finishedAt ? (
-                        <span className="text-[10px] text-stone-400">закончил</span>
-                      ) : (
-                        <span className="text-[10px] text-blue-500 animate-pulse">играет...</span>
-                      )}
-                    </>
-                  ) : p.status === 'DECLINED' ? (
-                    <span className="text-xs text-red-500">Отказ</span>
-                  ) : match.status === 'FINISHED' ? (
-                    <span className="text-xs text-stone-400">Пропустил</span>
-                  ) : (
-                    <span className="text-xs text-stone-400">Приглашен</span>
-                  )}
+                  {(() => {
+                    if (p.status === 'ACCEPTED') {
+                      if (p.finishedAt) {
+                        return (
+                          <>
+                            <span className="font-bold text-lg leading-none">{p.score !== null ? p.score : '-'}</span>
+                            <span className="text-[10px] text-stone-400">закончил</span>
+                          </>
+                        )
+                      } else if (p.startedAt) {
+                        return (
+                          <>
+                            <span className="font-bold text-lg leading-none">-</span>
+                            <span className="text-[10px] text-blue-500 animate-pulse">играет...</span>
+                          </>
+                        )
+                      } else {
+                        return <span className="text-xs text-amber-600 font-medium bg-amber-100 px-2 py-0.5 rounded">Готовится</span>
+                      }
+                    } else if (p.status === 'DECLINED') {
+                      return <span className="text-xs text-red-500">Отклонил</span>
+                    } else if (match.status === 'FINISHED') {
+                      return <span className="text-xs text-stone-400">Пропустил</span>
+                    } else {
+                      // INVITED
+                      const isExpired = new Date().getTime() - new Date(match.createdAt).getTime() > 60000;
+                      if (isExpired && match.creatorId === currentUserId) {
+                        return <button onClick={() => reinvite(p.userId)} className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200">Вызвать</button>
+                      } else if (isExpired) {
+                         return <span className="text-xs text-stone-400">Истекло</span>
+                      }
+                      return <span className="text-xs text-stone-400">Приглашен</span>
+                    }
+                  })()}
                 </div>
               </li>
             )

@@ -366,6 +366,7 @@ model PuzzleRushMatchParticipant {
   userId      String
   status      String   @default("INVITED") // INVITED, ACCEPTED, DECLINED
   score       Int?
+  startedAt   DateTime?
   finishedAt  DateTime?
 
   match       PuzzleRushMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)

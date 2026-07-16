@@ -104,7 +104,21 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
     }
   }, [isPlaying, timeLeft])
 
-  const startRush = () => {
+  const startRush = async () => {
+    if (matchId) {
+      try {
+        const res = await fetch(`/api/puzzle-rush/match/${matchId}/start`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json()
+          alert(data.error || 'Ошибка доступа к матчу')
+          return
+        }
+      } catch (e) {
+        console.error(e)
+        return
+      }
+    }
+    
     setScore(0)
     setTimeLeft(180)
     setIsPlaying(true)

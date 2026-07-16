@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { UserPlus, UserCheck, X, Check, Search, Swords } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export function FriendsTab({ notify, userId }: { notify: (s: string) => void, userId: string }) {
+  const router = useRouter()
   const [friends, setFriends] = useState<any[]>([])
   const [pendingIncoming, setPendingIncoming] = useState<any[]>([])
   const [pendingOutgoing, setPendingOutgoing] = useState<any[]>([])
@@ -123,8 +125,10 @@ export function FriendsTab({ notify, userId }: { notify: (s: string) => void, us
                 <button className="outline-button py-1 text-xs justify-center w-full" onClick={async () => {
                   try {
                     const res = await fetch('/api/puzzle-rush/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opponentUserIds: [friend.id] }) })
-                    const data = await res.json()
-                    if (data.matchId) window.location.href = '/?section=puzzles&matchId=' + data.matchId
+                    if (res.ok) {
+                      const data = await res.json()
+                      if (data.matchId) router.push('/?section=puzzles&matchId=' + data.matchId)
+                    }
                   } catch { notify('Ошибка создания матча') }
                 }}>
                   <Swords className="size-3 mr-1" /> Вызвать на матч

@@ -39,6 +39,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     if (match) {
       const activeParticipants = match.participants.filter(p => p.status === 'ACCEPTED')
+      // If someone has no startedAt but is ACCEPTED, they haven't finished. 
+      // If they have startedAt but no finishedAt, they haven't finished.
+      // So all activeParticipants must have finishedAt !== null to be considered finished.
       const allFinished = activeParticipants.every(p => p.finishedAt !== null)
       
       if (allFinished && activeParticipants.length > 0) {
