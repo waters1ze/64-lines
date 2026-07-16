@@ -2544,7 +2544,6 @@ function VideosSection({
   const [newCategoryName, setNewCategoryName] = useState('')
 
   const sortedVideos = [...videos].filter(v => {
-    if (selectedCategory === 'PREMIUM') return v.isPremiumOnly
     if (selectedCategory === null) return true
     return v.categoryId === selectedCategory
   })
@@ -2638,18 +2637,11 @@ function VideosSection({
               <div className="p-5 flex flex-col flex-1">
                 <h3 className="font-semibold flex items-center gap-2">
                   {v.title}
-                  {v.isPremiumOnly && <Crown className="w-4 h-4 text-yellow-500" title="Только Premium" />}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground flex-1">{v.meta}</p>
-                {(!v.isPremiumOnly || isUserPremium || teacher) ? (
-                  <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
-                    Смотреть на YouTube<ExternalLink />
-                  </a>
-                ) : (
-                  <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition-all mt-5 w-full flex justify-center items-center gap-2" onClick={onPremiumClick}>
-                    <LockKeyhole className="w-4 h-4" /> Купить Premium
-                  </button>
-                )}
+                <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
+                  Смотреть на YouTube<ExternalLink />
+                </a>
                 {teacher && (
                   <div className="flex items-center gap-2 mt-2 shrink-0">
                     <button className="outline-button flex-1 py-1 text-xs h-auto" onClick={() => openEdit(v)}><Pencil className="size-3" /> Изменить</button>
@@ -2671,12 +2663,6 @@ function VideosSection({
               className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === null ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
             >
               <span>Все видео</span>
-            </button>
-            <button
-              onClick={() => setSelectedCategory('PREMIUM')}
-              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === 'PREMIUM' ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
-            >
-              <span>⭐ Premium</span>
             </button>
             {categories.map(c => (
               <div key={c.id} className={`group flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === c.id ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}>
@@ -2734,10 +2720,6 @@ function VideosSection({
                 <option value="">Без категории</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-            </label>
-            <label className="flex items-center gap-2 mt-2 cursor-pointer pt-6">
-              <input type="checkbox" checked={form.isPremiumOnly} onChange={e => setForm(p => ({ ...p, isPremiumOnly: e.target.checked }))} className="rounded border-border" />
-              <span>Только для Premium</span>
             </label>
           </div>
           <button className="button mt-4" onClick={handleSave}>{modal === 'add' ? 'Опубликовать' : 'Сохранить'}</button>
