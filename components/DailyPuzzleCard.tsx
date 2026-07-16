@@ -49,12 +49,29 @@ export function DailyPuzzleCard() {
   const handleStart = () => {
     if (!data?.puzzle) return
     const chess = new Chess(data.puzzle.fen)
-    // Determine orientation from who is to move
-    const toMove = data.puzzle.fen.split(' ')[1]
-    setOrientation(toMove === 'w' ? 'white' : 'black')
     const moves = data.puzzle.moves.trim().split(' ').filter(Boolean)
+    
+    // В задачах Lichess первый ход в массиве moves — это ход оппонента.
+    // Мы должны сделать его за оппонента, чтобы ученик играл с нужной стороны.
+    if (moves.length > 0) {
+      const firstMove = moves[0]
+      try {
+        chess.move({
+          from: firstMove.substring(0, 2),
+          to: firstMove.substring(2, 4),
+          promotion: firstMove.length > 4 ? firstMove[4] : undefined
+        })
+      } catch (e) {
+        console.error("Ошибка при первом ходе оппонента:", e)
+      }
+    }
+
+    // Определяем, за кого играет пользователь, уже ПОСЛЕ хода оппонента
+    const toMove = chess.fen().split(' ')[1]
+    setOrientation(toMove === 'w' ? 'white' : 'black')
+    
     setExpectedMoves(moves)
-    setMoveIndex(0)
+    setMoveIndex(1) // Индекс 0 уже сделан оппонентом, ученик делает ход с индексом 1
     setGame(chess)
     setResult(null)
     setPlaying(true)
@@ -124,10 +141,17 @@ export function DailyPuzzleCard() {
     setTimeout(() => {
       const opponentClone = new Chess(clone.fen())
       try {
-        opponentClone.move(expectedMoves[nextIndex])
+        const compMove = expectedMoves[nextIndex]
+        opponentClone.move({
+          from: compMove.substring(0, 2),
+          to: compMove.substring(2, 4),
+          promotion: compMove.length > 4 ? compMove[4] : undefined
+        })
         setGame(opponentClone)
         setMoveIndex(nextIndex + 1)
-      } catch { /* */ }
+      } catch (e) {
+        console.error("Ошибка хода компьютера:", e)
+      }
     }, 400)
 
     return true
