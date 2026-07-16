@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       userId: id,
       title: 'Вызов в Puzzle Rush',
       message: `${user.name || 'Пользователь'} вызывает вас на матч в Puzzle Rush!`,
-      link: `/puzzle-rush/match/${match.id}`,
+      link: `/?section=puzzles&matchId=${match.id}`,
       type: 'MATCH_INVITE',
       relatedId: match.id,
     }))

@@ -124,7 +124,7 @@ export function FriendsTab({ notify, userId }: { notify: (s: string) => void, us
                   try {
                     const res = await fetch('/api/puzzle-rush/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opponentUserIds: [friend.id] }) })
                     const data = await res.json()
-                    if (data.matchId) window.open('/puzzle-rush/match/' + data.matchId, '_blank')
+                    if (data.matchId) window.location.href = '/?section=puzzles&matchId=' + data.matchId
                   } catch { notify('Ошибка создания матча') }
                 }}>
                   <Swords className="size-3 mr-1" /> Вызвать на матч

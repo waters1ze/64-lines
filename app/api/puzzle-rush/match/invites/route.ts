@@ -16,7 +16,10 @@ export async function GET() {
         userId: user.id,
         status: 'INVITED',
         match: {
-          status: 'WAITING'
+          status: 'WAITING',
+          createdAt: {
+            gte: new Date(Date.now() - 1000 * 60 * 60 * 24) // only from last 24 hours
+          }
         }
       },
       include: {

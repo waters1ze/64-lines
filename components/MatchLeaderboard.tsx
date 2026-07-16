@@ -109,6 +109,8 @@ export function MatchLeaderboard({ matchId, currentUserId }: { matchId: string, 
                     </>
                   ) : p.status === 'DECLINED' ? (
                     <span className="text-xs text-red-500">Отказ</span>
+                  ) : match.status === 'FINISHED' ? (
+                    <span className="text-xs text-stone-400">Пропустил</span>
                   ) : (
                     <span className="text-xs text-stone-400">Приглашен</span>
                   )}

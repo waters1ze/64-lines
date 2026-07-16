@@ -12,6 +12,7 @@ import { Chess } from 'chess.js'
 import dynamic from 'next/dynamic'
 import { ActivityCalendar } from './ActivityCalendar'
 import { AchievementsTab } from './AchievementsTab'
+import { MatchLeaderboard } from './MatchLeaderboard'
 import { PuzzleRush } from './PuzzleRush'
 import { EngineAnalysis } from './EngineAnalysis'
 import { OpeningTrainer } from './OpeningTrainer'
@@ -1060,7 +1061,16 @@ export function TeacherHub({
                   {puzzleSubMode === 'normal' ? (
                     <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} />
                   ) : puzzleSubMode === 'rush' ? (
-                    <PuzzleRush />
+                    <div className="flex flex-col lg:flex-row gap-6 items-start justify-center">
+                      <div className="flex-1 w-full max-w-5xl">
+                        <PuzzleRush matchId={searchParams.get('matchId') || undefined} userId={userId} />
+                      </div>
+                      {searchParams.get('matchId') && (
+                        <div className="w-full lg:w-80 shrink-0">
+                          <MatchLeaderboard matchId={searchParams.get('matchId')!} currentUserId={userId} />
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <Puzzles isPremium={isPremium} onPremiumClick={purchaseSubscription} onRatingChange={setRatingState} apiEndpoint="/api/puzzles/missed" title="Мои ошибки" />
                   )}

@@ -73,7 +73,7 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
       })
       if (res.ok) {
         if (action === 'accept') {
-          router.push(`/puzzle-rush/match/${matchIdToRespond}`)
+          router.push(`/?section=puzzles&matchId=${matchIdToRespond}`)
         } else {
           setInvites(prev => prev.filter(inv => inv.matchId !== matchIdToRespond))
         }

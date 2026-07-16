@@ -52,7 +52,7 @@ export function MatchInviteModal({ isOpen, onClose }: { isOpen: boolean, onClose
       })
       if (res.ok) {
         const data = await res.json()
-        router.push(`/puzzle-rush/match/${data.matchId}`)
+        router.push(`/?section=puzzles&matchId=${data.matchId}`)
         onClose()
       }
     } catch (e) {
