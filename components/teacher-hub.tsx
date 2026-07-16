@@ -417,7 +417,7 @@ export function TeacherHub({
   }, [purchases])
   
   const hasAccessToCourse = (c: Course) => {
-    return purchasedIds.includes(c.id) || !!(c.isPremium && isPremium)
+    return purchasedIds.includes(c.id) || !!(c.isPremium && isPremium) || c.price === 0
   }
   
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null)
@@ -3771,7 +3771,8 @@ function Storefront({ courses, categories, purchasedIds, onPurchase, onOpen }: {
                 <p className="mt-1 flex-1 text-sm text-muted-foreground line-clamp-2">{item.desc}</p>
                 <div className="mt-4">
                   {item.price > 0 && !owned && <b className="block mb-2">{item.price.toLocaleString('ru-RU')} ₽</b>}
-                  {owned
+                  {item.price === 0 && <b className="block mb-2 text-green-600">Бесплатно</b>}
+                  {owned || item.price === 0
                     ? <div className="flex gap-2">
                         <button className="outline-button flex-1" onClick={() => setDetailId(item.id)}>Подробнее</button>
                         <button className="button flex-1" onClick={() => onOpen?.(item.id)}>Открыть<ChevronRight /></button>
@@ -3823,10 +3824,10 @@ function Storefront({ courses, categories, purchasedIds, onPurchase, onOpen }: {
           {detail.imageUrl && <img src={detail.imageUrl} alt={detail.name} className="max-h-48 w-full rounded-lg object-cover" />}
           <div data-color-mode="light"><MarkdownPreview source={detail.description} style={{ backgroundColor: 'transparent' }} /></div>
           <div className="flex items-center justify-between border-t pt-4">
-            <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
-            {purchasedIds.includes(detail.id as number)
-              ? <span className="badge"><Check className="size-3" />Куплен</span>
-              : <button className="button" onClick={() => { onPurchase(detail.id); setDetailId(null) }}><LockKeyhole />Оплатить</button>}
+            {detail.price === 0 ? <span className="text-2xl font-semibold text-green-600">Бесплатно</span> : <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>}
+            {purchasedIds.includes(detail.id as number) || detail.price === 0
+              ? <div className="flex gap-2"><span className="badge"><Check className="size-3" />Доступен</span><button className="button" onClick={() => { onOpen?.(detail.id); setDetailId(null) }}>Открыть</button></div>
+              : <button className="button" onClick={() => { onPurchase(detail.id); setDetailId(null) }}><LockKeyhole className="size-4 mr-2"/>Оплатить</button>}
           </div>
         </Modal>
         )
@@ -3837,7 +3838,7 @@ function Storefront({ courses, categories, purchasedIds, onPurchase, onOpen }: {
 
 // ─── Opening Courses (CRUD) ───────────────────────────────────────────────────
 
-type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string; isPremium: boolean; categoryId: string | null }
+type CourseForm = { name: string; description: string; price: string; imageUrl: string; pgn: string; isPremium: boolean; categoryId: string | null; isFree: boolean }
 
 function OpeningCourses({ courses, categories, setCategories, isTeacher, purchasedIds, onPurchase, onOpen, onAdd, onUpdate, onDelete, notify }: {
   courses: Course[]; categories: Category[]; setCategories: any; isTeacher: boolean; purchasedIds: number[]
@@ -3850,7 +3851,7 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
 }) {
   const [modal, setModal] = useState<null | 'add' | 'detail' | string | number>(null)
   const [detailId, setDetailId] = useState<string | number | null>(null)
-  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null })
+  const [form, setForm] = useState<CourseForm>({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null, isFree: false })
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -3865,8 +3866,8 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
     })
   const detailCourse = courses.find(c => c.id === detailId)
 
-  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null }); setModal('add') }
-  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '', isPremium: !!c.isPremium, categoryId: c.categoryId ?? null }); setModal(c.id) }
+  function openAdd() { setForm({ name: '', description: '', price: '', imageUrl: '', pgn: '', isPremium: false, categoryId: null, isFree: false }); setModal('add') }
+  function openEdit(c: Course) { setForm({ name: c.name, description: c.description, price: c.price === 0 ? '' : String(c.price), imageUrl: c.imageUrl ?? '', pgn: c.pgn ?? '', isPremium: !!c.isPremium, categoryId: c.categoryId ?? null, isFree: c.price === 0 }); setModal(c.id) }
   async function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     const formData = new FormData()
@@ -3881,8 +3882,9 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
     }
   }
   function handleSave() {
-    if (!form.name || !form.price) { notify('Заполните название и цену'); return }
-    const data = { name: form.name, description: form.description, price: Number(form.price), imageUrl: form.imageUrl, pgn: form.pgn || undefined, isPremium: form.isPremium, categoryId: form.categoryId }
+    if (!form.name || (!form.isFree && !form.price)) { notify('Заполните название и цену'); return }
+    const finalPrice = form.isFree ? 0 : Number(form.price)
+    const data = { name: form.name, description: form.description, price: finalPrice, imageUrl: form.imageUrl, pgn: form.pgn || undefined, isPremium: form.isPremium, categoryId: form.categoryId }
     const isEdit = modal !== 'add' && modal !== 'detail' && modal !== null
     if (modal === 'add') onAdd(data)
     else if (isEdit) onUpdate(modal as string | number, data)
@@ -3946,8 +3948,8 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
                   <p className="mt-1 text-xs text-muted-foreground">⚠️ PGN не загружен</p>
                 )}
                 <div className="mt-4 flex items-center justify-between">
-                  <b className="text-lg">{c.price.toLocaleString('ru-RU')} ₽</b>
-                  {purchased && <span className="badge"><Check className="size-3" />Куплен</span>}
+                  {c.price === 0 ? <b className="text-lg text-green-600">Бесплатно</b> : <b className="text-lg">{c.price.toLocaleString('ru-RU')} ₽</b>}
+                  {(purchased || c.price === 0) && <span className="badge"><Check className="size-3" />Доступен</span>}
                 </div>
                 <div className="mt-3 flex gap-2">
                   {isTeacher ? (
@@ -4017,7 +4019,18 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <label className="field">Цена (₽)<input className="input" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" /></label>
+            <div className="field">
+              <span className="text-sm font-medium mb-1">Стоимость (₽)</span>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer bg-green-500/10 px-3 py-1.5 rounded-md hover:bg-green-500/20 transition-colors">
+                  <input type="checkbox" className="size-4 rounded text-green-600 focus:ring-green-600 cursor-pointer" checked={form.isFree} onChange={e => setForm(p => ({ ...p, isFree: e.target.checked, price: e.target.checked ? '0' : p.price === '0' ? '' : p.price }))} />
+                  <span className="font-semibold text-green-700">Бесплатно</span>
+                </label>
+                {!form.isFree && (
+                  <input className="input flex-1" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" />
+                )}
+              </div>
+            </div>
             <label className="field">Категория
               <select className="input" value={form.categoryId || ''} onChange={e => setForm(p => ({ ...p, categoryId: e.target.value || null }))}>
                 <option value="">Без категории</option>
