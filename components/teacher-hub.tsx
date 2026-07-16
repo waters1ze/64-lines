@@ -3371,7 +3371,7 @@ function ShopSection({ modules, courses, purchases, purchasedIds, isGuest, notif
 // ─── Modules View (Student/Guest) ─────────────────────────────────────────────
 
 
-function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse, onOpenCourse }: {
+function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purchases = [], courses = [], onPurchaseCourse, onOpenCourse, isPremium }: {
   modules: Module[]
   setModules: React.Dispatch<React.SetStateAction<Module[]>>
   onPurchase: (id: string) => void
