@@ -198,25 +198,38 @@ export function Puzzles({
         return
       }
 
-      if (data.error === 'ALL_SOLVED_FOR_THEMES') {
+      if (data.error) {
         setPuzzle(null)
         setGame(new Chess())
-        setBannerType('info')
-        setBannerMessage('Вы решили все задачи по этой теме!')
+        
+        if (data.error === 'ALL_SOLVED_FOR_THEMES') {
+          setBannerType('info')
+          setBannerMessage('Вы решили все задачи по этой теме!')
+        } else if (data.error === 'NO_MISSED_PUZZLES') {
+          setBannerType('info')
+          setBannerMessage('У вас пока нет ошибок для повторения — отлично!')
+        } else {
+          setBannerType('warning')
+          setBannerMessage('Ошибка: ' + (data.error === 'Puzzle not found' ? 'Задача не найдена' : 'Не удалось загрузить задачу'))
+        }
+        
         setLoading(false)
         return
       }
 
       setPuzzle(data)
       let newGame = new Chess()
+      const fen = data.fen || ''
+      const movesStr = data.moves || ''
+
       try {
-        newGame = new Chess(data.fen)
+        if (fen) newGame = new Chess(fen)
       } catch (err) {
-        console.error('Error loading FEN:', data.fen, err)
+        console.error('Error loading FEN:', fen, err)
       }
       
       // Make the first move automatically (opponent's move)
-      const moves = data.moves.split(' ')
+      const moves = movesStr.split(' ').filter(Boolean)
       if (moves.length > 0) {
         const move = moves[0]
         try {
@@ -228,12 +241,12 @@ export function Puzzles({
       }
       
       // Initialize position history
-      const solutionFens = getSolutionFens(data.fen, data.moves)
+      const solutionFens = getSolutionFens(fen, movesStr)
       if (solutionFens.length > 1) {
         setPositionHistory(solutionFens.slice(0, 2))
         setCurrentHistoryIndex(1)
       } else {
-        setPositionHistory([data.fen])
+        setPositionHistory([fen || newGame.fen()])
         setCurrentHistoryIndex(0)
       }
 
@@ -554,18 +567,9 @@ export function Puzzles({
                 {puzzle.rating}
               </span>
             </div>
-            {puzzle.themes && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {puzzle.themes.split(' ').slice(0, 3).map((t: string) => {
-                  const name = PUZZLE_THEMES.find(pt => pt.code === t)?.ru || t
-                  return (
-                    <span key={t} className="text-[10px] px-2 py-1 bg-background rounded-full border border-border text-muted-foreground uppercase tracking-wider">
-                      {name}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
+            <p className="mt-2 text-sm leading-relaxed max-w-[200px] sm:max-w-none">
+              {(puzzle?.themes ?? '').split(' ').filter(Boolean).map((t: string) => <span key={t} className="inline-block bg-muted/50 px-2 py-0.5 rounded-md mr-1.5 mb-1.5 text-xs text-muted-foreground border border-border/50">{PUZZLE_THEMES.find(pt => pt.code === t)?.ru || t}</span>)}
+            </p>
           </div>
         )}
 
