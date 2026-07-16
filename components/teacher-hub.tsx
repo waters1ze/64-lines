@@ -2519,6 +2519,8 @@ function getYouTubeId(url: string) {
 
 function VideosSection({ 
   videos, 
+  categories,
+  setCategories,
   setVideos, 
   teacher, 
   notify,
@@ -2526,6 +2528,8 @@ function VideosSection({
   onPremiumClick
 }: { 
   videos: Video[]; 
+  categories: Category[];
+  setCategories: any;
   setVideos: React.Dispatch<React.SetStateAction<Video[]>>; 
   teacher: boolean; 
   notify: (s: string) => void;
@@ -2533,15 +2537,23 @@ function VideosSection({
   onPremiumClick?: () => void;
 }) {
   const [modal, setModal] = useState<null | 'add' | string | number>(null)
-  const [form, setForm] = useState({ title: '', meta: '', url: '', isPremium: false })
+  const [form, setForm] = useState({ title: '', meta: '', url: '', isPremium: false, categoryId: null as string | null, isPremiumOnly: false })
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [newCategoryName, setNewCategoryName] = useState('')
+
+  const sortedVideos = [...videos].filter(v => {
+    if (selectedCategory === 'PREMIUM') return v.isPremiumOnly
+    if (selectedCategory === null) return true
+    return v.categoryId === selectedCategory
+  })
 
   function openAdd() {
-    setForm({ title: '', meta: '', url: '', isPremium: false })
+    setForm({ title: '', meta: '', url: '', isPremium: false, categoryId: null, isPremiumOnly: false })
     setModal('add')
   }
 
   function openEdit(v: Video) {
-    setForm({ title: v.title, meta: v.meta, url: v.url, isPremium: !!v.isPremium })
+    setForm({ title: v.title, meta: v.meta, url: v.url, isPremium: !!v.isPremium, categoryId: v.categoryId || null, isPremiumOnly: !!v.isPremiumOnly })
     setModal(v.id)
   }
 
@@ -2602,8 +2614,9 @@ function VideosSection({
       <Head over="YouTube библиотека" title="Видеоуроки"
         text={teacher ? 'Публикуйте ссылки на видео с вашего канала.' : 'Смотрите видеоуроки тренера.'}
         action={teacher ? <button className="button" onClick={openAdd}><Plus />Добавить видео</button> : undefined} />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {videos.map(v => {
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex-1 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sortedVideos.map(v => {
           const ytId = getYouTubeId(v.url)
           return (
             <article key={v.id} className="overflow-hidden rounded-lg border flex flex-col">
@@ -2623,10 +2636,10 @@ function VideosSection({
               <div className="p-5 flex flex-col flex-1">
                 <h3 className="font-semibold flex items-center gap-2">
                   {v.title}
-                  {v.isPremium && <Crown className="w-4 h-4 text-yellow-500" />}
+                  {v.isPremiumOnly && <Crown className="w-4 h-4 text-yellow-500" title="Только Premium" />}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground flex-1">{v.meta}</p>
-                {(!v.isPremium || isUserPremium || teacher) ? (
+                {(!v.isPremiumOnly || isUserPremium || teacher) ? (
                   <a className="outline-button mt-5 w-full shrink-0" href={v.url} target="_blank" rel="noreferrer" onClick={() => notify('Открываем YouTube')}>
                     Смотреть на YouTube<ExternalLink />
                   </a>
@@ -2645,16 +2658,86 @@ function VideosSection({
             </article>
           )
         })}
+        {sortedVideos.length === 0 && <p className="text-muted-foreground text-sm col-span-full">В этой категории пока нет видео.</p>}
+        </div>
+
+        <div className="w-full lg:w-64 shrink-0 flex flex-col gap-3 sticky top-6">
+          <h3 className="font-medium mb-1">Категории</h3>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === null ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>Все видео</span>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('PREMIUM')}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === 'PREMIUM' ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>⭐ Premium</span>
+            </button>
+            {categories.map(c => (
+              <div key={c.id} className={`group flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === c.id ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}>
+                <button className="flex-1 text-left truncate" onClick={() => setSelectedCategory(c.id)}>{c.name}</button>
+                {teacher && (
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    if (!confirm('Точно удалить категорию? Видео останутся, но будут без категории.')) return;
+                    fetch(`/api/categories/${c.id}`, { method: 'DELETE' }).then(res => {
+                      if (res.ok) {
+                        setCategories((prev: Category[]) => prev.filter(cat => cat.id !== c.id));
+                        if (selectedCategory === c.id) setSelectedCategory(null);
+                        notify('Категория удалена');
+                      } else notify('Ошибка удаления');
+                    });
+                  }} className={`ml-2 shrink-0 ${selectedCategory === c.id ? 'text-primary-foreground/70 hover:text-primary-foreground' : 'text-muted-foreground/50 hover:text-destructive'} opacity-0 group-hover:opacity-100 transition-opacity`} title="Удалить категорию">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {teacher && (
+            <div className="flex gap-2 mt-2 pt-4 border-t">
+              <input type="text" className="input text-sm flex-1" placeholder="Новая..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (!newCategoryName.trim()) return;
+                  fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCategoryName, type: 'VIDEO' }) }).then(res => res.json()).then(cat => {
+                    setCategories((prev: Category[]) => [...prev, cat]);
+                    setNewCategoryName('');
+                    notify('Категория добавлена');
+                  });
+                }
+              }} />
+              <button className="button shrink-0 px-2" onClick={() => {
+                if (!newCategoryName.trim()) return;
+                fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCategoryName, type: 'VIDEO' }) }).then(res => res.json()).then(cat => {
+                  setCategories((prev: Category[]) => [...prev, cat]);
+                  setNewCategoryName('');
+                  notify('Категория добавлена');
+                });
+              }}><Plus className="size-4" /></button>
+            </div>
+          )}
+        </div>
       </div>
       {(modal === 'add' || (modal !== null)) && (
         <Modal title={modal === 'add' ? 'Добавить видео с YouTube' : 'Редактировать видео'} close={() => setModal(null)}>
           <label className="field">Название<input className="input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></label>
           <label className="field">Длительность и тема<input className="input" value={form.meta} onChange={e => setForm(p => ({ ...p, meta: e.target.value }))} placeholder="18 мин · Тактика" /></label>
           <label className="field">Ссылка YouTube<input className="input" type="url" value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://youtube.com/watch?v=..." /></label>
-          <label className="flex items-center gap-2 mt-2 cursor-pointer">
-            <input type="checkbox" checked={form.isPremium} onChange={e => setForm(p => ({ ...p, isPremium: e.target.checked }))} className="rounded border-border" />
-            <span>Premium видео</span>
-          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="field">Категория
+              <select className="input" value={form.categoryId || ''} onChange={e => setForm(p => ({ ...p, categoryId: e.target.value || null }))}>
+                <option value="">Без категории</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 mt-2 cursor-pointer pt-6">
+              <input type="checkbox" checked={form.isPremiumOnly} onChange={e => setForm(p => ({ ...p, isPremiumOnly: e.target.checked }))} className="rounded border-border" />
+              <span>Только для Premium</span>
+            </label>
+          </div>
           <button className="button mt-4" onClick={handleSave}>{modal === 'add' ? 'Опубликовать' : 'Сохранить'}</button>
         </Modal>
       )}
@@ -3672,19 +3755,26 @@ function Sales({ purchases, onApprove, onReject, onDelete, yoomoneyConfigured }:
 
 // ─── Storefront (Витрина) ─────────────────────────────────────────────────────
 
-function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Course[]; purchasedIds: number[]; onPurchase: (id: string | number) => void; onOpen?: (id: string | number) => void }) {
+function Storefront({ courses, categories, purchasedIds, onPurchase, onOpen }: { courses: Course[]; categories: Category[]; purchasedIds: number[]; onPurchase: (id: string | number) => void; onOpen?: (id: string | number) => void }) {
   const [detailId, setDetailId] = useState<string | number | null>(null)
-  const detail = courses.find(c => c.id === detailId)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
-  // Only real courses (no more static module placeholders)
-  const allItems = [...courses].sort((a, b) => b.createdAt - a.createdAt).map(c => ({
-    id: c.id, name: c.name, desc: c.description, price: c.price, img: c.imageUrl
-  }))
+  const allItems = [...courses]
+    .filter(c => {
+      if (selectedCategory === 'PREMIUM') return c.isPremium
+      if (selectedCategory === null) return true
+      return c.categoryId === selectedCategory
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    .map(c => ({
+      id: c.id, name: c.name, desc: c.description, price: c.price, img: c.imageUrl, isPremium: c.isPremium, categoryId: c.categoryId, imageUrl: c.imageUrl
+    }))
 
   return (
     <>
       <Head over="Витрина" title="Все материалы" text="Все доступные курсы и модули — от нового к старому." />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="flex-1 grid gap-4 md:grid-cols-2">
         {allItems.map(item => {
           const owned = purchasedIds.includes(item.id as any)
           return (
@@ -3712,19 +3802,52 @@ function Storefront({ courses, purchasedIds, onPurchase, onOpen }: { courses: Co
             </article>
           )
         })}
+        {allItems.length === 0 && <p className="text-muted-foreground text-sm col-span-full">В этой категории пока нет курсов.</p>}
+        </div>
+
+        <div className="w-full lg:w-64 shrink-0 flex flex-col gap-3 sticky top-6">
+          <h3 className="font-medium mb-1">Категории</h3>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === null ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>Все курсы</span>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('PREMIUM')}
+              className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${selectedCategory === 'PREMIUM' ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+            >
+              <span>⭐ Premium</span>
+            </button>
+            {categories.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCategory(c.id)}
+                className={`flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors text-left truncate ${selectedCategory === c.id ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      {detail && (
-        <Modal title={detail.name} close={() => setDetailId(null)}>
+      {detailId && (() => {
+        const detail = courses.find(c => c.id === detailId)
+        if (!detail) return null
+        return (
+          <Modal title={detail.name} close={() => setDetailId(null)}>
           {detail.imageUrl && <img src={detail.imageUrl} alt={detail.name} className="max-h-48 w-full rounded-lg object-cover" />}
-          <div data-color-mode="light"><MarkdownPreview source={detail.desc} style={{ backgroundColor: 'transparent' }} /></div>
+          <div data-color-mode="light"><MarkdownPreview source={detail.description} style={{ backgroundColor: 'transparent' }} /></div>
           <div className="flex items-center justify-between border-t pt-4">
             <span className="text-2xl font-semibold">{detail.price.toLocaleString('ru-RU')} ₽</span>
-            {purchasedIds.includes(detail.id)
+            {purchasedIds.includes(detail.id as number)
               ? <span className="badge"><Check className="size-3" />Куплен</span>
               : <button className="button" onClick={() => { onPurchase(detail.id); setDetailId(null) }}><LockKeyhole />Оплатить</button>}
           </div>
         </Modal>
-      )}
+        )
+      })()}
     </>
   )
 }
@@ -3910,7 +4033,15 @@ function OpeningCourses({ courses, categories, setCategories, isTeacher, purchas
               <MDEditor value={form.description} onChange={val => setForm(p => ({ ...p, description: val || '' }))} textareaProps={{ placeholder: 'Подробное описание курса...' }} height={200} />
             </div>
           </div>
-          <label className="field">Цена (₽)<input className="input" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" /></label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="field">Цена (₽)<input className="input" type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="4900" /></label>
+            <label className="field">Категория
+              <select className="input" value={form.categoryId || ''} onChange={e => setForm(p => ({ ...p, categoryId: e.target.value || null }))}>
+                <option value="">Без категории</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          </div>
           <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors">
             <input type="checkbox" className="size-5 rounded border-yellow-500 text-yellow-500 focus:ring-yellow-500" checked={form.isPremium} onChange={e => setForm(p => ({ ...p, isPremium: e.target.checked }))} />
             <div className="flex flex-col">

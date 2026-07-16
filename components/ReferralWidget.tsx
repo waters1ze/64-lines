@@ -51,7 +51,7 @@ export function ReferralWidget() {
         Пригласи друга - получи Premium!
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Отправь эту ссылку другу. Как только он зарегистрируется и решит свою первую задачу, вы оба получите +1 месяц Premium бесплатно!
+        Отправь эту ссылку другу. Как только он зарегистрируется и решит свою первую задачу, вы получите +1 день Premium бесплатно!
       </p>
 
       <div className="flex items-center gap-2 mb-4">

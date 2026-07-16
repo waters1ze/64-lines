@@ -93,13 +93,13 @@ export async function POST(req: Request) {
       try {
         const referrer = await db.user.findUnique({ where: { id: user.referredById } })
         if (referrer) {
-          const oneMonthFromNow = new Date()
-          oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1)
+          const oneDayFromNow = new Date()
+          oneDayFromNow.setDate(oneDayFromNow.getDate() + 1)
           
-          let newPremiumUntil = oneMonthFromNow
+          let newPremiumUntil = oneDayFromNow
           if (referrer.isPremium && referrer.premiumUntil && referrer.premiumUntil > new Date()) {
             newPremiumUntil = new Date(referrer.premiumUntil)
-            newPremiumUntil.setMonth(newPremiumUntil.getMonth() + 1)
+            newPremiumUntil.setDate(newPremiumUntil.getDate() + 1)
           }
 
           // If they are not premium, or they are premium via referral/trial, we update source.
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
             data: {
               userId: referrer.id,
               type: 'REFERRAL_REWARD',
-              message: `Ваш друг ${user.name || 'пользователь'} решил первую задачу! Вы получаете +1 месяц Premium 🌟`
+              message: `Ваш друг ${user.name || 'пользователь'} решил первую задачу! Вы получаете +1 день Premium 🌟`
             }
           })
         }
