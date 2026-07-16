@@ -1179,7 +1179,7 @@ export function TeacherHub({
             {section === 'modules'     && (
               isAdmin
                 ? <ModulesEditor modules={modules} setModules={setModules} students={students} notify={notify} />
-                : <ModulesView modules={modules} setModules={setModules} onPurchase={purchaseCourse} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} onOpenCourse={openCourseViewer} />
+                : <ModulesView modules={modules} setModules={setModules} onPurchase={purchaseCourse} isGuest={isGuest} notify={notify} purchases={purchases} courses={courses} onPurchaseCourse={purchaseCourse} onOpenCourse={openCourseViewer} isPremium={isPremium} />
             )}
             {section === 'shop'        && <ShopSection modules={modules} courses={courses} purchases={purchases} purchasedIds={purchasedIds} isGuest={isGuest} notify={notify} onPurchaseCourse={purchaseCourse} onPurchaseModule={(id) => { setPaymentStep('method'); setPaymentSender(''); setPaymentComment(''); setPaymentModuleId(id) }} onOpenCourse={openCourseViewer} onOpenModule={() => notify('Открытие модуля (в разработке)')} />}
             {section === 'friends' && (
@@ -3507,9 +3507,11 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
   courses?: Course[]
   onPurchaseCourse?: (id: string | number) => void
   onOpenCourse?: (id: string | number) => void
+  isPremium?: boolean
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Compute purchased course IDs
   const purchasedCourseIds = purchases
@@ -3517,7 +3519,7 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
     .map(p => p.courseId)
     .filter(Boolean)
 
-  const ownedCourses = (courses || []).filter(c => purchasedCourseIds.includes(c.id))
+  const ownedCourses = (courses || []).filter(c => purchasedCourseIds.includes(c.id) || c.price === 0 || !!(c.isPremium && isPremium))
   const accessibleModules = modules.filter(m => m.hasAccess || m.visibility === 'ALL')
 
   const allTags = Array.from(new Set([
@@ -3525,26 +3527,32 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
     ...(ownedCourses.length > 0 ? ['Дебют'] : [])
   ]))
 
-  const filtered = activeTag
+  const filtered = (activeTag
     ? activeTag === 'Дебют'
       ? []
       : accessibleModules.filter(m => m.tags.includes(activeTag))
-    : accessibleModules
+    : accessibleModules).filter(m => !searchQuery || m.title.toLowerCase().includes(searchQuery.toLowerCase()) || m.description.toLowerCase().includes(searchQuery.toLowerCase()))
 
-  const filteredCourses = activeTag === 'Дебют' || !activeTag ? ownedCourses : []
+  const filteredCourses = (activeTag === 'Дебют' || !activeTag ? ownedCourses : []).filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.description.toLowerCase().includes(searchQuery.toLowerCase()))
 
-  const hasAnyContent = accessibleModules.length > 0 || ownedCourses.length > 0
+  const hasAnyContent = filtered.length > 0 || filteredCourses.length > 0
 
   return (
     <>
       <Head over="Программы" title="Модули" text="Видеоуроки по темам. Откройте бесплатные или приобретите платные." />
 
       {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button className={`badge cursor-pointer ${!activeTag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(null)}>Все</button>
-          {allTags.map(tag => (
-            <button key={tag} className={`badge cursor-pointer ${activeTag === tag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(activeTag === tag ? null : tag)}>{tag}</button>
-          ))}
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input type="text" className="input pl-9" placeholder="Поиск по курсам и модулям..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className={`badge cursor-pointer ${!activeTag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(null)}>Все</button>
+            {allTags.map(tag => (
+              <button key={tag} className={`badge cursor-pointer ${activeTag === tag ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => setActiveTag(activeTag === tag ? null : tag)}>{tag}</button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3554,6 +3562,10 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
         {/* Purchased / buyable courses shown as module cards */}
         {filteredCourses.map(c => {
           const isPurchased = purchasedCourseIds.includes(c.id)
+          const isAccessiblePremium = !!(c.isPremium && isPremium)
+          const isAccessibleFree = c.price === 0
+          const hasAccess = isPurchased || isAccessiblePremium || isAccessibleFree
+
           return (
             <div key={`course-${c.id}`} className="rounded-lg border flex flex-col overflow-hidden">
               {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="w-full aspect-video object-cover" />}
@@ -3562,21 +3574,21 @@ function ModulesView({ modules, setModules: _, onPurchase, isGuest, notify, purc
                   <span className="badge bg-blue-50 text-blue-600 text-xs">Дебют</span>
                   {isPurchased
                     ? <span className="badge bg-green-50 text-green-700">✅ Куплен</span>
-                    : c.price > 0
-                      ? <span className="badge bg-amber-50 text-amber-700">💳 {c.price.toLocaleString()} ₽</span>
-                      : <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>}
+                    : isAccessiblePremium
+                      ? <span className="badge bg-yellow-500/20 text-yellow-700 border-yellow-500/30 font-semibold"><Crown className="size-3 mr-1" />Premium</span>
+                      : isAccessibleFree
+                        ? <span className="badge bg-green-50 text-green-700">🌐 Бесплатно</span>
+                        : <span className="badge bg-amber-50 text-amber-700">💳 {c.price.toLocaleString()} ₽</span>}
                 </div>
                 <h3 className="font-semibold">{c.name}</h3>
                 {c.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{c.description}</p>}
                 <div className="mt-4 flex gap-2">
-                  {isPurchased ? (
+                  {hasAccess ? (
                     <button className="button flex-1" onClick={() => onOpenCourse?.(c.id)}>Открыть<ChevronRight className="size-4" /></button>
-                  ) : c.price > 0 ? (
-                    <button className="button flex-1" onClick={() => { if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }; onPurchaseCourse?.(c.id) }}>
-                      <LockKeyhole className="size-4" />Купить доступ
-                    </button>
                   ) : (
-                    <button className="button flex-1" onClick={() => onOpenCourse?.(c.id)}>Открыть<ChevronRight className="size-4" /></button>
+                    <button className="button flex-1" onClick={() => { if (isGuest) { notify('Пожалуйста, зарегистрируйтесь для покупки.'); return }; onPurchaseCourse?.(c.id) }}>
+                      <LockKeyhole className="size-4 mr-2" />Купить доступ
+                    </button>
                   )}
                 </div>
               </div>
@@ -3766,7 +3778,7 @@ function Storefront({ courses, categories, purchasedIds, onPurchase, onOpen }: {
                 {item.img ? <img src={item.img} alt={item.name} className="size-full object-cover" /> : <Library className="size-10 text-muted-foreground" />}
               </div>
               <div className="flex flex-1 flex-col p-5">
-                <span className="badge w-fit">Курс</span>
+                <span className="badge w-fit flex items-center">Курс {item.isPremium && <span className="ml-2 badge bg-yellow-500/20 text-yellow-700 border-yellow-500/30 font-semibold"><Crown className="size-3 mr-1" />Доступно с Premium</span>}</span>
                 <h3 className="mt-3 font-semibold">{item.name}</h3>
                 <p className="mt-1 flex-1 text-sm text-muted-foreground line-clamp-2">{item.desc}</p>
                 <div className="mt-4">
