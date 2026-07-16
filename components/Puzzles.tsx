@@ -177,10 +177,13 @@ export function Puzzles({
     setCurrentHistoryIndex(0)
     
     try {
-      const themesParam = themes.length ? (apiEndpoint.includes('?') ? '&' : '?') + `themes=${themes.join(',')}` : ''
-      const diffParam = apiEndpoint.includes('?') ? `&difficulty=${diff}` : `?difficulty=${diff}`
+      const url = new URL(apiEndpoint, window.location.origin)
+      url.searchParams.set('difficulty', diff)
+      if (themes.length > 0) {
+        url.searchParams.set('themes', themes.join(','))
+      }
       
-      const res = await fetch(`${apiEndpoint}${diffParam}${themesParam}`)
+      const res = await fetch(url.toString())
       if (res.status === 403) {
         setError('LIMIT_REACHED')
         setLoading(false)
