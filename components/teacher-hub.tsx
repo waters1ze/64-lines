@@ -1472,17 +1472,17 @@ function PersonalStatsSection({
     : 0
 
   let levelName = 'Новичок'
-  let levelIcon = '♟️'
-  if (puzzlesSolvedTotal >= 1000) { levelName = 'Гроссмейстер'; levelIcon = '♔' }
-  else if (puzzlesSolvedTotal >= 500) { levelName = 'Мастер'; levelIcon = '♕' }
-  else if (puzzlesSolvedTotal >= 100) { levelName = 'Кандидат'; levelIcon = '♖' }
-  else if (puzzlesSolvedTotal >= 50) { levelName = 'Продвинутый'; levelIcon = '♗' }
-  else if (puzzlesSolvedTotal >= 10) { levelName = 'Любитель'; levelIcon = '♘' }
+  let levelIcon = 'https://img.icons8.com/fluency/48/pawn.png'
+  if (puzzlesSolvedTotal >= 1000) { levelName = 'Гроссмейстер'; levelIcon = 'https://img.icons8.com/fluency/48/king.png' }
+  else if (puzzlesSolvedTotal >= 500) { levelName = 'Мастер'; levelIcon = 'https://img.icons8.com/fluency/48/queen.png' }
+  else if (puzzlesSolvedTotal >= 100) { levelName = 'Кандидат'; levelIcon = 'https://img.icons8.com/fluency/48/rook.png' }
+  else if (puzzlesSolvedTotal >= 50) { levelName = 'Продвинутый'; levelIcon = 'https://img.icons8.com/fluency/48/bishop.png' }
+  else if (puzzlesSolvedTotal >= 10) { levelName = 'Любитель'; levelIcon = 'https://img.icons8.com/fluency/48/knight.png' }
 
   return (
     <>
       <div className="flex items-center gap-2 mb-4 bg-primary/10 border border-primary/20 text-primary w-fit px-4 py-2 rounded-xl shadow-sm">
-        <span className="text-xl leading-none">{levelIcon}</span>
+        <span className="flex items-center justify-center shrink-0 w-6 h-6"><img src={levelIcon} alt={levelName} className="w-full h-full object-contain drop-shadow-sm" /></span>
         <span className="font-bold text-sm tracking-wide uppercase">Уровень: {levelName}</span>
       </div>
 
