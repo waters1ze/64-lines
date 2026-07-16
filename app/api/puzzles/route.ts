@@ -40,7 +40,8 @@ export async function GET(req: Request) {
     }
   }
 
-  const targetRating = user.rating || 1200
+  const targetRatingParam = url.searchParams.get('targetRating')
+  const targetRating = targetRatingParam ? parseInt(targetRatingParam, 10) : (user.rating || 1200)
   let puzzle = null
 
   let minDiff = -100

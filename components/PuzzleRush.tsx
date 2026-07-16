@@ -24,6 +24,8 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false)
   const [failedSquares, setFailedSquares] = useState<{ from: string; to: string } | null>(null)
   
+  const [sessionRating, setSessionRating] = useState<number | null>(null)
+
   const [invites, setInvites] = useState<any[]>([])
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const router = useRouter()
@@ -42,7 +44,7 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
     setLoadingLeaderboard(true)
     try {
       const res = await fetch('/api/puzzle-rush/leaderboard')
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json()
         setLeaderboard(data.results || [])
       }
@@ -55,7 +57,7 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
   const fetchInvites = async () => {
     try {
       const res = await fetch('/api/puzzle-rush/match/invites')
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json()
         setInvites(data)
       }
@@ -109,17 +111,23 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
       try {
         const res = await fetch(`/api/puzzle-rush/match/${matchId}/start`, { method: 'POST' })
         if (!res.ok) {
-          const data = await res.json()
-          alert(data.error || 'Ошибка доступа к матчу')
+          if (res.headers.get('content-type')?.includes('application/json')) {
+            const data = await res.json()
+            alert(data.error || 'Ошибка доступа к матчу')
+          } else {
+            alert('Ошибка сервера при старте матча')
+          }
           return
         }
       } catch (e) {
         console.error(e)
+        alert('Ошибка при старте матча')
         return
       }
     }
     
     setScore(0)
+    setSessionRating(null)
     setTimeLeft(180)
     setIsPlaying(true)
     setStatus('playing')
@@ -154,16 +162,24 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
     }
   }
 
-  const loadNextPuzzle = async () => {
+  const loadNextPuzzle = async (currentSessionRating?: number | null) => {
     setLoadingPuzzle(true)
     try {
-      const res = await fetch('/api/puzzles?mode=rush&t=' + Date.now())
+      const targetQuery = currentSessionRating ? `&targetRating=${currentSessionRating}` : ''
+      const res = await fetch('/api/puzzles?mode=rush&t=' + Date.now() + targetQuery)
       if (!res.ok) {
+        if (res.headers.get('content-type')?.includes('application/json')) {
+          const data = await res.json()
+          if (data.error === 'LIMIT_REACHED') {
+            throw new Error('Limit reached')
+          }
+        }
         throw new Error('Failed to load puzzle')
       }
       const data = await res.json()
-      if (data.error === 'LIMIT_REACHED') {
-        throw new Error('Limit reached')
+      
+      if (!currentSessionRating && data.rating) {
+        setSessionRating(data.rating)
       }
 
       setPuzzle(data)
@@ -185,7 +201,7 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
       setStatus('playing')
     } catch (e) {
       console.error(e)
-      setTimeout(loadNextPuzzle, 1000)
+      setTimeout(() => loadNextPuzzle(currentSessionRating), 1000)
     }
     setLoadingPuzzle(false)
   }
@@ -224,9 +240,11 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
 
         if (moveIndex === moves.length - 1) {
           setScore((s) => s + 1)
+          const newRating = sessionRating ? sessionRating + 15 : null
+          setSessionRating(newRating)
           setStatus('correct')
           setTimeout(() => {
-            loadNextPuzzle()
+            loadNextPuzzle(newRating)
           }, 400)
         } else {
           const nextIndex = moveIndex + 1
@@ -244,9 +262,11 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
               
               if (nextIndex === moves.length - 1) {
                 setScore((s) => s + 1)
+                const newRating = sessionRating ? sessionRating + 15 : null
+                setSessionRating(newRating)
                 setStatus('correct')
                 setTimeout(() => {
-                  loadNextPuzzle()
+                  loadNextPuzzle(newRating)
                 }, 400)
               }
             } catch (e) {
@@ -258,9 +278,11 @@ export function PuzzleRush({ matchId, userId }: { matchId?: string, userId?: str
       } else {
         setFailedSquares({ from: sourceSquare, to: targetSquare })
         setStatus('wrong')
+        const newRating = sessionRating ? Math.max(sessionRating - 10, 400) : null
+        setSessionRating(newRating)
         setTimeout(() => {
           setFailedSquares(null)
-          loadNextPuzzle()
+          loadNextPuzzle(newRating)
         }, 500)
         return false
       }
