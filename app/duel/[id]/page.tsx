@@ -4,16 +4,17 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { redirect, notFound } from 'next/navigation'
 import { PuzzleRush } from '@/components/PuzzleRush'
 
-export default async function DuelPage({ params }: { params: { id: string } }) {
+export default async function DuelPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
-    redirect('/login?callbackUrl=/duel/' + params.id)
+    redirect('/login?callbackUrl=/duel/' + id)
   }
 
   const user = await db.user.findUnique({ where: { email: session.user.email } })
   if (!user) redirect('/login')
 
-  const duel = await db.puzzleRushDuel.findUnique({ where: { id: params.id } })
+  const duel = await db.puzzleRushDuel.findUnique({ where: { id: id } })
   if (!duel) notFound()
 
   // User must be either creator or opponent
@@ -25,7 +26,7 @@ export default async function DuelPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-stone-50 flex flex-col items-center py-10 px-4">
       <div className="w-full max-w-5xl">
         <h1 className="text-2xl font-bold mb-6 text-center">Дуэль в Puzzle Rush</h1>
-        <PuzzleRush duelId={params.id} userId={user.id} />
+        <PuzzleRush duelId={id} userId={user.id} />
       </div>
     </div>
   )

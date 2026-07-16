@@ -3,8 +3,9 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
-export async function generateMetadata({ params }: { params: { userId: string } }): Promise<Metadata> {
-  const user = await db.user.findUnique({ where: { id: params.userId } })
+export async function generateMetadata({ params }: { params: Promise<{ userId: string }> }): Promise<Metadata> {
+  const { userId } = await params
+  const user = await db.user.findUnique({ where: { id: userId } })
   if (!user) return { title: 'Пользователь не найден' }
 
   return {
@@ -18,8 +19,9 @@ export async function generateMetadata({ params }: { params: { userId: string } 
   }
 }
 
-export default async function ProfilePage({ params }: { params: { userId: string } }) {
-  const user = await db.user.findUnique({ where: { id: params.userId } })
+export default async function ProfilePage({ params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params
+  const user = await db.user.findUnique({ where: { id: userId } })
   if (!user) return notFound()
 
   return (
