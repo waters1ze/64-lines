@@ -377,7 +377,7 @@ export function TeacherHub({
   const [mobile, setMobile] = useState(false)
   const [toast, setToast] = useState('')
 
-  const [puzzleSubMode, setPuzzleSubMode] = useState<'normal' | 'rush' | 'missed'>('normal')
+  const [puzzleSubMode, setPuzzleSubMode] = useState<'normal' | 'rush' | 'missed'>(searchParams.get('matchId') ? 'rush' : 'normal')
 
   const [students, setStudents] = useState<Student[]>(initialStudents || INIT_STUDENTS)
   const [homeworks, setHomeworks] = useState<HW[]>(initialHomeworks || INIT_HW)
@@ -1063,11 +1063,11 @@ export function TeacherHub({
                   ) : puzzleSubMode === 'rush' ? (
                     <div className="flex flex-col lg:flex-row gap-6 items-start justify-center">
                       <div className="flex-1 w-full max-w-5xl">
-                        <PuzzleRush matchId={searchParams.get('matchId') || undefined} userId={userId} />
+                        <PuzzleRush matchId={searchParams.get('matchId') || undefined} userId={(!isGuest && session?.user) ? session.user.id : ''} />
                       </div>
                       {searchParams.get('matchId') && (
                         <div className="w-full lg:w-80 shrink-0">
-                          <MatchLeaderboard matchId={searchParams.get('matchId')!} currentUserId={userId} />
+                          <MatchLeaderboard matchId={searchParams.get('matchId')!} currentUserId={(!isGuest && session?.user) ? session.user.id : ''} />
                         </div>
                       )}
                     </div>
