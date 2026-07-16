@@ -227,8 +227,8 @@ export function DailyPuzzleCard() {
 
         {/* Board or start button */}
         {playing && game ? (
-          <div className="mx-auto w-full" style={{ maxWidth: 'clamp(200px, 80vw, 380px)' }}>
-            <div className="w-full aspect-square rounded-xl overflow-hidden border border-border shadow-md">
+          <div className="mx-auto w-full" style={{ maxWidth: 'clamp(250px, 90vw, 550px)' }}>
+            <div className="w-full aspect-square rounded-2xl overflow-hidden border-2 border-border shadow-lg mb-4">
               <Chessboard
                 options={{
                   position: game.fen(),
@@ -240,19 +240,28 @@ export function DailyPuzzleCard() {
                 }}
               />
             </div>
-            {result && (
-              <button
-                className="mt-3 w-full outline-button text-sm py-2 flex items-center justify-center gap-2"
-                onClick={() => { setPlaying(false); setResult(null) }}
-              >
-                <RefreshCw className="w-4 h-4" /> Закрыть
-              </button>
-            )}
+            <div className="w-full flex gap-3">
+              {result ? (
+                <button
+                  className="flex-1 outline-button text-sm py-2.5 flex items-center justify-center gap-2"
+                  onClick={() => { setPlaying(false); setResult(null); setGame(null) }}
+                >
+                  <RefreshCw className="w-4 h-4" /> Закрыть доску
+                </button>
+              ) : (
+                <button
+                  className="flex-1 outline-button text-sm py-2.5 flex items-center justify-center gap-2"
+                  onClick={() => { setPlaying(false); setResult(null); setGame(null) }}
+                >
+                  Свернуть доску
+                </button>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
             {/* Mini preview board */}
-            <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-border opacity-80">
+            <div className="shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden border-2 border-border opacity-90 shadow-sm pointer-events-none">
               <Chessboard
                 options={{
                   position: data.puzzle.fen,
@@ -261,7 +270,7 @@ export function DailyPuzzleCard() {
                 }}
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col justify-center text-center sm:text-left h-full">
               <p className="text-sm text-muted-foreground mb-3">
                 {data.solved !== null
                   ? 'Вы уже решили задачу сегодня. Приходите завтра!'
@@ -270,10 +279,18 @@ export function DailyPuzzleCard() {
               </p>
               {data.solved === null && (
                 <button
-                  className="button text-sm py-2 px-4"
+                  className="button text-sm py-2.5 px-6 mx-auto sm:mx-0 w-full sm:w-auto mt-2 font-medium"
                   onClick={handleStart}
                 >
                   Решить задачу дня
+                </button>
+              )}
+              {data.solved !== null && (
+                <button
+                  className="outline-button text-sm py-2.5 px-6 mx-auto sm:mx-0 w-full sm:w-auto mt-2 font-medium opacity-80 hover:opacity-100"
+                  onClick={handleStart}
+                >
+                  Посмотреть доску
                 </button>
               )}
             </div>
