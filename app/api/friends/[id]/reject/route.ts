@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Just delete the request to reject/cancel it
-  await db.friendRequest.delete({ where: { id: params.id } })
+  await db.friendRequest.delete({ where: { id } })
 
   return NextResponse.json({ success: true })
 }

@@ -30,5 +30,15 @@ export async function POST(req: Request) {
     data: { senderId: user.id, receiverId }
   })
 
+  // Create notification for the receiver
+  await db.notification.create({
+    data: {
+      userId: receiverId,
+      title: 'Новая заявка в друзья',
+      message: `${user.name || 'Пользователь'} хочет добавить вас в друзья.`,
+      link: '/?section=overview',
+    }
+  })
+
   return NextResponse.json(request)
 }
