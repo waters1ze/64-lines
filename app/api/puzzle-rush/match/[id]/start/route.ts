@@ -5,9 +5,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -15,7 +16,7 @@ export async function POST(
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     const match = await db.puzzleRushMatch.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { participants: true }
     })
 
@@ -23,6 +24,14 @@ export async function POST(
 
     const participant = match.participants.find(p => p.userId === user.id)
     if (!participant) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    if (match.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Матч был отменен организатором' }, { status: 400 })
+    }
+
+    if (participant.status === 'REMOVED') {
+      return NextResponse.json({ error: 'Вы были исключены из этого матча' }, { status: 403 })
+    }
 
     if (participant.status === 'DECLINED') {
       return NextResponse.json({ error: 'You have declined this match' }, { status: 400 })

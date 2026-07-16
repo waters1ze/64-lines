@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
-export async function POST(
+export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -21,9 +21,7 @@ export async function POST(
     })
 
     if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
-
-    const isCreator = match.creatorId === user.id
-    if (!isCreator) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (match.creatorId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { targetUserId } = await req.json()
     if (!targetUserId) return NextResponse.json({ error: 'Missing targetUserId' }, { status: 400 })
@@ -31,33 +29,39 @@ export async function POST(
     const participant = match.participants.find(p => p.userId === targetUserId)
     if (!participant) return NextResponse.json({ error: 'Participant not found' }, { status: 404 })
 
-    if (participant.status !== 'INVITED') {
-      return NextResponse.json({ error: 'Can only reinvite INVITED participants' }, { status: 400 })
-    }
-
-    // Since they are still INVITED, let's just recreate a notification and update match createdAt 
-    // to give it another minute, or we could just bump the createdAt on the match.
-    // Let's just bump match.createdAt to now() so the timer resets.
-    await db.puzzleRushMatch.update({
-      where: { id: match.id },
-      data: { createdAt: new Date() }
+    await db.puzzleRushMatchParticipant.update({
+      where: { id: participant.id },
+      data: { status: 'REMOVED' }
     })
 
-    // Also send a new notification
+    // Notify the kicked user
     await db.notification.create({
       data: {
         userId: targetUserId,
-        title: 'Повторный вызов в Puzzle Rush',
-        message: `${user.name || 'Пользователь'} снова вызывает вас на матч!`,
-        link: `/?section=puzzles&matchId=${match.id}`,
-        type: 'MATCH_INVITE',
+        title: 'Исключение из матча',
+        message: `${user.name || 'Организатор'} исключил вас из матча.`,
+        link: `/?section=puzzles`,
+        type: 'MATCH_UPDATE',
         relatedId: match.id,
       }
     })
 
+    // Since we kicked someone, we might need to check if the match should finish 
+    // if the removed person was the last one we were waiting for.
+    const activeParticipants = match.participants.filter(p => p.status === 'ACCEPTED' && p.userId !== targetUserId)
+    if (match.status === 'ACTIVE') {
+      const allFinished = activeParticipants.every(p => p.finishedAt !== null)
+      if (allFinished && activeParticipants.length > 0) {
+        await db.puzzleRushMatch.update({
+          where: { id: match.id },
+          data: { status: 'FINISHED', finishedAt: new Date() }
+        })
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error reinviting:', error)
+    console.error('Error kicking participant:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

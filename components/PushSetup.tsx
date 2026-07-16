@@ -53,16 +53,36 @@ export function PushSetup() {
           })
         }
 
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey)
-        })
+        let subscription = await registration.pushManager.getSubscription()
+        
+        try {
+          if (!subscription) {
+             subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            })
+          }
+        } catch (err: any) {
+          if (err.name === 'InvalidStateError' || err.message.includes('A subscription with a different applicationServerKey')) {
+            if (subscription) {
+              await subscription.unsubscribe()
+            }
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            })
+          } else {
+            throw err
+          }
+        }
 
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription)
-        })
+        if (subscription) {
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+          })
+        }
       } catch (e) {
         console.error('Error during Web Push registration:', e)
       }

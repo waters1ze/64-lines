@@ -351,7 +351,7 @@ model FriendRequest {
 model PuzzleRushMatch {
   id          String   @id @default(cuid())
   creatorId   String
-  status      String   @default("WAITING") // WAITING, ACTIVE, FINISHED
+  status      String   @default("WAITING") // WAITING, ACTIVE, FINISHED, CANCELLED
   createdAt   DateTime @default(now())
   startedAt   DateTime?
   finishedAt  DateTime?
@@ -364,7 +364,7 @@ model PuzzleRushMatchParticipant {
   id          String   @id @default(cuid())
   matchId     String
   userId      String
-  status      String   @default("INVITED") // INVITED, ACCEPTED, DECLINED
+  status      String   @default("INVITED") // INVITED, ACCEPTED, DECLINED, REMOVED
   score       Int?
   startedAt   DateTime?
   finishedAt  DateTime?
