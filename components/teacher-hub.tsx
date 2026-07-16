@@ -76,7 +76,6 @@ type Video = {
   url: string;
   isPremium?: boolean;
   categoryId?: string | null;
-  isPremiumOnly?: boolean;
 }
 
 type Category = {
@@ -2539,7 +2538,7 @@ function VideosSection({
   onPremiumClick?: () => void;
 }) {
   const [modal, setModal] = useState<null | 'add' | string | number>(null)
-  const [form, setForm] = useState({ title: '', meta: '', url: '', isPremium: false, categoryId: null as string | null, isPremiumOnly: false })
+  const [form, setForm] = useState({ title: '', meta: '', url: '', isPremium: false, categoryId: null as string | null })
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
 
@@ -2549,12 +2548,12 @@ function VideosSection({
   })
 
   function openAdd() {
-    setForm({ title: '', meta: '', url: '', isPremium: false, categoryId: null, isPremiumOnly: false })
+    setForm({ title: '', meta: '', url: '', isPremium: false, categoryId: null })
     setModal('add')
   }
 
   function openEdit(v: Video) {
-    setForm({ title: v.title, meta: v.meta, url: v.url, isPremium: !!v.isPremium, categoryId: v.categoryId || null, isPremiumOnly: !!v.isPremiumOnly })
+    setForm({ title: v.title, meta: v.meta, url: v.url, isPremium: !!v.isPremium, categoryId: v.categoryId || null })
     setModal(v.id)
   }
 

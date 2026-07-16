@@ -457,7 +457,7 @@ export function Puzzles({
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl mx-auto">
+    <div className="flex flex-col lg:flex-row gap-12 w-full max-w-6xl mr-auto">
       <div className="flex flex-col gap-3">
         <ResponsiveBoard>
           {!isClient || !puzzle || !game ? (

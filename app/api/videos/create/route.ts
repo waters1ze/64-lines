@@ -11,7 +11,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, meta, url, isPremium, tags, categoryId, isPremiumOnly } = await req.json()
+    const { title, meta, url, isPremium, tags, categoryId } = await req.json()
     if (!title || !url) {
       return NextResponse.json({ error: 'Title and URL are required' }, { status: 400 })
     }
@@ -23,8 +23,7 @@ export async function POST(req: Request) {
         url, 
         isPremium: !!isPremium, 
         tags: tags || null,
-        categoryId: categoryId || null,
-        isPremiumOnly: !!isPremiumOnly
+        categoryId: categoryId || null
       }
     })
 
