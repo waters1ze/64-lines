@@ -16,8 +16,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Неверные данные для входа")
         }
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email }
+        const user = await db.user.findFirst({
+          where: { email: { equals: credentials.email, mode: "insensitive" } }
         })
 
         if (!user) {

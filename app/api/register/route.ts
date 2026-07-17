@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Пожалуйста, заполните все поля" }, { status: 400 })
     }
 
+    const lowerEmail = email.toLowerCase()
+
     let role = "STUDENT"
     let teacherId = null
     let invite = null
@@ -29,8 +31,8 @@ export async function POST(req: NextRequest) {
       teacherId = invite.teacherId
     }
 
-    const existingUser = await db.user.findUnique({
-      where: { email }
+    const existingUser = await db.user.findFirst({
+      where: { email: { equals: lowerEmail, mode: "insensitive" } }
     })
 
     if (existingUser) {
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
     const user = await db.user.create({
       data: {
         name,
-        email,
+        email: lowerEmail,
         passwordHash,
         role: role as any,
         teacherId,
