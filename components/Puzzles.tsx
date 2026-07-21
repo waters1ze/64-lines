@@ -453,7 +453,7 @@ export function Puzzles({
           <Crown className="size-10" />
         </div>
         <h2 className="text-2xl font-bold">Лимит исчерпан</h2>
-        <p className="text-muted-foreground">Вам доступно 5 бесплатных задач в день. Чтобы решать задачи без ограничений, приобретите Premium подписку.</p>
+        <p className="text-muted-foreground">Вам доступно 15 бесплатных задач в день. Чтобы решать задачи без ограничений, приобретите Premium подписку.</p>
         <button onClick={onPremiumClick} className="button w-full bg-amber-500 hover:bg-amber-600 text-white border-0 py-3 text-lg font-semibold shadow-lg shadow-amber-500/20">Оформить Premium</button>
       </div>
     )

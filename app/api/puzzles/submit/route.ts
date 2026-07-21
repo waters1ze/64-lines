@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!user.isPremium && solvedToday >= 10) {
+  if (!user.isPremium && solvedToday >= 15) {
     return NextResponse.json({ error: 'LIMIT_REACHED' }, { status: 403 })
   }
 
